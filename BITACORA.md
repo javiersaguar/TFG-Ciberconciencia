@@ -49,10 +49,10 @@
 - **Rutas:** el repo vive en `~/proyectos/tfg-ciberconciencia` (disco Linux, no `/mnt/c`).
 
 ## 4. Estado actual
-- **Fase:** F0 — arranque del entorno (cerrando).
-- **Hecho:** decisiones de diseño, anteproyecto, planning, estudios de recursos/infra. **Entorno base montado:** WSL2 + Ubuntu (systemd), `.wslconfig` (44GB/24/swap 8GB), Docker Engine dentro de WSL funcionando sin sudo (hello-world OK), VS Code conectado a WSL. Repo creado en `~/proyectos/tfg-ciberconciencia` con estructura + README + .gitignore + bitácora.
-- **En curso:** primer commit de F0.
-- **Siguiente:** esqueleto de `docker-compose` con perfiles + levantar Redpanda de prueba; contactar al tutor (agosto).
+- **Fase:** F1 — arranque del pipeline.
+- **Hecho:** F0 completa (entorno WSL2+Docker+VS Code, repo en GitHub privado). Primer servicio del pipeline operativo: **Redpanda + Redpanda Console** vía `infra/docker-compose.yml` (perfil `core`), verificado el ciclo producir→consumir y la consola web en `localhost:8080`.
+- **En curso:** cerrar sesión con commit.
+- **Siguiente:** empezar el *replay* de un dataset de seguridad (p. ej. OTRF/Mordor) hacia Redpanda; después, el consumidor en Flink.
 
 ## 5. Estructura del repo
 ```
@@ -107,3 +107,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** ninguno relevante.
 - **Siguiente paso:** primer commit; luego `docker-compose` con perfiles + Redpanda de prueba.
 - **Archivos tocados:** repo inicial, README.md, .gitignore, BITACORA.md.
+
+### 2026-07-21 — F1: Redpanda operativo
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** montar el bus de eventos, primer servicio real del pipeline.
+- **Hecho:** creado `infra/docker-compose.yml` con perfil `core` (Redpanda v25.2.1 + Console v3.1.0, límites 2 CPU/2G). Levantado con `docker compose --profile core up -d`. Verificado: clúster `Healthy: true`, ciclo producir→consumir OK, consola web en `localhost:8080`. GitHub: repo privado sincronizado.
+- **Decisiones:** Redpanda Console incluida desde el inicio. Topics internos por `redpanda:29092`, externos por `localhost:9092`.
+- **Problemas / pendiente:** ninguno.
+- **Siguiente paso:** replay de dataset (OTRF/Mordor) → Redpanda.
+- **Archivos tocados:** `infra/docker-compose.yml` (nuevo), `BITACORA.md`.

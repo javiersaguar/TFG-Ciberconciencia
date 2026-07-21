@@ -1,0 +1,42 @@
+name: tfg-ciberconciencia
+
+services:
+  redpanda:
+    image: redpandadata/redpanda:v25.2.1
+    container_name: redpanda
+    profiles: ["core"]
+    command:
+      - redpanda
+      - start
+      - --smp=2
+      - --memory=2G
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:29092,EXTERNAL://localhost:9092
+    ports:
+      - "9092:9092"      # Kafka API (desde tu host / apps)
+      - "9644:9644"      # Admin API
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  console:
+    image: redpandadata/console:v3.1.0
+    container_name: redpanda-console
+    profiles: ["core"]
+    depends_on:
+      - redpanda
+    ports:
+      - "8080:8080"      # interfaz web de la consola
+    environment:
+      KAFKA_BROKERS: "redpanda:29092"
+
+volumes:
+  redpanda_data:
