@@ -47,12 +47,13 @@
 - **Git:** rama `main` estable; ramas `feat/<fase>` por trabajo; commits pequeños y descriptivos.
 - **Editor:** VS Code + WSL/Remote-SSH; en remoto, sobre Tailscale.
 - **Rutas:** el repo vive en `~/proyectos/tfg-ciberconciencia` (disco Linux, no `/mnt/c`).
+- **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F1 — arranque del pipeline.
-- **Hecho:** F0 completa (entorno WSL2+Docker+VS Code, repo en GitHub privado). Primer servicio del pipeline operativo: **Redpanda + Redpanda Console** vía `infra/docker-compose.yml` (perfil `core`), verificado el ciclo producir→consumir y la consola web en `localhost:8080`.
+- **Fase:** F1 — plano de telemetría en marcha.
+- **Hecho:** F0 completa (WSL2 + Docker Engine + VS Code + repo en GitHub privado). Redpanda + Console operativos (perfil `core`). Datasets OTRF Security-Datasets clonados en `data/` (1.2 GB, ignorado por git). Productor `pipeline/replay_dataset.py` funcionando: 184 eventos del dataset LSASS/comsvcs ingeridos en el topic `raw.host.windows`, con particionado por host, *event time* original preservado y cabeceras de trazabilidad. Verificado el ataque en los datos (`rundll32.exe -> lsass.exe`, GrantedAccess 0x1fffff).
 - **En curso:** cerrar sesión con commit.
-- **Siguiente:** empezar el *replay* de un dataset de seguridad (p. ej. OTRF/Mordor) hacia Redpanda; después, el consumidor en Flink.
+- **Siguiente:** añadir Flink al compose y escribir el primer job consumidor (normalización a OCSF); después, reglas Sigma. Escenario serio pendiente: `compound/apt29` (day1/day2, host + red).
 
 ## 5. Estructura del repo
 ```
@@ -116,3 +117,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** ninguno.
 - **Siguiente paso:** replay de dataset (OTRF/Mordor) → Redpanda.
 - **Archivos tocados:** `infra/docker-compose.yml` (nuevo), `BITACORA.md`.
+
+### 2026-07-23 — F1: primer replay de datos reales a Redpanda
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** localizar datasets de seguridad e ingerirlos en el bus de eventos.
+- **Hecho:** clonado OTRF Security-Datasets (shallow, 1.2 GB) en `data/`. Explorados `atomic` (por tácticas ATT&CK) y `compound` (apt29 day1/day2, LSASS_campaign_01..07, Log4Shell, GoldenSAML). Elegido para arrancar el atomic `psh_lsass_memory_dump_comsvcs` (T1003.001 / TA0006, metadatos en `SDWIN-201018195009.yaml`, 184 eventos JSON Lines). Creado venv + `confluent-kafka` 2.15.0. Escrito `pipeline/replay_dataset.py` y ejecutado el replay completo (184 ev, 0 omitidos, ~3300 ev/s). Verificada la técnica en los datos.
+- **Decisiones:** taxonomía de topics `raw.* / norm.* / det.*`; clave de partición = hostname (orden por máquina, requisito del CEP); timestamp del evento original como timestamp Kafka (habilita *event time* en Flink); cliente `confluent-kafka` (librdkafka) en vez de kafka-python. Añadida regla estricta de autoría + hook `.githooks/commit-msg`.
+- **Problemas / pendiente:** Ubuntu `resolute` y Python 3.14 son muy nuevos; hubo que fijar el repo de Docker a `noble`. `confluent-kafka` sí tenía wheel para cp314.
+- **Siguiente paso:** Flink en el compose + job consumidor con normalización OCSF.
+- **Archivos tocados:** `pipeline/replay_dataset.py` (nuevo), `.githooks/commit-msg` (nuevo), `BITACORA.md`, `AGENTS.md`.

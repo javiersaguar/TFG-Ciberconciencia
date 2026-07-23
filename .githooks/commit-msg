@@ -1,0 +1,23 @@
+#!/bin/sh
+# Guardián de autoría: impide que cualquier agente de IA se atribuya commits.
+# Ver BITACORA.md §3 (Convenciones).
+
+MSG_FILE="$1"
+EXPECTED_EMAIL="javisaguarantona@gmail.com"
+
+# 1) El autor debe ser siempre el propietario del repo
+AUTHOR_EMAIL=$(git var GIT_AUTHOR_IDENT | sed -n 's/^.*<\(.*\)>.*$/\1/p')
+if [ "$AUTHOR_EMAIL" != "$EXPECTED_EMAIL" ]; then
+  echo "ERROR: autor no permitido -> $AUTHOR_EMAIL" >&2
+  echo "Este repositorio solo admite commits de $EXPECTED_EMAIL" >&2
+  exit 1
+fi
+
+# 2) Eliminar cualquier atribucion a asistentes de IA del mensaje
+TMP=$(mktemp)
+grep -v -i -E 'Co-[Aa]uthored-[Bb]y:.*(claude|anthropic|copilot|cursor|chatgpt|openai|gemini|codex|noreply@anthropic)' "$MSG_FILE" \
+  | grep -v -i -E '(Generated with|Created with|Assisted by).*(Claude|Anthropic|Copilot|Cursor|ChatGPT|AI)' \
+  > "$TMP"
+mv "$TMP" "$MSG_FILE"
+
+exit 0
