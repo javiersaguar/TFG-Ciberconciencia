@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F1.3 — normalización OCSF (oleada 1 completada).
-- **Hecho:** normalización a OCSF con **100 % de cobertura** sobre el dataset LSASS (184/184, 0 a DLQ), progresión medida 40,2 % → 80,4 % → 100 %. Mapeadores: Sysmon 1/3/5/7/10/11/12/13/14 y Security 4688/4689/4656/4663/4658/4690/1102/5156/5158/4624/4625. Despachador `(Channel, EventID) → mapeador` con excepción `UnmappedEvent` para DLQ. Señales de detección precalculadas, con **correlación cruzada verificada**: acceso a LSASS confirmado por Sysmon 10 y Security 4656/4663 de forma independiente.
+- **Fase:** F1.3 completada — pipeline `raw → norm` operativo.
+- **Hecho:** normalización OCSF al **100 %** validada en batch y en streaming (184/184, 0 DLQ). Job `pipeline/jobs/normalize_job.py` consumiendo `raw.host.windows` → `norm.events` (+ `dlq.normalize`), con trazabilidad `dataset_id` propagada por cabeceras Kafka de extremo a extremo. Topics: `norm.events` (6 part.), `dlq.normalize` (1 part.). Plantilla LaTeX de la memoria incorporada en `Memoria/`.
 - **En curso:** cerrar sesión.
-- **Siguiente:** job PyFlink `raw.host.windows → norm.events` usando el despachador; después ClickHouse (F1.4) y observabilidad (F1.5).
+- **Siguiente:** F1.4 ClickHouse (persistencia analítica) y F1.5 observabilidad; después F2 (reglas Sigma).
 
 ## 5. Estructura del repo
 ```
@@ -155,3 +155,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** ninguno. Revisar si alguna extensión Windows de OCSF añade clase de registro.
 - **Siguiente paso:** job PyFlink de normalización hacia `norm.events`.
 - **Archivos tocados:** `pipeline/normalize/{sysmon,winsecurity,registry,coverage}.py`, `BITACORA.md`.
+
+### 2026-07-24 (4) — F1.3: pipeline raw → norm en streaming
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** llevar la normalización al streaming real.
+- **Hecho:** creados topics `norm.events` (6 part.) y `dlq.normalize`. Escrito `normalize_job.py` (consumidor/productor con DLQ, commit manual de offsets, idle-exit). Ejecutado sobre los 184 eventos: 100 % normalizados, 0 a DLQ — coincide con la medición en batch. Verificado en `norm.events` un evento OCSF completo (rundll32→lsass, 0x1fffff) con `dataset_id` propagado. Limpiados ficheros `:Zone.Identifier` de Windows y añadidos al .gitignore.
+- **Decisiones:** la etapa de normalización se implementa como servicio Python con confluent-kafka (opción C), no en PyFlink. Motivo: la lógica de mapeo es idéntica y así avanzamos rápido; Flink entra en F2/F3 para Sigma y CEP, donde su estado y checkpointing sí son imprescindibles. Trade-off consciente: esta etapa no tiene exactly-once de Flink.
+- **Problemas / pendiente:** dos entornos virtuales (.venv 3.14 con confluent-kafka / .venv-flink 3.12 con PyFlink) obligan a alternar; valorar unificar en .venv-flink.
+- **Siguiente paso:** F1.4 ClickHouse + F1.5 observabilidad.
+- **Archivos tocados:** `pipeline/jobs/normalize_job.py`, `.gitignore`, `Memoria/`, `BITACORA.md`.
