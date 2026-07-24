@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F1.3 — normalización OCSF (oleada 1, en curso).
-- **Hecho:** Flink 2.2.1 con conector Kafka persistido en compose + `idle-timeout` por defecto. PyFlink 2.2.1 operativo en entorno propio (`.venv-flink`, Python 3.12 vía uv; Java 17 en WSL). Definido el subconjunto OCSF ampliado (~20 clases) por oleadas. Cimiento de normalización (`ocsf_common.py`) + primer mapeador **Sysmon 10 → Process Activity (1007)** probado con eventos reales: distingue actor/target y precalcula señales `signal_lsass_access` / `signal_suspicious_access`.
+- **Fase:** F1.3 — normalización OCSF (oleada 1 completada).
+- **Hecho:** normalización a OCSF con **100 % de cobertura** sobre el dataset LSASS (184/184, 0 a DLQ), progresión medida 40,2 % → 80,4 % → 100 %. Mapeadores: Sysmon 1/3/5/7/10/11/12/13/14 y Security 4688/4689/4656/4663/4658/4690/1102/5156/5158/4624/4625. Despachador `(Channel, EventID) → mapeador` con excepción `UnmappedEvent` para DLQ. Señales de detección precalculadas, con **correlación cruzada verificada**: acceso a LSASS confirmado por Sysmon 10 y Security 4656/4663 de forma independiente.
 - **En curso:** cerrar sesión.
-- **Siguiente:** resto de mapeadores de la oleada 1 (Sysmon 1/5/11/3, Security 4688/4689/4624/4625/1102); despachador `(Channel, EventID) → mapeador`; job PyFlink `raw.host.windows → norm.events`.
+- **Siguiente:** job PyFlink `raw.host.windows → norm.events` usando el despachador; después ClickHouse (F1.4) y observabilidad (F1.5).
 
 ## 5. Estructura del repo
 ```
@@ -145,3 +145,13 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** cadena de incompatibilidades por versiones nuevas (3.14, uv PATH al activar venv, PyFlink 2.3→2.2.1, falta de java) — todas resueltas. Registro de Windows (Sysmon 12/13/14) pendiente de verificar en OCSF.
 - **Siguiente paso:** completar mapeadores oleada 1 + despachador + job de normalización.
 - **Archivos tocados:** `infra/docker-compose.yml`, `pipeline/jobs/smoke_pyflink.py`, `pipeline/normalize/{__init__,ocsf_common,sysmon,test_sysmon}.py`, `BITACORA.md`.
+
+
+### 2026-07-24 (3) — F1.3: normalización OCSF al 100 % de cobertura
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** completar la oleada 1 de mapeadores y medir cobertura.
+- **Hecho:** `sysmon.py` (1/3/5/7/10/11 + registro 12/13/14), `winsecurity.py` (4688/4689/handles 4656-4663-4658-4690/1102/5156/5158/4624/4625), `registry.py` (despachador) y `coverage.py` (métrica). Cobertura sobre el dataset LSASS: 40,2 % → 80,4 % → **100 %** (184/184, 0 DLQ), 12 tipos OCSF distintos. Verificada la cadena de señales: dump_module (Sysmon 7) → lsass_access (Sysmon 10 + Security 4656/4663) → dump_file (Sysmon 11) → log_cleared (Security 1102).
+- **Decisiones:** el registro de Windows (Sysmon 12/13/14) no tiene clase en el OCSF base → se mapea a Process Activity conservando todo en `unmapped`, decisión documentada. Señales `tfg.signal_*` precalculadas en el mapeador. Hashes parseados al formato OCSF (para cruce con IOCs en F4).
+- **Problemas / pendiente:** ninguno. Revisar si alguna extensión Windows de OCSF añade clase de registro.
+- **Siguiente paso:** job PyFlink de normalización hacia `norm.events`.
+- **Archivos tocados:** `pipeline/normalize/{sysmon,winsecurity,registry,coverage}.py`, `BITACORA.md`.
