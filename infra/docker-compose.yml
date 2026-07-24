@@ -51,8 +51,9 @@ services:
         FLINK_PROPERTIES=
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
+        table.exec.source.idle-timeout: 5s
     volumes:
-      - ./flink/lib:/opt/flink/lib/extra
+      - ./flink/lib/flink-sql-connector-kafka-5.0.0-2.2.jar:/opt/flink/lib/flink-sql-connector-kafka-5.0.0-2.2.jar
       - ./flink/jobs:/opt/jobs
       - flink_data:/opt/flink/data
 
@@ -70,8 +71,9 @@ services:
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
         taskmanager.memory.process.size: 3g
+        table.exec.source.idle-timeout: 5s
     volumes:
-      - ./flink/lib:/opt/flink/lib/extra
+      - ./flink/lib/flink-sql-connector-kafka-5.0.0-2.2.jar:/opt/flink/lib/flink-sql-connector-kafka-5.0.0-2.2.jar
       - ./flink/jobs:/opt/jobs
 
 volumes:

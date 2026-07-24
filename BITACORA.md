@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F1 — plano de telemetría en marcha.
-- **Hecho:** F0 completa (WSL2 + Docker Engine + VS Code + repo en GitHub privado). Redpanda + Console operativos (perfil `core`). Datasets OTRF Security-Datasets clonados en `data/` (1.2 GB, ignorado por git). Productor `pipeline/replay_dataset.py` funcionando: 184 eventos del dataset LSASS/comsvcs ingeridos en el topic `raw.host.windows`, con particionado por host, *event time* original preservado y cabeceras de trazabilidad. Verificado el ataque en los datos (`rundll32.exe -> lsass.exe`, GrantedAccess 0x1fffff).
-- **En curso:** cerrar sesión con commit.
-- **Siguiente:** añadir Flink al compose y escribir el primer job consumidor (normalización a OCSF); después, reglas Sigma. Escenario serio pendiente: `compound/apt29` (day1/day2, host + red).
+- **Fase:** F1.3 — normalización OCSF (oleada 1, en curso).
+- **Hecho:** Flink 2.2.1 con conector Kafka persistido en compose + `idle-timeout` por defecto. PyFlink 2.2.1 operativo en entorno propio (`.venv-flink`, Python 3.12 vía uv; Java 17 en WSL). Definido el subconjunto OCSF ampliado (~20 clases) por oleadas. Cimiento de normalización (`ocsf_common.py`) + primer mapeador **Sysmon 10 → Process Activity (1007)** probado con eventos reales: distingue actor/target y precalcula señales `signal_lsass_access` / `signal_suspicious_access`.
+- **En curso:** cerrar sesión.
+- **Siguiente:** resto de mapeadores de la oleada 1 (Sysmon 1/5/11/3, Security 4688/4689/4624/4625/1102); despachador `(Channel, EventID) → mapeador`; job PyFlink `raw.host.windows → norm.events`.
 
 ## 5. Estructura del repo
 ```
@@ -135,3 +135,13 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** el CEP no emitía nada por watermark bloqueado (particiones vacías al tener un solo host); resuelto con `table.exec.source.idle-timeout=5s`. El `cp` del jar a /opt/flink/lib es temporal (pendiente de automatizar en compose).
 - **Siguiente paso:** persistir el conector vía compose; subconjunto OCSF + normalización (F1.2–F1.3).
 - **Archivos tocados:** `infra/docker-compose.yml`, `infra/flink/lib/*.jar`, `BITACORA.md`.
+
+
+### 2026-07-24 (2) — F1.3: entorno PyFlink + primer mapeador OCSF
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** dejar PyFlink operativo y empezar la normalización a OCSF.
+- **Hecho:** persistido el jar del conector y el idle-timeout en compose. Verificados class_uid OCSF en schema.ocsf.io y definido subconjunto ampliado (~20 clases) en 3 oleadas. Creado `pipeline/normalize/ocsf_common.py` (esqueleto base, type_uid, extensión tfg, unmapped) y `sysmon.py` con map_sysmon_10 (Process Activity 1007). Test con eventos reales OK: rundll32→lsass, signal_suspicious_access=true, CallTrace con comsvcs.dll preservado.
+- **Decisiones:** normalización en PyFlink (opción A). PyFlink no soporta Python 3.14 → entorno aparte `.venv-flink` con Python 3.12 (uv) + OpenJDK 17 en WSL. Señales de detección precalculadas en el mapeador (semilla de explicabilidad).
+- **Problemas / pendiente:** cadena de incompatibilidades por versiones nuevas (3.14, uv PATH al activar venv, PyFlink 2.3→2.2.1, falta de java) — todas resueltas. Registro de Windows (Sysmon 12/13/14) pendiente de verificar en OCSF.
+- **Siguiente paso:** completar mapeadores oleada 1 + despachador + job de normalización.
+- **Archivos tocados:** `infra/docker-compose.yml`, `pipeline/jobs/smoke_pyflink.py`, `pipeline/normalize/{__init__,ocsf_common,sysmon,test_sysmon}.py`, `BITACORA.md`.

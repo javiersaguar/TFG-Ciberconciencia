@@ -16,3 +16,4 @@ secrets/
 Thumbs.db
 infra/flink/lib/*.jar
 infra/flink/lib/*.jar
+.venv-flink/
