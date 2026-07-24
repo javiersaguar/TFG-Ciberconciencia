@@ -1,7 +1,9 @@
 name: tfg-ciberconciencia
 
 services:
+
   redpanda:
+
     image: redpandadata/redpanda:v25.2.1
     container_name: redpanda
     profiles: ["core"]
@@ -37,6 +39,41 @@ services:
       - "8080:8080"      # interfaz web de la consola
     environment:
       KAFKA_BROKERS: "redpanda:29092"
+  flink-jobmanager:
+    image: apache/flink:2.2.1-java17
+    container_name: flink-jobmanager
+    profiles: ["stream"]
+    command: jobmanager
+    ports:
+      - "8081:8081"      # UI web de Flink
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+    volumes:
+      - ./flink/lib:/opt/flink/lib/extra
+      - ./flink/jobs:/opt/jobs
+      - flink_data:/opt/flink/data
+
+
+  flink-taskmanager:
+    image: apache/flink:2.2.1-java17
+    container_name: flink-taskmanager
+    profiles: ["stream"]
+    command: taskmanager
+    depends_on:
+      - flink-jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 3g
+    volumes:
+      - ./flink/lib:/opt/flink/lib/extra
+      - ./flink/jobs:/opt/jobs
 
 volumes:
   redpanda_data:
+  flink_data:
