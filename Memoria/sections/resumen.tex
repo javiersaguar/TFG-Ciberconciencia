@@ -1,0 +1,43 @@
+\chapter*{Resumen}
+\addcontentsline{toc}{chapter}{Resumen}
+
+Los centros de operaciones de seguridad (SOC) se enfrentan hoy a dos problemas que se
+refuerzan mutuamente. Por un lado, el volumen de alertas generadas por las herramientas
+de detección supera con holgura la capacidad de análisis humano, lo que provoca el
+fenómeno conocido como \textit{fatiga de alertas}: los analistas descartan o posponen
+avisos que podrían ser relevantes simplemente porque no hay tiempo material para
+revisarlos todos. Por otro, esas alertas llegan \textit{sin contexto}: un aviso aislado no
+indica si el comportamiento observado corresponde a una técnica documentada, si ha sido
+empleada por un actor conocido, ni qué activos de la organización quedan expuestos como
+consecuencia.
+
+A este panorama se suma que los ataques dirigidos no se manifiestan como eventos puntuales,
+sino como \textbf{secuencias de etapas} que se desarrollan a lo largo del tiempo:
+reconocimiento, acceso inicial, ejecución, persistencia, movimiento lateral y exfiltración.
+Los sistemas de detección que evalúan cada evento de forma independiente son, por
+construcción, incapaces de reconocer esa estructura temporal, y resultan por tanto fáciles
+de evadir mediante técnicas individualmente poco llamativas.
+
+Este Trabajo Fin de Grado propone el diseño, la implementación y la validación de una
+plataforma de datos que aborda ambos problemas de forma conjunta. El sistema ingiere
+telemetría heterogénea de red y de sistema operativo, la normaliza a un esquema canónico
+(OCSF), detecta secuencias de ataque multi-etapa mediante procesamiento de eventos
+complejos (CEP), las contextualiza contra un grafo de conocimiento de inteligencia de
+amenazas alineado con MITRE ATT\&CK, razona sobre las rutas de ataque factibles hacia los
+activos críticos empleando un motor lógico basado en Datalog, y emite finalmente una
+priorización de incidentes \textbf{explicable}, en la que cada puntuación va acompañada de
+la descomposición de los factores que la justifican.
+
+La arquitectura se articula sobre tres pilares: la detección multi-etapa, el grafo de
+ataque razonado y la priorización explicable. El objetivo último no es sustituir a las
+herramientas de detección existentes, sino transformar su salida en información accionable,
+aportando \textbf{conciencia cibersituacional} y soporte a la decisión al analista.
+
+La validación se realiza sobre conjuntos de datos públicos etiquetados con MITRE ATT\&CK,
+lo que permite contrastar cuantitativamente la precisión de la detección, la reducción del
+volumen de alertas y la calidad de la priorización frente a líneas base establecidas.
+
+\vspace{1em}
+\noindent\textbf{Palabras clave:} conciencia cibersituacional, detección de intrusiones,
+MITRE ATT\&CK, procesamiento de eventos complejos, grafos de ataque, inteligencia de
+amenazas, ingeniería de datos en tiempo real, explicabilidad.

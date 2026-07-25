@@ -46,12 +46,39 @@
 \usepackage[document]{ragged2e}
 \usepackage{float}
 \usepackage{listings}
+\usepackage{titlesec}
 \usepackage[left=3cm, right=3cm, top = 2.5cm, bottom = 2.5cm, includehead, includefoot]{geometry}
 
-\usepackage{titlesec}
-
 \usepackage{appendix}
-\usepackage{minted}
+\usepackage{listings}
+\definecolor{codeback}{HTML}{F7F7F7}
+\definecolor{codekw}{HTML}{0033B3}
+\definecolor{codestr}{HTML}{067D17}
+\definecolor{codecom}{HTML}{8C8C8C}
+\lstset{
+  backgroundcolor=\color{codeback},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekw}\bfseries,
+  stringstyle=\color{codestr},
+  commentstyle=\color{codecom}\itshape,
+  numbers=left,
+  numberstyle=\tiny\color{codecom},
+  numbersep=8pt,
+  frame=single,
+  rulecolor=\color{codecom!40},
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+  literate=%
+    {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+    {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {ü}{{\"u}}1 {¿}{{?`}}1 {¡}{{!`}}1
+}
+\renewcommand{\lstlistingname}{Listado}
 \usepackage{afterpage}
 \usepackage{xparse}
 
@@ -82,7 +109,7 @@
 
 \renewcommand{\contentsname}{Índice}
 \renewcommand{\partname}{Parte} 
-\renewcommand{\chaptername}{Chapter} 
+\renewcommand{\chaptername}{Capítulo} 
 
 \renewcommand{\appendixname}{Apéndice} 
 \renewcommand{\figurename}{Figura}
@@ -141,7 +168,7 @@
 
 %%%%% CUERPO DEL DOCUMENTO %%%%%%%
 
-\input{sections/introducción.tex}
+\input{sections/introduccion.tex}
 
 \input{sections/estadoarte}
 

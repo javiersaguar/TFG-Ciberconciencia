@@ -1,0 +1,39 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+Security Operations Centres (SOCs) currently face two mutually reinforcing problems. First,
+the volume of alerts produced by detection tooling far exceeds human analysis capacity,
+leading to the well-documented phenomenon of \textit{alert fatigue}: analysts dismiss or
+postpone potentially relevant warnings simply because there is no time to review them all.
+Second, those alerts arrive \textit{without context}: an isolated warning does not indicate
+whether the observed behaviour corresponds to a documented technique, whether it has been
+used by a known threat actor, or which organisational assets are consequently at risk.
+
+Compounding this, targeted attacks do not manifest as isolated events but as
+\textbf{multi-stage sequences} unfolding over time: reconnaissance, initial access,
+execution, persistence, lateral movement and exfiltration. Detection systems that evaluate
+each event independently are, by construction, unable to recognise that temporal structure,
+and are therefore easily evaded through individually unremarkable techniques.
+
+This Bachelor's Thesis proposes the design, implementation and validation of a data platform
+addressing both problems jointly. The system ingests heterogeneous network and host
+telemetry, normalises it to a canonical schema (OCSF), detects multi-stage attack sequences
+via complex event processing (CEP), contextualises them against a cyber threat intelligence
+knowledge graph aligned with MITRE ATT\&CK, reasons over feasible attack paths towards
+critical assets using a Datalog-based logic engine, and finally produces an
+\textbf{explainable} incident prioritisation in which every score is accompanied by a
+breakdown of the contributing factors.
+
+The architecture rests on three pillars: multi-stage detection, the reasoned attack graph,
+and explainable prioritisation. The ultimate goal is not to replace existing detection
+tooling, but to transform its output into actionable information, providing
+\textbf{cyber situational awareness} and decision support to the analyst.
+
+Validation is carried out on public datasets labelled with MITRE ATT\&CK techniques,
+enabling a quantitative assessment of detection accuracy, alert volume reduction and
+prioritisation quality against established baselines.
+
+\vspace{1em}
+\noindent\textbf{Keywords:} cyber situational awareness, intrusion detection, MITRE ATT\&CK,
+complex event processing, attack graphs, threat intelligence, real-time data engineering,
+explainability.

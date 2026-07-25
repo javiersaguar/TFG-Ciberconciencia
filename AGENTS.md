@@ -50,10 +50,11 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** **F1 COMPLETADA**. Pipeline `raw → norm → ClickHouse` con observabilidad.
-- **Hecho:** F1.5 cerrada — Prometheus (5 targets `up`: Redpanda, Flink JM/TM, ClickHouse, self) + Grafana con datasources y **3 dashboards provisionados automáticamente**: (1) Salud del pipeline [Prometheus], (2) Panel de seguridad con kill chain reconstruida [ClickHouse], (3) Cobertura y calidad de datos [ClickHouse].
+- **Fase:** F1 completada. Memoria arrancada.
+- **Hecho:** todo F1 (ingesta → normalización OCSF 100% → ClickHouse → observabilidad con 3 dashboards). **Memoria en marcha**: plantilla oficial ETSIT operativa en `Memoria/`, compilando 54 páginas. Redactados: resumen/abstract, glosario (22 términos), introducción, estado del arte (8 secciones), desarrollo (requisitos, arquitectura, decisiones, toda F1 con las 3 incidencias documentadas) y aspectos éticos. `ref.bib` con 11 referencias.
 - **En curso:** cerrar sesión.
-- **Siguiente:** **arrancar la memoria** (montar LaTeX + estado del arte, agosto). Después F2 (reglas Sigma).
+- **Siguiente:** completar el estado del arte con la revisión bibliográfica (agosto); figura de arquitectura; anexo del subconjunto OCSF. Después F2 (Sigma).
+
 
 ## 5. Estructura del repo
 ```
@@ -183,3 +184,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** (1) el reporter solo estaba en el jobmanager, faltaba en el taskmanager. (2) Docker crea como root las carpetas montadas que no existen → `chown` necesario. (3) Confusión entre `provisioning/dashboards/` (config) y `dashboards/` (los JSON). (4) El plugin de ClickHouse no admite `UNION ALL` en un panel → resuelto con `arrayJoin`.
 - **Siguiente paso:** arrancar la memoria; luego F2 (Sigma).
 - **Archivos tocados:** `infra/docker-compose.yml`, `infra/prometheus/`, `infra/grafana/`, `infra/clickhouse/config.d/memory.xml`, `BITACORA.md`.
+
+### 2026-07-25 (2) — Arranque de la memoria
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** montar el proyecto LaTeX y redactar los capítulos ya posibles.
+- **Hecho:** instalado TeX Live; plantilla oficial reorganizada en `Memoria/`; Makefile y .gitignore de LaTeX. Redactados resumen, abstract, glosario, introducción, estado del arte, desarrollo (hasta F1) y aspectos éticos; ref.bib inicial. Compila en 54 páginas sin errores ni referencias rotas.
+- **Decisiones:** se sustituye `minted` por `listings` (latexminted es incompatible con Python 3.14 y habría fallado al insertar el primer bloque de código). Se mantiene la estructura de capítulos oficial de la UPM, mapeando las fases del roadmap como secciones de `desarrollo.tex`.
+- **Problemas / pendiente:** portada sin rellenar; falta figura de arquitectura; anexoA vacío; estado del arte necesita referencias de la revisión de agosto.
+- **Siguiente paso:** revisión bibliográfica de agosto.
+- **Archivos tocados:** `Memoria/` (completa), `.gitignore`, `BITACORA.md`.

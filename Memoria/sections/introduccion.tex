@@ -1,0 +1,138 @@
+\chapter{Introducción}
+\label{cap:introduccion}
+
+\section{Contexto y motivación}
+
+La detección de intrusiones en entornos corporativos ha evolucionado en las últimas dos
+décadas desde el análisis de firmas sobre tráfico de red hasta plataformas que agregan
+telemetría de múltiples fuentes: cortafuegos, sistemas de detección de red, agentes de
+\textit{endpoint}, servicios en la nube y registros de aplicación. Esa evolución ha
+resuelto un problema de \textit{visibilidad}, pero ha creado otro de \textit{escala}.
+
+Un centro de operaciones de seguridad (SOC) de tamaño medio recibe diariamente un volumen
+de alertas que excede con claridad su capacidad de análisis. La consecuencia directa es la
+llamada \textbf{fatiga de alertas}: cuando la proporción de avisos irrelevantes es
+suficientemente alta, el analista deja de tratarlos individualmente y adopta estrategias de
+descarte que, inevitablemente, acaban filtrando también señales legítimas. El problema no
+es únicamente de cantidad, sino de \textbf{ausencia de contexto}. Una alerta que informa de
+que un proceso ha accedido a la memoria de otro no dice, por sí sola, si ese comportamiento
+corresponde a una técnica adversaria documentada, si ha sido observada previamente en
+campañas de un actor conocido, ni qué activos de la organización quedan comprometidos si la
+sospecha se confirma.
+
+A esta situación se añade una segunda dificultad, de naturaleza estructural. Los ataques
+dirigidos no se manifiestan como eventos aislados sino como \textbf{secuencias de etapas}
+encadenadas en el tiempo. Un adversario que busca credenciales privilegiadas ejecuta primero
+un reconocimiento del entorno, obtiene después acceso a un equipo, carga las herramientas
+necesarias, extrae la información y, con frecuencia, borra sus huellas. Cada una de esas
+acciones, considerada por separado, puede resultar indistinguible de la actividad
+administrativa legítima. Es la \textit{secuencia}, y no cada evento individual, la que
+constituye la evidencia sólida del ataque. Los sistemas de detección que evalúan eventos de
+forma independiente son, por construcción, incapaces de reconocer esa estructura.
+
+El panorama de amenazas actual agrava ambos problemas. Los informes de referencia del sector
+señalan un crecimiento sostenido de los ataques asistidos por inteligencia artificial y una
+consolidación de MITRE ATT\&CK \cite{mitre_attack} como lenguaje común para describir el
+comportamiento adversario \cite{enisa2025}. Existe por tanto una necesidad clara de
+\textbf{pasar de la alerta aislada al incidente correlacionado, contextualizado y
+priorizado}, que es precisamente el ámbito de la denominada \textit{conciencia
+cibersituacional}.
+
+\section{Planteamiento del problema}
+
+El problema que aborda este trabajo puede formularse en tres preguntas encadenadas:
+
+\begin{enumerate}
+    \item ¿Cómo detectar automáticamente que un conjunto de eventos dispersos, procedentes
+    de fuentes heterogéneas, constituye en realidad una \textbf{secuencia de ataque
+    coherente} y no actividad legítima?
+    \item Una vez detectada, ¿cómo determinar el \textbf{alcance real del riesgo} que esa
+    secuencia supone para la organización, en función de los activos que puede llegar a
+    comprometer?
+    \item ¿Cómo presentar el resultado de forma que el analista pueda \textbf{confiar en la
+    priorización y comprender su fundamento}, en lugar de recibir una puntuación opaca?
+\end{enumerate}
+
+Las tres preguntas comparten un requisito transversal: la respuesta debe producirse en
+tiempo útil sobre un flujo continuo de datos, no como resultado de un análisis
+\textit{a posteriori}.
+
+\section{Objetivos}
+
+\subsection{Objetivo general}
+
+Diseñar, implementar y validar una plataforma de datos que detecte ataques multi-etapa en
+tiempo real y priorice los incidentes resultantes de forma explicable, integrando
+inteligencia de amenazas y razonamiento sobre rutas de ataque para dar soporte a la
+conciencia cibersituacional.
+
+\subsection{Objetivos específicos}
+
+\begin{enumerate}
+    \item \textbf{Ingerir y normalizar} telemetría heterogénea de red y de sistema operativo
+    a un esquema canónico común, sobre una arquitectura de procesamiento en
+    \textit{streaming}.
+
+    \item \textbf{Detectar secuencias de ataque multi-etapa} mediante procesamiento de
+    eventos complejos, alineando las detecciones con las tácticas y técnicas de MITRE
+    ATT\&CK.
+
+    \item \textbf{Construir y mantener un grafo de ataque} que integre activos, topología,
+    vulnerabilidades e inteligencia de amenazas estructurada.
+
+    \item \textbf{Aplicar razonamiento lógico} sobre dicho grafo para derivar las rutas de
+    ataque factibles hacia los activos críticos de la organización.
+
+    \item \textbf{Priorizar los incidentes de forma explicable}, combinando la confianza de
+    la detección, la severidad de la etapa alcanzada, la criticidad del activo afectado y su
+    proximidad en una ruta de ataque derivada.
+
+    \item \textbf{Validar cuantitativamente} el sistema sobre conjuntos de datos etiquetados
+    con MITRE ATT\&CK, y proporcionar un despliegue reproducible.
+\end{enumerate}
+
+\section{Metodología de trabajo}
+
+El desarrollo sigue un enfoque \textbf{incremental por fases}, en el que cada fase produce
+un sistema funcional y verificable antes de acometer la siguiente. Esta decisión responde a
+dos consideraciones prácticas: por un lado, garantiza que en cualquier momento del proyecto
+exista una versión demostrable; por otro, permite validar las hipótesis técnicas de mayor
+riesgo de forma temprana, antes de invertir esfuerzo sobre una arquitectura que pudiera
+resultar inviable.
+
+Cada componente se valida sobre datos reales de ataques documentados desde el momento de su
+construcción, en lugar de posponer la verificación a una fase final de pruebas. Este
+principio ha demostrado su utilidad durante el desarrollo: varios de los problemas más
+relevantes descritos en el Capítulo~\ref{cap:desarrollo} son errores silenciosos que no
+producían fallo alguno y que solo se detectaron al inspeccionar la coherencia de los
+resultados intermedios.
+
+Todas las decisiones de arquitectura relevantes se han registrado de forma continua junto
+con su justificación y las alternativas descartadas, práctica que constituye la base del
+apartado de decisiones de diseño de este documento.
+
+\section{Estructura del documento}
+
+El resto de la memoria se organiza como sigue:
+
+\begin{itemize}
+    \item El \textbf{Capítulo~\ref{cap:estadoarte}} revisa el estado del arte: los modelos y
+    estándares sobre los que se apoya el trabajo (ATT\&CK, OCSF, STIX, Sigma), las técnicas
+    de detección de secuencias, los grafos de ataque y el razonamiento lógico aplicado a
+    seguridad, y los trabajos relacionados, identificando el hueco que este trabajo pretende
+    cubrir.
+
+    \item El \textbf{Capítulo~\ref{cap:desarrollo}} describe el análisis de requisitos, la
+    arquitectura propuesta, las decisiones de diseño adoptadas y la implementación de cada
+    uno de los componentes del sistema.
+
+    \item El \textbf{Capítulo~\ref{cap:resultados}} presenta el protocolo de evaluación, los
+    experimentos realizados y el análisis de los resultados obtenidos frente a las líneas
+    base establecidas.
+
+    \item El \textbf{Capítulo~\ref{cap:conclusiones}} recoge las conclusiones del trabajo y
+    las líneas de continuación identificadas.
+
+    \item Los capítulos finales abordan los aspectos éticos, sociales y legales del trabajo,
+    y su valoración económica.
+\end{itemize}

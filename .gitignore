@@ -18,3 +18,18 @@ infra/flink/lib/*.jar
 infra/flink/lib/*.jar
 .venv-flink/
 *:Zone.Identifier
+
+# LaTeX (temporales)
+Memoria/*.aux
+Memoria/*.log
+Memoria/*.out
+Memoria/*.toc
+Memoria/*.lof
+Memoria/*.lot
+Memoria/*.bbl
+Memoria/*.blg
+Memoria/*.fls
+Memoria/*.fdb_latexmk
+Memoria/*.synctex.gz
+Memoria/_minted-*/
+Memoria/main.pdf

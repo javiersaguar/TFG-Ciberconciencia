@@ -1,0 +1,594 @@
+\chapter{Desarrollo}
+\label{cap:desarrollo}
+
+Este capítulo describe el análisis de requisitos, la arquitectura propuesta, las decisiones
+de diseño adoptadas y la implementación del sistema. La exposición sigue el mismo orden
+incremental en que se ha llevado a cabo el desarrollo, de modo que cada apartado se apoya en
+las capacidades construidas en el anterior.
+
+\section{Análisis de requisitos}
+
+\subsection{Requisitos funcionales}
+
+\begin{description}
+    \item[RF1] El sistema debe ingerir telemetría de sistema operativo y de red procedente de
+    fuentes heterogéneas, sobre un flujo continuo de datos.
+    \item[RF2] El sistema debe normalizar los eventos ingeridos a un esquema canónico común,
+    preservando la información de origen que no encuentre correspondencia en el modelo.
+    \item[RF3] El sistema debe detectar técnicas adversarias individuales sobre el flujo
+    normalizado, etiquetando cada detección con la técnica de MITRE ATT\&CK correspondiente.
+    \item[RF4] El sistema debe detectar secuencias de ataque multi-etapa, esto es, patrones
+    formados por varias detecciones relacionadas temporalmente.
+    \item[RF5] El sistema debe mantener un grafo que integre activos, topología,
+    vulnerabilidades e inteligencia de amenazas.
+    \item[RF6] El sistema debe derivar rutas de ataque factibles hacia los activos críticos
+    mediante razonamiento lógico sobre dicho grafo.
+    \item[RF7] El sistema debe asignar a cada incidente una puntuación de riesgo acompañada
+    de la descomposición de los factores que la determinan.
+    \item[RF8] El sistema debe permitir la consulta analítica de los eventos almacenados con
+    fines de investigación y evaluación.
+    \item[RF9] El sistema debe mantener la trazabilidad de cada evento respecto de su origen,
+    de forma que sea posible contrastar los resultados con la verdad conocida durante la
+    evaluación.
+\end{description}
+
+\subsection{Requisitos no funcionales}
+
+\begin{description}
+    \item[RNF1] \textbf{Reproducibilidad}: el sistema completo debe poder desplegarse desde
+    cero sobre una máquina de trabajo, sin intervención manual de configuración.
+    \item[RNF2] \textbf{Corrección temporal}: el procesamiento debe apoyarse en el tiempo de
+    ocurrencia real de los eventos, no en el de su procesamiento.
+    \item[RNF3] \textbf{Ausencia de pérdida silenciosa}: todo evento que no pueda procesarse
+    debe derivarse a una cola de rechazos con el motivo del fallo, nunca descartarse.
+    \item[RNF4] \textbf{Observabilidad}: debe ser posible medir el estado y el rendimiento de
+    cada componente del sistema en tiempo real.
+    \item[RNF5] \textbf{Contención de recursos}: el sistema debe operar dentro de los límites
+    de una estación de trabajo, sin requerir infraestructura dedicada.
+    \item[RNF6] \textbf{Trazabilidad de decisiones}: las salidas del sistema deben ser
+    explicables, evitando puntuaciones cuyo fundamento no pueda inspeccionarse.
+\end{description}
+
+\subsection{Restricciones}
+
+El proyecto se apoya exclusivamente en herramientas de código abierto y conjuntos de datos
+públicos. Toda la emulación de comportamiento adversario se realiza sobre datos previamente
+capturados en entornos de laboratorio, sin ejecución sobre sistemas en producción. Los
+recursos de cómputo se limitan a una estación de trabajo, lo que descarta por diseño
+cualquier planteamiento que requiera el entrenamiento de modelos de gran tamaño.
+
+\section{Visión general de la arquitectura}
+
+La arquitectura se organiza en \textbf{dos planos de datos} que convergen en una
+\textbf{capa de correlación y decisión}.
+
+El \textbf{plano de telemetría} recorre el camino que va desde los sensores hasta las
+detecciones: los eventos crudos se publican en un bus de eventos, se normalizan a un esquema
+canónico, se evalúan contra reglas de detección y se correlacionan en busca de secuencias
+multi-etapa. El \textbf{plano de inteligencia} construye en paralelo un grafo de conocimiento
+a partir de fuentes de CTI y de la base de MITRE ATT\&CK. La capa de correlación cruza ambos:
+enriquece las detecciones con el contexto del grafo, razona sobre las rutas de ataque
+resultantes y emite la priorización final.
+
+Sobre esa estructura se articulan los tres pilares que constituyen la aportación del trabajo:
+
+\begin{description}
+    \item[Pilar A --- Detección multi-etapa] Reconocimiento de secuencias de la
+    \textit{kill chain} mediante procesamiento de eventos complejos, en lugar de alertas
+    aisladas.
+    \item[Pilar B --- Grafo de ataque razonado] Derivación de rutas de ataque factibles hacia
+    los activos críticos mediante razonamiento lógico, con trazabilidad de cada paso.
+    \item[Pilar C --- Priorización explicable] Asignación a cada incidente de una puntuación
+    descompuesta en factores interpretables, acompañada de una justificación legible.
+\end{description}
+
+% TODO: insertar figura del diagrama de arquitectura completo (img/arquitectura.pdf)
+
+\subsection{Contrato de flujos de datos}
+
+La comunicación entre etapas se realiza mediante \textit{topics} de un bus de eventos, con
+una convención de nombres que refleja el grado de elaboración del dato: el prefijo
+\texttt{raw} designa telemetría cruda, \texttt{norm} eventos ya normalizados, \texttt{det}
+detecciones y \texttt{enr} incidentes enriquecidos. Los rechazos de cada etapa se derivan a
+un \textit{topic} con prefijo \texttt{dlq}.
+
+La Tabla~\ref{tab:topics} recoge el contrato establecido.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|l|l|}
+\hline
+\textbf{Topic} & \textbf{Part.} & \textbf{Clave} & \textbf{Contenido} \\
+\hline
+\texttt{raw.host.windows} & 3 & \textit{hostname} & Telemetría cruda de sistema \\
+\texttt{raw.net.zeek} & 3 & IP origen & Telemetría cruda de red \\
+\texttt{norm.events} & 6 & \textit{hostname} & Eventos normalizados a OCSF \\
+\texttt{det.alerts} & 3 & \textit{hostname} & Detecciones de reglas individuales \\
+\texttt{det.campaigns} & 3 & \textit{hostname} & Secuencias multi-etapa detectadas \\
+\texttt{enr.incidents} & 3 & \textit{id} incidente & Incidentes priorizados \\
+\texttt{dlq.*} & 1 & --- & Rechazos, con el motivo del fallo \\
+\hline
+\end{tabular}
+\caption{Contrato de \textit{topics} del sistema.}
+\label{tab:topics}
+\end{table}
+
+La elección del \textbf{nombre de host como clave de particionado} responde a un requisito
+funcional concreto: garantizar que todos los eventos de una misma máquina se procesen en
+orden. La detección de secuencias carece de sentido si los eventos que la componen pueden
+llegar desordenados, por lo que esta decisión, aparentemente menor, condiciona la viabilidad
+del Pilar~A. Como se documenta en la Sección~\ref{sec:incidencia_watermark}, tiene además una
+consecuencia no evidente sobre el procesamiento temporal.
+
+\section{Decisiones de diseño}
+
+Esta sección recoge las decisiones de arquitectura relevantes junto con su justificación y
+las alternativas descartadas. Se documentan de forma explícita porque constituyen, en buena
+medida, el contenido técnico del trabajo: en un proyecto de integración como este, el valor
+reside tanto en las piezas elegidas como en los motivos de la elección.
+
+\subsection{Representación del grafo: grafo de propiedades frente a RDF}
+
+El planteamiento inicial contemplaba representar el grafo de conocimiento mediante RDF y
+consultarlo con SPARQL, siguiendo la tradición de la web semántica. Esta opción se
+\textbf{descartó} en favor de un grafo de propiedades consultado mediante Cypher, por tres
+motivos. Primero, el grafo de propiedades es el modelo predominante en las herramientas de
+análisis de rutas de ataque del ámbito de la seguridad ofensiva, lo que facilita la
+comparación con el estado de la práctica. Segundo, la disponibilidad de bibliotecas de
+analítica de grafos (centralidad, caminos mínimos, detección de comunidades) sobre este
+modelo es considerablemente mayor. Y tercero, la capacidad de inferencia que aportaría una
+ontología OWL queda cubierta —y superada para este dominio— por el razonador Datalog descrito
+a continuación, que además es específico de seguridad.
+
+\subsection{Razonamiento: Datalog frente a reglas ontológicas}
+
+Para la derivación de rutas de ataque se adopta un motor Datalog siguiendo el enfoque de
+MulVAL \cite{mulval}, en lugar de reglas de inferencia sobre una ontología. La razón es que
+Datalog aplicado a análisis de seguridad de red es un enfoque canónico y consolidado, que
+proporciona de forma natural la trazabilidad exigida por el requisito RNF6: cada conclusión
+derivada puede justificarse indicando la regla aplicada y los hechos que la sustentan.
+
+\subsection{Motor de procesamiento: Flink frente a micro-lotes}
+
+Se adopta Apache Flink como motor de procesamiento en lugar de una solución basada en
+micro-lotes. El motivo es que el Pilar~A requiere procesamiento con estado sobre tiempo de
+evento y ventanas temporales precisas, capacidades que constituyen el núcleo del modelo de
+Flink. Una arquitectura de micro-lotes obligaría a emular ese comportamiento con una
+complejidad añadida considerable y garantías más débiles.
+
+Dentro de Flink existían a su vez dos vías para expresar los patrones de secuencia: la
+\textit{Pattern API} de FlinkCEP, disponible únicamente desde Java, y la construcción
+\texttt{MATCH\_RECOGNIZE} de SQL, accesible también desde Python. Dado que el resto del
+sistema se desarrolla en Python y que la segunda opción es un estándar SQL plenamente
+expresivo para el tipo de patrones requeridos, se optó por esta última. La decisión se
+validó experimentalmente antes de comprometerla, como se describe en la
+Sección~\ref{sec:validacion_cep}.
+
+\subsection{Componentes de infraestructura}
+
+El resto de componentes se seleccionaron atendiendo a criterios de eficiencia operativa
+sobre una estación de trabajo:
+
+\begin{itemize}
+    \item \textbf{Bus de eventos}: se emplea Redpanda, compatible con la API de Kafka pero
+    implementado como binario único sin dependencia de JVM ni de un servicio de coordinación
+    externo, lo que reduce sensiblemente el consumo de recursos y la complejidad operativa.
+    \item \textbf{Almacén analítico}: se emplea ClickHouse, base de datos columnar orientada
+    a analítica, por su rendimiento en consultas de agregación y filtrado sobre grandes
+    volúmenes de eventos, que es el patrón de acceso característico de la investigación de
+    incidentes.
+    \item \textbf{Contenedores frente a máquinas virtuales}: todos los servicios se despliegan
+    como contenedores sobre un único anfitrión. Dedicar una máquina virtual completa a cada
+    servicio habría supuesto multiplicar el consumo de memoria por el sistema operativo
+    invitado sin aportar aislamiento adicional relevante para este caso de uso.
+\end{itemize}
+
+\subsection{Uso del aprendizaje automático}
+
+Se establece como restricción de diseño que el aprendizaje automático se emplee
+exclusivamente en modo \textbf{inferencia}, sobre modelos preentrenados, admitiéndose como
+máximo un ajuste fino ligero de modelos de pequeño tamaño. Esta decisión responde tanto a la
+restricción de recursos como a una consideración de fondo: el objeto del trabajo es la
+arquitectura de correlación y razonamiento, no el entrenamiento de modelos, y desplazar el
+esfuerzo hacia esto último habría desdibujado la contribución.
+
+\section{Entorno de desarrollo}
+
+El desarrollo se realiza sobre una estación de trabajo con procesador de 16 núcleos, 64~GB de
+memoria y GPU dedicada, ejecutando el subsistema de Windows para Linux (WSL2) con Ubuntu como
+sistema anfitrión de contenedores. Los límites de recursos asignados al subsistema
+(44~GB de memoria y 24 hilos) se fijan de forma declarativa, reservando el resto para el
+sistema operativo anfitrión.
+
+Los servicios se orquestan mediante Docker Compose con \textbf{perfiles por fase}, lo que
+permite levantar únicamente el subconjunto de componentes necesario para la tarea en curso.
+Esta organización responde al requisito RNF5: el sistema completo excede los recursos
+razonables de una estación de trabajo si todos los servicios se ejecutan simultáneamente,
+mientras que por perfiles el consumo se mantiene contenido.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Perfil} & \textbf{Servicios} & \textbf{Uso} \\
+\hline
+\texttt{core} & Bus de eventos y consola & Siempre activo \\
+\texttt{stream} & Motor de procesamiento & Desarrollo de detección \\
+\texttt{store} & Almacén analítico & Consulta y evaluación \\
+\texttt{graph} & Base de datos de grafos & Trabajo sobre el Pilar B \\
+\texttt{cti} & Plataforma de inteligencia & Ingesta de CTI \\
+\texttt{observability} & Métricas y visualización & Monitorización \\
+\hline
+\end{tabular}
+\caption{Perfiles de despliegue definidos.}
+\label{tab:perfiles}
+\end{table}
+
+\subsection{Incidencias del entorno}
+
+La construcción del entorno presentó una cadena de incompatibilidades derivadas de emplear
+versiones muy recientes del sistema operativo y del intérprete de Python, que se documentan
+por su valor práctico:
+
+\begin{itemize}
+    \item La distribución de Linux empleada es posterior a las versiones para las que existen
+    repositorios oficiales de algunos componentes, lo que obligó a fijar explícitamente el
+    repositorio de la última versión con soporte a largo plazo disponible.
+    \item La versión de Python del sistema (3.14) carece de paquetes precompilados para las
+    bibliotecas de integración con el motor de procesamiento, cuyas dependencias no soportan
+    aún esa versión. Se resolvió mediante un entorno virtual independiente con Python 3.12,
+    manteniendo el entorno principal para el resto del código.
+    \item La biblioteca de integración requiere una máquina virtual Java en el anfitrión, no
+    solo en los contenedores, lo que no resulta evidente hasta que falla la primera
+    invocación.
+\end{itemize}
+
+\section{Ingesta de datos}
+
+\subsection{Selección de los conjuntos de datos}
+
+La validación requiere telemetría de ataques reales con \textbf{verdad conocida}, esto es,
+con etiquetado explícito de las técnicas presentes. Se emplean para ello los conjuntos de
+datos abiertos de OTRF \cite{otrf}, que reúnen capturas de laboratorio de técnicas
+adversarias con dos propiedades especialmente valiosas: cada conjunto está mapeado a las
+técnicas de MITRE ATT\&CK correspondientes, y las capturas incluyen no solo los eventos del
+ataque sino también la actividad benigna concurrente, lo que permite evaluar falsos
+positivos sobre datos realistas.
+
+El repositorio organiza los conjuntos en dos familias. Los \textbf{atómicos} corresponden a
+una única técnica aislada y resultan adecuados para la validación de componentes; los
+\textbf{compuestos} recogen cadenas de ataque completas de varias etapas, y constituyen el
+material de evaluación del Pilar~A.
+
+Para el desarrollo inicial se seleccionó el conjunto atómico correspondiente al volcado de
+memoria del proceso LSASS mediante la biblioteca \texttt{comsvcs.dll}, identificado como
+\texttt{SDWIN-201018195009} y etiquetado con la técnica \texttt{T1003.001} de la táctica
+\texttt{TA0006}. La elección responde a que, pese a tratarse de un conjunto pequeño
+(184~eventos), contiene una cadena de acciones representativa y dos fuentes de auditoría
+independientes que registran el mismo comportamiento, lo que permite validar la correlación
+cruzada.
+
+\subsection{Reproducción de la telemetría}
+
+La ingesta se implementa mediante un componente de reproducción que lee los conjuntos de
+datos —almacenados en formato JSON Lines, un evento por línea— y los publica en el bus de
+eventos. Su diseño incorpora cuatro decisiones relevantes:
+
+\begin{enumerate}
+    \item \textbf{Clave de particionado por host}, conforme al contrato de la
+    Tabla~\ref{tab:topics}, para garantizar el orden por máquina.
+    \item \textbf{Preservación del tiempo de evento original}: la marca temporal del evento
+    se propaga como marca temporal del mensaje en el bus, lo que permite que las etapas
+    posteriores operen sobre tiempo de evento y no sobre tiempo de procesamiento (RNF2).
+    \item \textbf{Trazabilidad mediante cabeceras}: cada mensaje incorpora el identificador
+    del conjunto de datos de origen, lo que satisface el requisito RF9 y permitirá contrastar
+    las detecciones con la verdad conocida durante la evaluación.
+    \item \textbf{Control de velocidad de reproducción}: el componente admite reproducir a
+    máxima velocidad, útil para pruebas, o respetando el ritmo temporal original de la
+    captura, útil para demostraciones realistas del comportamiento en tiempo real.
+\end{enumerate}
+
+La reproducción del conjunto seleccionado se completó con la totalidad de los 184~eventos
+publicados sin pérdidas, a un rendimiento aproximado de 3.300~eventos por segundo.
+
+\section{Normalización a OCSF}
+
+\subsection{Selección del subconjunto del esquema}
+
+OCSF define un número elevado de clases de evento, de las cuales solo un subconjunto resulta
+pertinente para la telemetría considerada. La selección se realizó a partir de las clases
+efectivamente presentes en los conjuntos de datos, y se organizó en tres oleadas de
+implementación para permitir que el sistema fuese funcional desde la primera.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Clase OCSF} & \textbf{\texttt{class\_uid}} & \textbf{Fuentes que absorbe} \\
+\hline
+File System Activity & 1001 & Creación y escritura de ficheros \\
+Module Activity & 1005 & Carga de bibliotecas dinámicas \\
+Scheduled Job Activity & 1006 & Tareas programadas y servicios \\
+Process Activity & 1007 & Creación, terminación y acceso a procesos \\
+Event Log Activity & 1008 & Manipulación del registro de auditoría \\
+Script Activity & 1009 & Ejecución de guiones \\
+Account Change & 3001 & Alta y modificación de cuentas \\
+Authentication & 3002 & Inicios de sesión \\
+Authorize Session & 3003 & Asignación de privilegios especiales \\
+Group Management & 3006 & Modificación de pertenencia a grupos \\
+Network Activity & 4001 & Conexiones de red \\
+DNS Activity & 4003 & Resolución de nombres \\
+\hline
+\end{tabular}
+\caption{Subconjunto de clases OCSF adoptado.}
+\label{tab:ocsf}
+\end{table}
+
+Merece una mención específica el tratamiento de los eventos de \textbf{registro de Windows}.
+El esquema base de OCSF no define una clase específica para esta categoría, por lo que se
+optó por asignarlos a la clase más próxima conservando la totalidad del detalle original en
+el campo \texttt{unmapped}. La decisión se documenta como tal, dado que una futura extensión
+del esquema podría cubrir este caso de forma más precisa.
+
+\subsection{Arquitectura de los mapeadores}
+
+La normalización se estructura en tres niveles. Un módulo común construye el esqueleto OCSF
+compartido por todos los eventos: identificadores de clase y actividad, marca temporal,
+metadatos, dispositivo de origen y los dos campos de extensión propios descritos más
+adelante. Sobre ese esqueleto, un conjunto de \textbf{mapeadores específicos} —uno por
+familia de origen y tipo de evento— añade los campos particulares de cada clase. Finalmente,
+un \textbf{despachador} enruta cada evento entrante a su mapeador correspondiente en función
+del par formado por el canal de origen y el identificador de evento.
+
+Cuando el despachador no encuentra un mapeador para un evento, lanza una excepción específica
+que la etapa de procesamiento traduce en la derivación del evento a la cola de rechazos,
+junto con el motivo. Este mecanismo materializa el requisito RNF3: no existe descarte
+silencioso.
+
+\subsection{Extensiones propias del esquema}
+
+El modelo incorpora dos extensiones sobre el esquema estándar:
+
+\begin{itemize}
+    \item El campo \texttt{unmapped}, previsto por el propio OCSF, conserva toda la
+    información de origen sin correspondencia en el modelo canónico.
+    \item Un bloque de extensión propio recoge la \textbf{trazabilidad} (identificador del
+    conjunto de datos, canal y tipo de evento de origen) y un conjunto de \textbf{señales de
+    detección precalculadas}.
+\end{itemize}
+
+La segunda extensión merece justificación, pues constituye una decisión de diseño con
+consecuencias importantes aguas abajo. Durante el mapeo, el sistema evalúa un conjunto de
+condiciones características de comportamiento adversario y las materializa como campos
+booleanos: acceso al proceso que custodia las credenciales, acceso con permisos compatibles
+con la lectura de memoria, carga de bibliotecas asociadas al volcado de procesos, escritura de
+ficheros de volcado, borrado del registro de auditoría o inicio de sesión remoto.
+
+El beneficio de precalcular estas señales en la normalización es doble. Por un lado, evita que
+cada regla de detección deba reinterpretar los campos de origen, simplificando notablemente su
+expresión. Por otro, y más relevante, constituye la \textbf{semilla de la explicabilidad}
+perseguida en el Pilar~C: cuando el sistema priorice un incidente, podrá indicar exactamente
+qué señales concretas contribuyeron a ello.
+
+\subsection{Resultados de cobertura}
+
+La cobertura de normalización —proporción de eventos que encuentran mapeador— se adoptó como
+métrica de progreso de esta fase. La Tabla~\ref{tab:cobertura} recoge su evolución sobre el
+conjunto de datos de referencia conforme se incorporaban mapeadores.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Iteración} & \textbf{Normalizados} & \textbf{Rechazados} & \textbf{Cobertura} \\
+\hline
+Mapeadores iniciales (Sysmon 1/3/5/10/11) & 74 & 110 & 40{,}2\,\% \\
++ Módulos y registro (Sysmon 7/12/13/14) & 148 & 36 & 80{,}4\,\% \\
++ Canal Security (11 tipos de evento) & 184 & 0 & 100{,}0\,\% \\
+\hline
+\end{tabular}
+\caption{Evolución de la cobertura de normalización sobre el conjunto \texttt{SDWIN-201018195009} (184 eventos).}
+\label{tab:cobertura}
+\end{table}
+
+El proceso ilustra una propiedad deseable del diseño: la propia métrica indica qué construir a
+continuación, pues los rechazos se agrupan por el par (canal, tipo de evento) que los provoca.
+El resultado final son 12~tipos de evento OCSF distintos generados a partir de un único
+conjunto de datos.
+
+La equivalencia entre el flujo por lotes y el flujo en \textit{streaming} se verificó
+ejecutando la misma lógica en ambos modos y contrastando los resultados, que coincidieron
+exactamente.
+
+\subsection{Correlación cruzada entre fuentes}
+
+Un resultado relevante de esta fase es la confirmación independiente del comportamiento
+adversario por parte de dos subsistemas de auditoría distintos. El acceso al proceso LSASS
+queda registrado simultáneamente por la telemetría extendida de Sysmon y por la auditoría
+nativa de Windows mediante los eventos de manipulación de descriptores de objeto.
+
+Que dos mecanismos independientes registren el mismo hecho tiene un valor operativo directo:
+constituye evidencia corroborada frente a un posible falso positivo, y ofrece resiliencia
+ante la desactivación de una de las fuentes por parte del adversario.
+
+Adicionalmente, la traza de llamadas preservada en el campo \texttt{unmapped} conserva la
+secuencia completa de bibliotecas implicadas en la operación de volcado, lo que constituye la
+evidencia forense que confirma la técnica concreta empleada.
+
+\subsection{Incidencia: sincronización temporal entre fuentes}
+\label{sec:incidencia_temporal}
+
+Durante la validación se detectó un error de consecuencias potencialmente graves que no
+producía fallo alguno. Los dos canales de telemetría considerados exponen campos temporales
+distintos: la telemetría extendida incorpora un campo con la marca de tiempo en formato UTC
+además del campo estándar, mientras que la auditoría nativa solo dispone de este último. La
+implementación inicial priorizaba el campo aparentemente más preciso cuando estaba
+disponible.
+
+El resultado fue un desfase de dieciséis horas entre ambos canales que reordenaba
+completamente la secuencia reconstruida: la etapa final del ataque —el borrado del registro de
+auditoría— aparecía como la primera. El error no generaba ningún rechazo ni advertencia, y
+solo se hizo visible al inspeccionar la coherencia lógica de la cadena de eventos.
+
+La corrección consistió en apoyar la normalización en el campo temporal \textbf{común y
+coherente} entre fuentes, en lugar del más específico. La lección resulta generalizable: en un
+sistema que correlaciona múltiples fuentes, la homogeneidad del criterio temporal prevalece
+sobre la precisión nominal de cada fuente considerada por separado.
+
+Tras la corrección, la secuencia reconstruida presenta un entrelazado coherente de ambas
+fuentes con resolución de milisegundos, condición necesaria para la detección de secuencias
+del Pilar~A.
+
+\section{Persistencia analítica}
+
+El almacenamiento de los eventos normalizados persigue dos objetivos: soportar la
+investigación interactiva sobre los datos y proporcionar el sustrato para la evaluación
+cuantitativa del sistema.
+
+\subsection{Diseño del esquema}
+
+El diseño adopta una estrategia \textbf{híbrida}. Los campos que participan habitualmente en
+filtros y agregaciones se promocionan a columnas dedicadas con tipos específicos, mientras que
+el evento OCSF completo se conserva íntegro en una columna adicional. De este modo se obtiene
+el rendimiento de una base de datos columnar sobre los accesos frecuentes sin renunciar a la
+flexibilidad de disponer del dato completo cuando se requiere un campo no previsto.
+
+Las decisiones de modelado más relevantes son las siguientes:
+
+\begin{itemize}
+    \item La \textbf{clave de ordenación} se establece sobre el par (host, tiempo), que
+    corresponde al patrón de acceso dominante en la investigación de incidentes: qué ocurrió
+    en una máquina concreta durante una ventana temporal determinada.
+    \item El \textbf{particionado} se realiza por mes, lo que facilita la gestión y el purgado
+    del almacén por rangos temporales.
+    \item Las \textbf{señales de detección} precalculadas durante la normalización se
+    materializan como columnas booleanas, lo que reduce las consultas de investigación sobre
+    comportamiento adversario a filtros triviales.
+    \item Se aplican \textbf{codificaciones específicas} por columna: diferencial más
+    compresión para las marcas temporales, que presentan valores próximos entre sí, y
+    diccionario para los campos de baja cardinalidad como nombres de host o de clase.
+\end{itemize}
+
+\subsection{Consultas de investigación}
+
+La materialización de las señales como columnas permite reconstruir la cadena completa del
+ataque mediante una única consulta declarativa que proyecta cada evento sobre la etapa
+correspondiente y los ordena temporalmente. El resultado sobre el conjunto de referencia
+recupera la secuencia esperada: preparación mediante carga de bibliotecas de volcado, acceso
+al proceso de credenciales confirmado por ambas fuentes de auditoría, escritura del volcado a
+disco y borrado del registro de auditoría.
+
+Conviene señalar que esta reconstrucción se obtiene \textbf{antes de aplicar regla de
+detección alguna}, únicamente a partir de las señales calculadas durante la normalización, lo
+que valida el enfoque adoptado en esa fase.
+
+\subsection{Incidencia: exposición del servicio de almacenamiento}
+
+Se documenta una segunda incidencia por su carácter no evidente. El servicio de
+almacenamiento, ejecutado en contenedor con el puerto correspondiente publicado, rechazaba
+las conexiones procedentes del anfitrión pese a responder correctamente a las peticiones
+originadas dentro del propio contenedor. El síntoma resultaba engañoso, ya que el error
+devuelto sugería un problema de red o de redirección de puertos.
+
+El diagnóstico se alcanzó comprobando que el servicio tampoco respondía a peticiones dirigidas
+a su propia dirección de red: escuchaba exclusivamente en la interfaz de bucle local interna.
+La solución consistió en declarar explícitamente la interfaz de escucha en la configuración
+del servidor.
+
+\section{Observabilidad}
+
+La instrumentación del sistema responde al requisito RNF4 y persigue dos finalidades:
+verificar durante el desarrollo que cada componente se comporta como se espera, y
+proporcionar durante la evaluación las medidas de rendimiento que se reportan en el
+Capítulo~\ref{cap:resultados}.
+
+La recolección de métricas se realiza mediante un sistema de series temporales que consulta
+periódicamente los puntos de exposición de cada componente. Se instrumentaron el bus de
+eventos, ambos nodos del motor de procesamiento y el almacén analítico, activando en cada
+caso el mecanismo de exposición correspondiente.
+
+Sobre esa base se construyeron tres cuadros de mando, aprovisionados de forma
+\textbf{declarativa} —definidos como ficheros de configuración versionados, no configurados
+manualmente— para dar cumplimiento al requisito de reproducibilidad RNF1:
+
+\begin{description}
+    \item[Salud del \textit{pipeline}] Estado del bus de eventos, volumen por \textit{topic},
+    recursos consumidos por el motor de procesamiento y actividad del almacén analítico.
+    Verifica el correcto funcionamiento de la infraestructura.
+    \item[Panel de seguridad] Distribución de eventos por clase OCSF, señales de detección
+    activas, cronología del ataque reconstruida y procesos más frecuentes. Constituye la
+    vista orientada al analista.
+    \item[Cobertura y calidad de datos] Cobertura de normalización, distribución por canal y
+    tipo de evento, conjuntos de datos cargados e indicadores de integridad temporal. Respalda
+    las métricas reportadas en la evaluación.
+\end{description}
+
+\section{Validación experimental del enfoque de detección de secuencias}
+\label{sec:validacion_cep}
+
+Antes de comprometer el desarrollo del Pilar~A con la vía tecnológica seleccionada, se realizó
+una validación experimental específica sobre datos reales. El objetivo era confirmar que la
+construcción SQL elegida permitía efectivamente detectar secuencias sobre el flujo procedente
+del bus de eventos, respetando el tiempo de evento original.
+
+La prueba consistió en definir un patrón mínimo de dos eventos consecutivos particionado por
+host, sobre la telemetría ya ingerida. El resultado inicial fue la ausencia total de
+coincidencias, lo que motivó el diagnóstico descrito a continuación.
+
+\subsection{Incidencia: bloqueo del avance temporal por particiones inactivas}
+\label{sec:incidencia_watermark}
+
+La causa resultó ser una consecuencia no evidente de la decisión de particionado adoptada. Al
+emplear el nombre de host como clave y contener el conjunto de datos un único host, la
+totalidad de los eventos se concentra en una sola partición, quedando las restantes vacías.
+
+El motor de procesamiento calcula la marca de agua global como el mínimo de las marcas de agua
+de todas sus fuentes. Las particiones que no reciben datos nunca emiten marca de agua alguna,
+por lo que el mínimo permanece indefinido y \textbf{el tiempo de evento no avanza jamás}. La
+consecuencia es que ninguna ventana temporal llega a considerarse cerrada y el motor no emite
+resultado alguno, sin producir error que lo delate.
+
+El diagnóstico se alcanzó por descarte, reduciendo el patrón a un único evento —que debería
+haber emitido una coincidencia por cada evento de entrada— y comprobando que tampoco producía
+salida, lo que descartaba un problema en la expresión del patrón y señalaba al mecanismo
+temporal. La solución consiste en configurar un tiempo de inactividad tras el cual una fuente
+sin datos se marca como inactiva y deja de bloquear el cálculo.
+
+Resuelta la incidencia, el patrón de dos eventos emitió correctamente las coincidencias
+esperadas, encadenadas y con las marcas temporales originales de la captura. Con ello quedó
+validada la vía tecnológica y descartada la necesidad de recurrir a la alternativa prevista
+como plan de contingencia.
+
+Esta incidencia ilustra una interacción no trivial entre dos decisiones de diseño
+independientes: el particionado por host, adoptado para garantizar el orden de eventos, tiene
+como efecto colateral la inutilización del mecanismo de avance temporal cuando el número de
+hosts es inferior al de particiones.
+
+% ============================================================================
+% TODO: las secciones siguientes se completarán conforme avancen las fases
+% ============================================================================
+
+\section{Detección basada en reglas}
+% TODO (F2): selección y curación del conjunto de reglas Sigma; construcción de la tabla de
+% equivalencia entre los campos nativos de las reglas y el modelo OCSF; implementación de la
+% evaluación en streaming y en lotes; esquema de alerta con los campos coincidentes como base
+% de la explicabilidad; matriz de cobertura ATT&CK resultante.
+
+\section{Pilar A: detección de secuencias multi-etapa}
+% TODO (F3): modelado de los escenarios a partir de los planes de emulación; definición de los
+% patrones de kill chain; tratamiento de las secuencias que cruzan varios hosts mediante
+% correlación jerárquica en dos niveles; esquema de campaña emitido.
+
+\section{Plano de inteligencia de amenazas}
+% TODO (F4): despliegue de la plataforma CTI e importación de ATT&CK; sincronización de
+% fuentes de indicadores; extracción automática de técnicas a partir de informes en lenguaje
+% natural y carga del resultado en el grafo.
+
+\section{Pilar B: grafo de ataque y razonamiento}
+% TODO (F5): modelo de datos del grafo; poblado del inventario y las vulnerabilidades;
+% analítica de grafos para criticidad y caminos; reglas de interacción en Datalog; exportación
+% de hechos y reimportación de las rutas derivadas; trazabilidad de la derivación.
+
+\section{Pilar C: priorización explicable y servicios}
+% TODO (F6): modelo de puntuación y justificación de los pesos; análisis de sensibilidad;
+% generación de la narrativa; interfaz de programación de la aplicación.
