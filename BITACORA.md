@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F1.3 completada — pipeline `raw → norm` operativo.
-- **Hecho:** normalización OCSF al **100 %** validada en batch y en streaming (184/184, 0 DLQ). Job `pipeline/jobs/normalize_job.py` consumiendo `raw.host.windows` → `norm.events` (+ `dlq.normalize`), con trazabilidad `dataset_id` propagada por cabeceras Kafka de extremo a extremo. Topics: `norm.events` (6 part.), `dlq.normalize` (1 part.). Plantilla LaTeX de la memoria incorporada en `Memoria/`.
+- **Fase:** F1.4 completada — pipeline `raw → norm → ClickHouse` operativo.
+- **Hecho:** ClickHouse 25.3 en compose (perfil `store`), tabla `tfg.events` (26 columnas: campos OCSF promocionados + señales + `raw` JSON, MergeTree particionado por mes, ORDER BY host+time). Sink `sink_clickhouse.py` volcando `norm.events` → ClickHouse (184/184). Scripts `up.sh`/`down.sh` + alias `tfg`. README completo. Kill chain del ataque reconstruible con SQL.
 - **En curso:** cerrar sesión.
-- **Siguiente:** F1.4 ClickHouse (persistencia analítica) y F1.5 observabilidad; después F2 (reglas Sigma).
+- **Siguiente:** F1.5 observabilidad (Prometheus/Grafana) o saltar a F2 (Sigma). Pendiente: arrancar la memoria (estado del arte, agosto).
 
 ## 5. Estructura del repo
 ```
@@ -164,3 +164,12 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** dos entornos virtuales (.venv 3.14 con confluent-kafka / .venv-flink 3.12 con PyFlink) obligan a alternar; valorar unificar en .venv-flink.
 - **Siguiente paso:** F1.4 ClickHouse + F1.5 observabilidad.
 - **Archivos tocados:** `pipeline/jobs/normalize_job.py`, `.gitignore`, `Memoria/`, `BITACORA.md`.
+
+### 2026-07-24 (5) — F1.4: ClickHouse y persistencia analítica
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** persistir los eventos normalizados para hunting y evaluación.
+- **Hecho:** ClickHouse en compose con límite de memoria; tabla `tfg.events` con columnas dedicadas + señales + raw JSON. Sink Kafka→ClickHouse por lotes (184 insertados). Scripts de arranque/parada y alias `tfg`. README del repo reescrito. Verificada la kill chain con SQL: carga DLL → acceso LSASS (Sysmon 10 + Security 4656/4663 entrelazados) → volcado a disco → borrado de logs.
+- **Decisiones:** esquema híbrido (columnas para lo consultado + `raw` completo). ORDER BY (device_hostname, time). Señales como columnas Bool para consultas triviales.
+- **Problemas / pendiente:** (1) ClickHouse solo escuchaba en loopback interno → `<listen_host>0.0.0.0</listen_host>`. (2) clickhouse-connect exige `datetime`, no float, para DateTime64. (3) **BUG IMPORTANTE**: priorizar `UtcTime` desincronizaba Sysmon y Security 16 h, invirtiendo el orden del ataque; corregido usando `TimeCreated` como campo común. Reprocesado todo. Ambos hallazgos anotados en AnotacionesMemoria.md.
+- **Siguiente paso:** F1.5 observabilidad o F2 (Sigma). Arrancar memoria en agosto.
+- **Archivos tocados:** `infra/docker-compose.yml`, `infra/clickhouse/`, `pipeline/jobs/sink_clickhouse.py`, `pipeline/normalize/ocsf_common.py`, `scripts/`, `README.md`, `AnotacionesMemoria.md`, `BITACORA.md`.

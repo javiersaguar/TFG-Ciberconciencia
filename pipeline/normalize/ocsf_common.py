@@ -42,9 +42,12 @@ def parse_ts(raw):
 
 def base_event(event, class_uid, category_uid, activity_id=0):
     """Construye el esqueleto OCSF común a todos los eventos."""
-    ts = (parse_ts(event.get("UtcTime"))
-          or parse_ts(event.get("TimeCreated"))
-          or parse_ts(event.get("@timestamp")))
+    # TimeCreated es el campo comun y coherente entre canales (Sysmon y Security).
+    # No usar UtcTime: en estos datasets viene desfasado respecto a TimeCreated,
+    # lo que desincroniza el orden entre fuentes y romperia la correlacion CEP.
+    ts = (parse_ts(event.get("TimeCreated"))
+          or parse_ts(event.get("@timestamp"))
+          or parse_ts(event.get("UtcTime")))
     return {
         "class_uid": class_uid,
         "category_uid": category_uid,

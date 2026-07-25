@@ -1,0 +1,5 @@
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+    <max_server_memory_usage_to_ram_ratio>0.3</max_server_memory_usage_to_ram_ratio>
+    <mark_cache_size>536870912</mark_cache_size>
+</clickhouse>

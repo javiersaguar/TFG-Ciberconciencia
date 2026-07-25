@@ -76,6 +76,32 @@ services:
       - ./flink/lib/flink-sql-connector-kafka-5.0.0-2.2.jar:/opt/flink/lib/flink-sql-connector-kafka-5.0.0-2.2.jar
       - ./flink/jobs:/opt/jobs
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.3
+    container_name: clickhouse
+    profiles: ["store"]
+    ports:
+      - "8123:8123"      # HTTP (consultas, UI)
+      - "9000:9000"      # cliente nativo
+    environment:
+      CLICKHOUSE_DB: tfg
+      CLICKHOUSE_USER: tfg
+      CLICKHOUSE_PASSWORD: tfg
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/config.d:/etc/clickhouse-server/config.d
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   redpanda_data:
   flink_data:
+  clickhouse_data:
