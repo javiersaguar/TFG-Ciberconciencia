@@ -1,0 +1,198 @@
+{
+  "uid": "tfg-data-quality",
+  "title": "3 · Cobertura y calidad de datos",
+  "tags": ["tfg", "calidad", "evaluacion"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": { "from": "2020-10-01T00:00:00.000Z", "to": "now" },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Cobertura de normalización",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "gauge",
+      "title": "Cobertura OCSF (%)",
+      "description": "Porcentaje de eventos que encuentran mapeador. Los rechazados van a dlq.normalize.",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT 100.0 AS cobertura",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 70 },
+              { "color": "green", "value": 90 }
+            ]
+          }
+        }
+      },
+      "options": { "showThresholdLabels": false, "showThresholdMarkers": true }
+    },
+    {
+      "type": "stat",
+      "title": "Eventos normalizados",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 4, "w": 5, "x": 6, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT count() AS n FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Tipos de evento distintos",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 4, "w": 5, "x": 11, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT uniqExact(concat(source_channel, '/', toString(source_event_id))) AS n FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Rango temporal cubierto",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT dateDiff('second', min(time), max(time)) AS segundos FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Eventos sin timestamp válido",
+      "description": "Indicador de calidad: eventos cuyo campo de tiempo no pudo parsearse.",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 4, "w": 5, "x": 6, "y": 5 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT countIf(toUnixTimestamp(time) = 0) AS n FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Eventos sin proceso actor",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 4, "w": 5, "x": 11, "y": 5 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT countIf(actor_process_name = '') AS n FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Tamaño medio del evento (bytes)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 5 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT round(avg(length(raw))) AS bytes FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "row",
+      "title": "Distribución por fuente",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "type": "table",
+      "title": "Cobertura por canal y EventID",
+      "description": "Qué EventIDs se están normalizando y en qué volumen. Guía para priorizar nuevos mapeadores.",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 11, "w": 12, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT source_channel AS canal, source_event_id AS event_id, class_name AS clase_ocsf, count() AS eventos, round(100.0 * count() / (SELECT count() FROM tfg.events), 2) AS pct FROM tfg.events GROUP BY canal, event_id, clase_ocsf ORDER BY eventos DESC",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": true, "reducer": ["sum"], "fields": ["eventos"] } }
+    },
+    {
+      "type": "table",
+      "title": "Datasets cargados",
+      "description": "Trazabilidad a la verdad conocida (metadatos de OTRF Security-Datasets).",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 11, "w": 12, "x": 12, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT dataset_id, count() AS eventos, uniqExact(device_hostname) AS hosts, uniqExact(class_uid) AS clases, min(time) AS primer_evento, max(time) AS ultimo_evento FROM tfg.events GROUP BY dataset_id ORDER BY eventos DESC",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "type": "row",
+      "title": "Calidad temporal",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 }
+    },
+    {
+      "type": "table",
+      "title": "Sincronización entre fuentes",
+      "description": "Comprueba que los canales están alineados temporalmente. Un desfase aquí rompería la correlación multi-etapa (ver AnotacionesMemoria: incidencia UtcTime vs TimeCreated).",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT source_channel AS canal, min(time) AS primero, max(time) AS ultimo, count() AS eventos FROM tfg.events GROUP BY canal ORDER BY primero",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "type": "barchart",
+      "title": "Eventos por severidad OCSF",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT multiIf(severity_id = 1, '1 Informational', severity_id = 2, '2 Low', severity_id = 3, '3 Medium', severity_id = 4, '4 High', severity_id = 5, '5 Critical', toString(severity_id)) AS severidad, count() AS n FROM tfg.events GROUP BY severidad ORDER BY severidad",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "orientation": "horizontal" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "continuous-YlRd" }, "custom": { "fillOpacity": 85 } }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

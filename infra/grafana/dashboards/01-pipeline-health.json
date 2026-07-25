@@ -1,0 +1,183 @@
+{
+  "uid": "tfg-pipeline-health",
+  "title": "1 · Salud del pipeline",
+  "tags": ["tfg", "infraestructura"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Bus de eventos (Redpanda)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Particiones activas",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "targets": [
+        { "expr": "sum(redpanda_cluster_partitions)", "refId": "A" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Topics",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "targets": [
+        { "expr": "count(count by (redpanda_topic) (redpanda_kafka_max_offset))", "refId": "A" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tráfico Kafka (bytes/s)",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 1 },
+      "targets": [
+        { "expr": "sum(rate(redpanda_kafka_request_bytes_total[1m])) by (redpanda_request)", "legendFormat": "{{redpanda_request}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "showPoints": "never" }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Mensajes por topic (offset máximo)",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        { "expr": "sum(redpanda_kafka_max_offset) by (redpanda_topic)", "legendFormat": "{{redpanda_topic}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Procesado (Apache Flink)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
+    },
+    {
+      "type": "stat",
+      "title": "TaskManagers registrados",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "flink_jobmanager_numRegisteredTaskManagers", "refId": "A" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Slots disponibles",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 16 },
+      "targets": [
+        { "expr": "flink_jobmanager_taskSlotsAvailable", "refId": "A" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Jobs en ejecución",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 16 },
+      "targets": [
+        { "expr": "flink_jobmanager_numRunningJobs", "refId": "A" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memoria heap de Flink",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "flink_jobmanager_Status_JVM_Memory_Heap_Used", "legendFormat": "JobManager", "refId": "A" },
+        { "expr": "flink_taskmanager_Status_JVM_Memory_Heap_Used", "legendFormat": "TaskManager", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "showPoints": "never" }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU de Flink",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 21 },
+      "targets": [
+        { "expr": "flink_jobmanager_Status_JVM_CPU_Load", "legendFormat": "JobManager", "refId": "A" },
+        { "expr": "flink_taskmanager_Status_JVM_CPU_Load", "legendFormat": "TaskManager", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "showPoints": "never" }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Almacén analítico (ClickHouse)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Consultas por segundo",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "targets": [
+        { "expr": "rate(ClickHouseProfileEvents_Query[1m])", "legendFormat": "queries/s", "refId": "A" },
+        { "expr": "rate(ClickHouseProfileEvents_InsertQuery[1m])", "legendFormat": "inserts/s", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "showPoints": "never" }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Memoria de ClickHouse",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "targets": [
+        { "expr": "ClickHouseAsyncMetrics_MemoryResident", "legendFormat": "residente", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "fillOpacity": 15, "lineWidth": 2, "showPoints": "never" }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

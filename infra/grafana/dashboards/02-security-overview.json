@@ -1,0 +1,199 @@
+{
+  "uid": "tfg-security-overview",
+  "title": "2 · Panel de seguridad",
+  "tags": ["tfg", "seguridad", "ocsf"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "2020-10-18T00:00:00.000Z", "to": "2020-10-19T00:00:00.000Z" },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Resumen",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "stat",
+      "title": "Eventos totales",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT count() AS total FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "auto" }
+    },
+    {
+      "type": "stat",
+      "title": "Hosts monitorizados",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT uniqExact(device_hostname) AS hosts FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Señales de detección activas",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 5, "w": 5, "x": 8, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT countIf(signal_lsass_access OR signal_suspicious_access OR signal_dump_module OR signal_dump_file OR signal_log_cleared OR signal_remote_logon) AS senales FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Datasets cargados",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 5, "w": 5, "x": 13, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT uniqExact(dataset_id) AS datasets FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Clases OCSF distintas",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "targets": [
+        { "refId": "A", "rawSql": "SELECT uniqExact(class_uid) AS clases FROM tfg.events", "format": 1, "queryType": "table" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "row",
+      "title": "Señales de ataque",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }
+    },
+    {
+      "type": "barchart",
+      "title": "Señales detectadas por tipo",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 9, "w": 10, "x": 0, "y": 7 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT s.1 AS senal, s.2 AS n FROM (SELECT arrayJoin([('Acceso a LSASS', countIf(signal_lsass_access)), ('Acceso sospechoso', countIf(signal_suspicious_access)), ('Carga DLL volcado', countIf(signal_dump_module)), ('Volcado a disco', countIf(signal_dump_file)), ('Borrado de logs', countIf(signal_log_cleared)), ('Logon remoto', countIf(signal_remote_logon))]) AS s FROM tfg.events) ORDER BY n DESC",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "orientation": "horizontal", "xTickLabelRotation": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-YlRd" },
+          "custom": { "fillOpacity": 85 }
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Cronología del ataque (kill chain reconstruida)",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 9, "w": 14, "x": 10, "y": 7 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, device_hostname AS host, multiIf(signal_log_cleared, 'BORRADO DE LOGS', signal_dump_module, 'Carga DLL de volcado', signal_suspicious_access, 'Acceso sospechoso a LSASS', signal_dump_file, 'Volcado escrito a disco', signal_lsass_access, 'Acceso a LSASS', signal_remote_logon, 'Logon remoto', '') AS etapa, actor_process_name AS proceso, source_channel AS fuente, source_event_id AS event_id FROM tfg.events WHERE etapa != '' ORDER BY time ASC LIMIT 100",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "type": "row",
+      "title": "Distribución de eventos",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 }
+    },
+    {
+      "type": "piechart",
+      "title": "Eventos por clase OCSF",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 17 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT class_name AS clase, count() AS n FROM tfg.events GROUP BY class_name ORDER BY n DESC",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value"] },
+        "pieType": "donut"
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Top procesos actores",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 17 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT actor_process_name AS proceso, count() AS n FROM tfg.events WHERE actor_process_name != '' GROUP BY actor_process_name ORDER BY n DESC LIMIT 10",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "orientation": "horizontal" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "continuous-BlPu" }, "custom": { "fillOpacity": 85 } }
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Eventos por canal de origen",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 17 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT source_channel AS canal, count() AS n FROM tfg.events GROUP BY source_channel ORDER BY n DESC",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": { "orientation": "horizontal" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "continuous-GrYlRd" }, "custom": { "fillOpacity": 85 } }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Actividad en el tiempo",
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-tfg" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfInterval(time, INTERVAL 1 SECOND) AS t, class_name, count() AS n FROM tfg.events GROUP BY t, class_name ORDER BY t",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 40, "lineWidth": 1, "stacking": { "mode": "normal" }, "showPoints": "never" }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

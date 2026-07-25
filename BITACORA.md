@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F1.4 completada — pipeline `raw → norm → ClickHouse` operativo.
-- **Hecho:** ClickHouse 25.3 en compose (perfil `store`), tabla `tfg.events` (26 columnas: campos OCSF promocionados + señales + `raw` JSON, MergeTree particionado por mes, ORDER BY host+time). Sink `sink_clickhouse.py` volcando `norm.events` → ClickHouse (184/184). Scripts `up.sh`/`down.sh` + alias `tfg`. README completo. Kill chain del ataque reconstruible con SQL.
+- **Fase:** **F1 COMPLETADA**. Pipeline `raw → norm → ClickHouse` con observabilidad.
+- **Hecho:** F1.5 cerrada — Prometheus (5 targets `up`: Redpanda, Flink JM/TM, ClickHouse, self) + Grafana con datasources y **3 dashboards provisionados automáticamente**: (1) Salud del pipeline [Prometheus], (2) Panel de seguridad con kill chain reconstruida [ClickHouse], (3) Cobertura y calidad de datos [ClickHouse].
 - **En curso:** cerrar sesión.
-- **Siguiente:** F1.5 observabilidad (Prometheus/Grafana) o saltar a F2 (Sigma). Pendiente: arrancar la memoria (estado del arte, agosto).
+- **Siguiente:** **arrancar la memoria** (montar LaTeX + estado del arte, agosto). Después F2 (reglas Sigma).
 
 ## 5. Estructura del repo
 ```
@@ -173,3 +173,13 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** (1) ClickHouse solo escuchaba en loopback interno → `<listen_host>0.0.0.0</listen_host>`. (2) clickhouse-connect exige `datetime`, no float, para DateTime64. (3) **BUG IMPORTANTE**: priorizar `UtcTime` desincronizaba Sysmon y Security 16 h, invirtiendo el orden del ataque; corregido usando `TimeCreated` como campo común. Reprocesado todo. Ambos hallazgos anotados en AnotacionesMemoria.md.
 - **Siguiente paso:** F1.5 observabilidad o F2 (Sigma). Arrancar memoria en agosto.
 - **Archivos tocados:** `infra/docker-compose.yml`, `infra/clickhouse/`, `pipeline/jobs/sink_clickhouse.py`, `pipeline/normalize/ocsf_common.py`, `scripts/`, `README.md`, `AnotacionesMemoria.md`, `BITACORA.md`.
+
+
+### 2026-07-25 — F1.5: observabilidad y cierre de F1
+- **Con qué/quién:** Claude (chat), paso a paso.
+- **Objetivo:** completar la observabilidad y cerrar F1.
+- **Hecho:** Prometheus + Grafana en compose (perfil `observability`). Reporter Prometheus en Flink (puerto 9249) y endpoint de métricas en ClickHouse (9363). 5 targets `up`, métricas reales verificadas. Datasources y dashboards provisionados por fichero (sin configuración manual): salud del pipeline, panel de seguridad y calidad de datos.
+- **Decisiones:** provisioning declarativo de Grafana (reproducible desde cero). Dos datasources: Prometheus para infraestructura, ClickHouse para eventos de seguridad. UIDs fijados para que los dashboards no dependan de IDs autogenerados.
+- **Problemas / pendiente:** (1) el reporter solo estaba en el jobmanager, faltaba en el taskmanager. (2) Docker crea como root las carpetas montadas que no existen → `chown` necesario. (3) Confusión entre `provisioning/dashboards/` (config) y `dashboards/` (los JSON). (4) El plugin de ClickHouse no admite `UNION ALL` en un panel → resuelto con `arrayJoin`.
+- **Siguiente paso:** arrancar la memoria; luego F2 (Sigma).
+- **Archivos tocados:** `infra/docker-compose.yml`, `infra/prometheus/`, `infra/grafana/`, `infra/clickhouse/config.d/memory.xml`, `BITACORA.md`.
