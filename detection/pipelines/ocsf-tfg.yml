@@ -1,0 +1,238 @@
+name: OCSF TFG pipeline
+priority: 20
+
+# ---------------------------------------------------------------------------
+# Pipeline de transformacion de reglas Sigma al esquema OCSF de este proyecto.
+#
+# Se inspira en la pipeline oficial pySigma-pipeline-ocsf pero corrige tres
+# desviaciones detectadas respecto del estandar OCSF:
+#
+#  1. process_access: la oficial mapea SourceImage a parent_process. En un
+#     evento ProcessAccess el proceso origen no es el padre del destino, sino
+#     el ACTOR que realiza la accion. Se mapea por tanto a actor.process.
+#  2. image_load: la oficial lo clasifica como Process Activity (1007) con
+#     actividad "Other" (99). OCSF define una clase especifica para esto,
+#     Module Activity (1005), con actividad Load (1).
+#  3. process_access: la oficial usa actividad "Other" (99) en lugar de
+#     Open (3), que es la que corresponde a la apertura de un handle.
+#
+# Ademas, los campos sin equivalente en el esquema OCSF (GrantedAccess,
+# CallTrace, etc.) se dirigen al bloque unmapped, conforme al modelo de datos
+# del proyecto.
+# ---------------------------------------------------------------------------
+
+transformations:
+
+  # =========================================================================
+  # PROCESS ACCESS (Sysmon 10) -> Process Activity 1007 / Open
+  # =========================================================================
+  - id: tfg_process_access_type
+    type: add_condition
+    conditions:
+      type_uid: 100703
+    rule_conditions:
+      - type: logsource
+        category: process_access
+
+  - id: tfg_process_access_fields
+    type: field_name_mapping
+    mapping:
+      SourceImage: actor.process.file.path
+      SourceProcessId: actor.process.pid
+      SourceUser: unmapped.SourceUser
+      TargetImage: process.file.path
+      TargetProcessId: process.pid
+      TargetUser: unmapped.TargetUser
+      GrantedAccess: unmapped.GrantedAccess
+      CallTrace: unmapped.CallTrace
+    rule_conditions:
+      - type: logsource
+        category: process_access
+
+  # =========================================================================
+  # PROCESS CREATION (Sysmon 1) -> Process Activity 1007 / Launch
+  # =========================================================================
+  - id: tfg_process_creation_type
+    type: add_condition
+    conditions:
+      type_uid: 100701
+    rule_conditions:
+      - type: logsource
+        category: process_creation
+
+  - id: tfg_process_creation_fields
+    type: field_name_mapping
+    mapping:
+      Image: process.file.path
+      ProcessId: process.pid
+      CommandLine: process.cmd_line
+      User: process.user.name
+      ParentImage: process.parent_process.file.path
+      ParentProcessId: process.parent_process.pid
+      ParentCommandLine: process.parent_process.cmd_line
+      OriginalFileName: process.file.internal_name
+      CurrentDirectory: unmapped.CurrentDirectory
+      IntegrityLevel: unmapped.IntegrityLevel
+      LogonId: unmapped.LogonId
+      Hashes: process.file.hashes.value
+    rule_conditions:
+      - type: logsource
+        category: process_creation
+
+  # =========================================================================
+  # IMAGE LOAD (Sysmon 7) -> Module Activity 1005 / Load
+  # =========================================================================
+  - id: tfg_image_load_type
+    type: add_condition
+    conditions:
+      type_uid: 100501
+    rule_conditions:
+      - type: logsource
+        category: image_load
+
+  - id: tfg_image_load_fields
+    type: field_name_mapping
+    mapping:
+      Image: actor.process.file.path
+      ProcessId: actor.process.pid
+      ImageLoaded: module.file.path
+      Hashes: module.file.hashes.value
+      Signed: unmapped.Signed
+      Signature: unmapped.Signature
+      SignatureStatus: unmapped.SignatureStatus
+      OriginalFileName: unmapped.OriginalFileName
+      Company: unmapped.Company
+    rule_conditions:
+      - type: logsource
+        category: image_load
+
+  # =========================================================================
+  # FILE EVENT (Sysmon 11) -> File System Activity 1001 / Create
+  # =========================================================================
+  - id: tfg_file_event_type
+    type: add_condition
+    conditions:
+      type_uid: 100101
+    rule_conditions:
+      - type: logsource
+        category: file_event
+
+  - id: tfg_file_event_fields
+    type: field_name_mapping
+    mapping:
+      Image: actor.process.file.path
+      ProcessId: actor.process.pid
+      TargetFilename: file.path
+      CreationUtcTime: file.created_time
+    rule_conditions:
+      - type: logsource
+        category: file_event
+
+  # =========================================================================
+  # NETWORK CONNECTION (Sysmon 3) -> Network Activity 4001 / Open
+  # =========================================================================
+  - id: tfg_network_type
+    type: add_condition
+    conditions:
+      type_uid: 400101
+    rule_conditions:
+      - type: logsource
+        category: network_connection
+
+  - id: tfg_network_fields
+    type: field_name_mapping
+    mapping:
+      Image: actor.process.file.path
+      ProcessId: actor.process.pid
+      SourceIp: src_endpoint.ip
+      SourcePort: src_endpoint.port
+      SourceHostname: src_endpoint.hostname
+      DestinationIp: dst_endpoint.ip
+      DestinationPort: dst_endpoint.port
+      DestinationHostname: dst_endpoint.hostname
+      Protocol: connection_info.protocol_name
+      Initiated: unmapped.Initiated
+    rule_conditions:
+      - type: logsource
+        category: network_connection
+
+  # =========================================================================
+  # REGISTRY (Sysmon 12/13/14)
+  # Nota: OCSF core no define clase de registro de Windows. Se conserva el
+  # detalle en unmapped, conforme a la decision documentada del proyecto.
+  # =========================================================================
+  - id: tfg_registry_event_fields
+    type: field_name_mapping
+    mapping:
+      Image: actor.process.file.path
+      ProcessId: actor.process.pid
+      TargetObject: unmapped.TargetObject
+      Details: unmapped.Details
+      EventType: unmapped.EventType
+      NewName: unmapped.NewName
+    rule_conditions:
+      - type: logsource
+        category: registry_event
+
+  - id: tfg_registry_set_fields
+    type: field_name_mapping
+    mapping:
+      Image: actor.process.file.path
+      ProcessId: actor.process.pid
+      TargetObject: unmapped.TargetObject
+      Details: unmapped.Details
+      EventType: unmapped.EventType
+    rule_conditions:
+      - type: logsource
+        category: registry_set
+
+  - id: tfg_registry_add_fields
+    type: field_name_mapping
+    mapping:
+      Image: actor.process.file.path
+      ProcessId: actor.process.pid
+      TargetObject: unmapped.TargetObject
+      EventType: unmapped.EventType
+    rule_conditions:
+      - type: logsource
+        category: registry_add
+
+  - id: tfg_registry_delete_fields
+    type: field_name_mapping
+    mapping:
+      Image: actor.process.file.path
+      ProcessId: actor.process.pid
+      TargetObject: unmapped.TargetObject
+      EventType: unmapped.EventType
+    rule_conditions:
+      - type: logsource
+        category: registry_delete
+
+  # =========================================================================
+  # CANAL SECURITY DE WINDOWS (builtin)
+  # =========================================================================
+  - id: tfg_security_fields
+    type: field_name_mapping
+    mapping:
+      SubjectUserName: actor.user.name
+      SubjectDomainName: actor.user.domain
+      SubjectUserSid: actor.user.uid
+      TargetUserName: user.name
+      TargetDomainName: user.domain
+      NewProcessName: process.file.path
+      NewProcessId: process.pid
+      ParentProcessName: process.parent_process.file.path
+      CommandLine: process.cmd_line
+      ProcessName: actor.process.file.path
+      LogonType: logon_type_id
+      IpAddress: src_endpoint.ip
+      WorkstationName: src_endpoint.hostname
+      ObjectName: unmapped.ObjectName
+      ObjectType: unmapped.ObjectType
+      AccessMask: unmapped.AccessMask
+      AccessList: unmapped.AccessList
+      PrivilegeList: unmapped.PrivilegeList
+    rule_conditions:
+      - type: logsource
+        product: windows
+        service: security

@@ -50,10 +50,10 @@
 - **Autoría (REGLA ESTRICTA):** todos los commits son exclusivamente de Javier Saguar <javisaguarantona@gmail.com>. **Ningún agente de IA debe figurar como autor ni co-autor**: prohibido añadir `Co-Authored-By`, "Generated with", "Assisted by" o cualquier atribución similar en mensajes de commit, PRs o código. Ninguna IA debe ejecutar `git commit`/`git push` de forma autónoma; los comandos se proponen y los ejecuta Javier. Guardián técnico: hook `.githooks/commit-msg` (activar tras clonar con `git config core.hooksPath .githooks`).
 
 ## 4. Estado actual
-- **Fase:** F1 completada. Memoria arrancada.
-- **Hecho:** todo F1 (ingesta → normalización OCSF 100% → ClickHouse → observabilidad con 3 dashboards). **Memoria en marcha**: plantilla oficial ETSIT operativa en `Memoria/`, compilando 54 páginas. Redactados: resumen/abstract, glosario (22 términos), introducción, estado del arte (8 secciones), desarrollo (requisitos, arquitectura, decisiones, toda F1 con las 3 incidencias documentadas) y aspectos éticos. `ref.bib` con 11 referencias.
+- **Fase:** F2 iniciada — detección con reglas Sigma.
+- **Hecho:** F1 completa. pySigma 1.4.0 + sigma-cli 3.1.0 + backend ClickHouse instalados (compatibles con Python 3.14). Repo SigmaHQ clonado (3.142 reglas; ~2.300 en categorías ya normalizadas). **Escrita `detection/pipelines/ocsf-tfg.yml`**, pipeline propia que traduce reglas Sigma al esquema OCSF del proyecto. Primera detección real validada: la regla oficial de volcado de LSASS dispara 1 alerta sobre el dataset, exactamente la esperada (0x1fffff), excluyendo correctamente 0x1410.
 - **En curso:** cerrar sesión.
-- **Siguiente:** completar el estado del arte con la revisión bibliográfica (agosto); figura de arquitectura; anexo del subconjunto OCSF. Después F2 (Sigma).
+- **Siguiente:** evaluador de reglas en Python para streaming (`det.alerts`); selección del conjunto de reglas; matriz de cobertura ATT&CK.
 
 
 ## 5. Estructura del repo
@@ -193,3 +193,13 @@ Copia esto al final, en la sección Diario (lo más nuevo abajo):
 - **Problemas / pendiente:** portada sin rellenar; falta figura de arquitectura; anexoA vacío; estado del arte necesita referencias de la revisión de agosto.
 - **Siguiente paso:** revisión bibliográfica de agosto.
 - **Archivos tocados:** `Memoria/` (completa), `.gitignore`, `BITACORA.md`.
+
+
+### 2026-07-25 (3) — F2: pipeline Sigma→OCSF propia y primera detección
+- **Con qué/quién:** Claude (chat).
+- **Objetivo:** montar la capa de detección con reglas Sigma.
+- **Hecho:** instalado el ecosistema pySigma y clonadas 3.142 reglas. Analizada la pipeline oficial `pySigma-pipeline-ocsf` y detectadas 3 desviaciones respecto al esquema del proyecto. Escrita pipeline propia (9 categorías). Validación de extremo a extremo: regla oficial → SQL → ClickHouse → 1 detección correcta (rundll32→lsass, 0x1fffff), con exclusión correcta del caso 0x1410.
+- **Decisiones:** se escribe pipeline propia en lugar de extender la oficial, porque las condiciones `add_condition` se acumulan con AND y los `type_uid` divergentes se anularían entre sí. Correcciones aplicadas: (1) `SourceImage` → `actor.process` y no `parent_process` (en ProcessAccess el origen es el actor, no el padre); (2) `image_load` → clase Module Activity 1005 y no Process Activity 1007/Other; (3) `process_access` → actividad Open (3) y no Other (99). Campos sin equivalente OCSF dirigidos a `unmapped`, conforme al modelo del proyecto.
+- **Problemas / pendiente:** `rule_condition_linking` no existe en pySigma 1.4.0 (bloques de registro separados por categoría). El backend de ClickHouse está en estado *testing*.
+- **Siguiente paso:** evaluador de reglas en streaming.
+- **Archivos tocados:** `detection/pipelines/ocsf-tfg.yml` (nuevo), `BITACORA.md`.
