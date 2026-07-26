@@ -73,7 +73,7 @@ Todo alineado con **MITRE ATT&CK** y con inteligencia de amenazas en formato **S
 - Observabilidad completa: Prometheus sobre todos los componentes del *pipeline* y tres cuadros de mando de Grafana aprovisionados de forma declarativa.
 - **Pipeline propia de traducción Sigma → OCSF**, que corrige tres desviaciones semánticas detectadas en la pipeline oficial de la comunidad. Primera detección validada: la regla de volcado de LSASS (T1003.001) dispara exactamente la alerta esperada sobre datos reales.
 
-Plan detallado en [`docs/ROADMAP.md`](docs/ROADMAP.md) · Registro de decisiones y bitácora en [`BITACORA.md`](BITACORA.md).
+Plan detallado en [`docs/ROADMAP.md`](docs/ROADMAP.md) · La memoria y el registro de decisiones se mantienen en un repositorio aparte (`tfg-memoria`, privado).
 
 ---
 

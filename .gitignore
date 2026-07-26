@@ -33,3 +33,8 @@ Memoria/*.fdb_latexmk
 Memoria/*.synctex.gz
 Memoria/_minted-*/
 Memoria/main.pdf
+
+# Documentacion y memoria (viven en el repositorio tfg-memoria)
+Memoria/
+BITACORA.md
+AnotacionesMemoria.md
