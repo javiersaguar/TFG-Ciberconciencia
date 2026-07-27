@@ -1,5 +1,6 @@
 """Despachador: (Channel, EventID) -> funcion de mapeo."""
 from pipeline.normalize import sysmon, winsecurity
+from pipeline.normalize import sysmon, winsecurity, powershell
 
 SECURITY_CHANNEL = "security"
 SYSMON_CHANNEL = "microsoft-windows-sysmon/operational"
@@ -26,6 +27,27 @@ MAPPERS = {
     (SECURITY_CHANNEL, 5158): winsecurity.map_sec_filtering,
     (SECURITY_CHANNEL, 4624): winsecurity.map_sec_4624,
     (SECURITY_CHANNEL, 4625): winsecurity.map_sec_4625,
+    ("microsoft-windows-powershell/operational", 4104): powershell.map_ps_script_block,
+    ("microsoft-windows-powershell/operational", 4103): powershell.map_ps_module,
+    ("windows powershell", 800): powershell.map_ps_classic,
+    ("windows powershell", 400): powershell.map_ps_classic,
+    ("windows powershell", 600): powershell.map_ps_classic,
+    (SECURITY_CHANNEL, 5447): winsecurity.map_sec_filtering,
+    (SECURITY_CHANNEL, 5154): winsecurity.map_sec_filtering,
+    (SECURITY_CHANNEL, 5145): winsecurity.map_sec_filtering,
+    (SYSMON_CHANNEL, 2): sysmon.map_sysmon_2,
+    (SYSMON_CHANNEL, 8): sysmon.map_sysmon_8,
+    (SYSMON_CHANNEL, 9): sysmon.map_sysmon_9,
+    (SYSMON_CHANNEL, 18): sysmon.map_sysmon_18,
+    (SYSMON_CHANNEL, 23): sysmon.map_sysmon_23,
+    (SECURITY_CHANNEL, 4672): winsecurity.map_sec_privileges,
+    (SECURITY_CHANNEL, 4673): winsecurity.map_sec_privileges,
+    (SECURITY_CHANNEL, 4703): winsecurity.map_sec_privileges,
+    (SECURITY_CHANNEL, 4634): winsecurity.map_sec_logoff,
+    (SECURITY_CHANNEL, 4647): winsecurity.map_sec_logoff,
+    (SECURITY_CHANNEL, 4627): winsecurity.map_sec_group_membership,
+    (SECURITY_CHANNEL, 4670): winsecurity.map_sec_audit_policy,
+    (SECURITY_CHANNEL, 4945): winsecurity.map_sec_audit_policy,
 }
 
 

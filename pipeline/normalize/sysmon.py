@@ -245,3 +245,117 @@ def _to_int(value):
         return int(str(value), 0)
     except (ValueError, TypeError):
         return None
+
+def map_sysmon_2(event):
+    """Sysmon 2 - File creation time changed -> File System Activity.
+
+    El cambio de marca temporal de un fichero es una tecnica de anti-forense
+    (timestomping, T1070.006).
+    """
+    ocsf = base_event(event, CLASS_FILE_SYSTEM, CAT_SYSTEM, activity_id=0)
+    ocsf["type_name"] = "File System Activity: Timestamp Change"
+    ocsf["severity_id"] = 3
+    image = event.get("Image", "")
+    target = event.get("TargetFilename", "")
+    ocsf["file"] = {"name": target.split("\\")[-1] if target else None, "path": target or None}
+    ocsf["actor"] = {"process": {
+        "name": image.split("\\")[-1] if image else None,
+        "pid": _to_int(event.get("ProcessId")),
+        "file": {"path": image or None},
+    }}
+    ocsf["unmapped"] = {
+        "CreationUtcTime": event.get("CreationUtcTime"),
+        "PreviousCreationUtcTime": event.get("PreviousCreationUtcTime"),
+    }
+    ocsf["tfg"]["signal_timestomp"] = True
+    return ocsf
+
+
+def map_sysmon_8(event):
+    """Sysmon 8 - CreateRemoteThread -> Process Activity (inyeccion, T1055)."""
+    ocsf = base_event(event, CLASS_PROCESS, CAT_SYSTEM, activity_id=4)  # 4 = Inject
+    ocsf["type_name"] = "Process Activity: Inject"
+    ocsf["severity_id"] = 3
+    source = event.get("SourceImage", "")
+    target = event.get("TargetImage", "")
+    ocsf["actor"] = {"process": {
+        "name": source.split("\\")[-1] if source else None,
+        "pid": _to_int(event.get("SourceProcessId")),
+        "file": {"path": source or None},
+    }}
+    ocsf["process"] = {
+        "name": target.split("\\")[-1] if target else None,
+        "pid": _to_int(event.get("TargetProcessId")),
+        "file": {"path": target or None},
+    }
+    ocsf["unmapped"] = {
+        "StartAddress": event.get("StartAddress"),
+        "StartModule": event.get("StartModule"),
+        "StartFunction": event.get("StartFunction"),
+        "NewThreadId": event.get("NewThreadId"),
+    }
+    ocsf["tfg"]["signal_remote_thread"] = True
+    return ocsf
+
+
+def map_sysmon_9(event):
+    """Sysmon 9 - RawAccessRead -> File System Activity (acceso crudo a disco)."""
+    ocsf = base_event(event, CLASS_FILE_SYSTEM, CAT_SYSTEM, activity_id=2)  # 2 = Read
+    ocsf["type_name"] = "File System Activity: Raw Access Read"
+    image = event.get("Image", "")
+    ocsf["file"] = {"path": event.get("Device")}
+    ocsf["actor"] = {"process": {
+        "name": image.split("\\")[-1] if image else None,
+        "pid": _to_int(event.get("ProcessId")),
+        "file": {"path": image or None},
+    }}
+    ocsf["unmapped"] = {"Device": event.get("Device")}
+    ocsf["tfg"]["signal_raw_disk_access"] = True
+    return ocsf
+
+
+def map_sysmon_18(event):
+    """Sysmon 18 - Pipe connected -> Process Activity.
+
+    Las tuberias con nombre son un canal habitual de comunicacion entre
+    implantes y de movimiento lateral.
+    """
+    ocsf = base_event(event, CLASS_PROCESS, CAT_SYSTEM, activity_id=0)
+    ocsf["type_name"] = "Named Pipe Activity"
+    image = event.get("Image", "")
+    ocsf["actor"] = {"process": {
+        "name": image.split("\\")[-1] if image else None,
+        "pid": _to_int(event.get("ProcessId")),
+        "file": {"path": image or None},
+    }}
+    ocsf["unmapped"] = {
+        "PipeName": event.get("PipeName"),
+        "EventType": event.get("EventType"),
+    }
+    ocsf["tfg"]["pipe_name"] = event.get("PipeName")
+    return ocsf
+
+
+def map_sysmon_23(event):
+    """Sysmon 23 - File Delete (archivado) -> File System Activity, Delete."""
+    ocsf = base_event(event, CLASS_FILE_SYSTEM, CAT_SYSTEM, activity_id=4)  # 4 = Delete
+    ocsf["type_name"] = "File System Activity: Delete"
+    image = event.get("Image", "")
+    target = event.get("TargetFilename", "")
+    ocsf["file"] = {
+        "name": target.split("\\")[-1] if target else None,
+        "path": target or None,
+        "hashes": _parse_hashes(event.get("Hashes")),
+    }
+    ocsf["actor"] = {"process": {
+        "name": image.split("\\")[-1] if image else None,
+        "pid": _to_int(event.get("ProcessId")),
+        "file": {"path": image or None},
+    }}
+    ocsf["unmapped"] = {
+        "IsExecutable": event.get("IsExecutable"),
+        "Archived": event.get("Archived"),
+        "User": event.get("User"),
+    }
+    ocsf["tfg"]["signal_file_deleted"] = True
+    return ocsf

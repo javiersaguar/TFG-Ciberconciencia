@@ -195,3 +195,77 @@ def _to_int(value):
         return int(str(value), 0)
     except (ValueError, TypeError):
         return None
+
+def map_sec_privileges(event):
+    """4672 / 4673 / 4703 - Privilegios especiales -> Authorize Session (3003)."""
+    from pipeline.normalize.ocsf_common import CLASS_AUTHORIZE
+    event_id = int(event.get("EventID"))
+    ocsf = base_event(event, CLASS_AUTHORIZE, CAT_IAM, activity_id=1)
+    ocsf["type_name"] = f"Authorize Session ({event_id})"
+    ocsf["user"] = {
+        "name": event.get("SubjectUserName"),
+        "domain": event.get("SubjectDomainName"),
+        "uid": event.get("SubjectUserSid"),
+    }
+    privs = event.get("PrivilegeList") or event.get("EnabledPrivilegeList") or ""
+    ocsf["privileges"] = [p.strip() for p in str(privs).replace("\n", " ").split() if p.strip()][:20]
+    ocsf["unmapped"] = {
+        "PrivilegeList": str(privs)[:500],
+        "ProcessName": event.get("ProcessName"),
+        "Service": event.get("Service"),
+    }
+    ocsf["tfg"]["signal_special_privileges"] = "SeDebugPrivilege" in str(privs)
+    return ocsf
+
+
+def map_sec_logoff(event):
+    """4634 / 4647 - Cierre de sesion -> Authentication (3002), Logoff."""
+    ocsf = base_event(event, CLASS_AUTHENTICATION, CAT_IAM, activity_id=2)  # 2 = Logoff
+    ocsf["type_name"] = "Authentication: Logoff"
+    ocsf["user"] = {
+        "name": event.get("TargetUserName"),
+        "domain": event.get("TargetDomainName"),
+        "uid": event.get("TargetUserSid"),
+    }
+    ocsf["logon_type_id"] = _to_int(event.get("LogonType"))
+    return ocsf
+
+
+def map_sec_group_membership(event):
+    """4627 - Informacion de pertenencia a grupos -> Authentication (3002)."""
+    ocsf = base_event(event, CLASS_AUTHENTICATION, CAT_IAM, activity_id=1)
+    ocsf["type_name"] = "Authentication: Group Membership"
+    ocsf["user"] = {
+        "name": event.get("TargetUserName"),
+        "domain": event.get("TargetDomainName"),
+    }
+    ocsf["unmapped"] = {
+        "GroupMembership": str(event.get("GroupMembership"))[:2000],
+        "TargetLogonId": event.get("TargetLogonId"),
+    }
+    return ocsf
+
+
+def map_sec_audit_policy(event):
+    """4670 / 4945 / 4907 - Cambios de politica de auditoria o permisos.
+
+    Se mapean a Event Log Activity por su relacion con la integridad del
+    registro de auditoria. Senal de posible manipulacion defensiva.
+    """
+    event_id = int(event.get("EventID"))
+    ocsf = base_event(event, CLASS_EVENT_LOG, CAT_SYSTEM, activity_id=0)
+    ocsf["type_name"] = f"Audit Policy Change ({event_id})"
+    ocsf["severity_id"] = 3
+    ocsf["actor"] = {"user": {
+        "name": event.get("SubjectUserName"),
+        "domain": event.get("SubjectDomainName"),
+    }}
+    ocsf["unmapped"] = {
+        "ObjectName": event.get("ObjectName"),
+        "ObjectType": event.get("ObjectType"),
+        "OldSd": str(event.get("OldSd"))[:1000],
+        "NewSd": str(event.get("NewSd"))[:1000],
+        "RuleName": event.get("RuleName"),
+    }
+    ocsf["tfg"]["signal_audit_policy_change"] = True
+    return ocsf
