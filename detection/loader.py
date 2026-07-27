@@ -49,16 +49,41 @@ def load_rules(paths, pipeline=None, verbose=False):
 
     return rules, errors
 
+# Tacticas oficiales de MITRE ATT&CK Enterprise
+ATTACK_TACTICS = {
+    "reconnaissance", "resource-development", "initial-access", "execution",
+    "persistence", "privilege-escalation", "defense-evasion", "credential-access",
+    "discovery", "lateral-movement", "collection", "command-and-control",
+    "exfiltration", "impact",
+}
+
 
 def rule_summary(rule):
-    """Extrae los metadatos relevantes de una regla para la alerta."""
-    techniques, tactics = [], []
+    """Extrae los metadatos relevantes de una regla para la alerta.
+
+    Las etiquetas de Sigma mezclan tres cosas bajo el prefijo 'attack.':
+    tecnicas (tNNNN), software (sNNNN) y tacticas (nombre). Ademas, algunas
+    reglas de la comunidad usan nombres de tactica no estandar. Se clasifican
+    por separado para no contaminar el mapeo ATT&CK.
+    """
+    techniques, tactics, software, otros = [], [], [], []
+
     for tag in rule.tags:
         t = str(tag).lower()
-        if t.startswith("attack.t"):
-            techniques.append(t.replace("attack.", "").upper())
-        elif t.startswith("attack."):
-            tactics.append(t.replace("attack.", ""))
+        if not t.startswith("attack."):
+            continue
+        valor = t.replace("attack.", "", 1)
+
+        if valor.startswith("t") and valor[1:2].isdigit():
+            techniques.append(valor.upper())
+        elif valor.startswith("s") and valor[1:2].isdigit():
+            software.append(valor.upper())
+        elif valor.startswith("g") and valor[1:2].isdigit():
+            otros.append(valor.upper())          # grupos de actores
+        elif valor in ATTACK_TACTICS:
+            tactics.append(valor)
+        else:
+            otros.append(valor)                  # etiquetas no estandar
 
     return {
         "rule_id": str(rule.id) if rule.id else None,
@@ -67,6 +92,8 @@ def rule_summary(rule):
         "rule_status": str(rule.status).lower() if rule.status else None,
         "techniques": techniques,
         "tactics": tactics,
+        "software": software,
+        "other_tags": otros,
         "logsource_category": rule.logsource.category,
         "logsource_product": rule.logsource.product,
         "logsource_service": rule.logsource.service,
