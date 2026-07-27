@@ -132,6 +132,17 @@ def main():
     # Control: solo volumen (la caracteristica mas obvia)
     feats_volumen = ["n_eventos"]
     ejecutar("E: control, solo n_eventos", feats_volumen, limpio, 0.05)
+    # --- Experimentos con caracteristicas RELATIVAS (sin volumen) ---
+    from ml.anomaly.features import relative_features, absolute_features
+
+    feats_rel = relative_features(df)
+    feats_abs = absolute_features(df)
+    print(f"\nCaracteristicas relativas: {len(feats_rel)}  |  absolutas: {len(feats_abs)}")
+    print(f"  relativas: {', '.join(feats_rel[:8])}...\n")
+
+    ejecutar("F: limpias, SOLO ratios (sin volumen)", feats_rel, limpio, 0.05)
+    ejecutar(f"G: todo (cont={args.contamination}), SOLO ratios", feats_rel,
+             todo, args.contamination)
     # --- Resultados ---
     print("Resultados sobre apt29 day1")
     print(f"  {'estrategia':44} {'feats':>6} {'entren.':>8} {'AUC-ROC':>9} {'AUC-PR':>8}")
