@@ -2,20 +2,49 @@
   "minutes": 5,
   "resultados": [
     {
-      "estrategia": "A: solo ventanas limpias",
+      "estrategia": "A: limpias, todas las feats",
       "auc_roc": 0.979,
       "auc_pr": 0.981,
       "positivos": 15,
       "muestras": 28,
-      "n_entrenamiento": 132
+      "n_entrenamiento": 132,
+      "n_features": 29
     },
     {
-      "estrategia": "B: todo, contaminacion=0.3",
+      "estrategia": "B: todo (cont=0.3), todas",
       "auc_roc": 0.933,
       "auc_pr": 0.933,
       "positivos": 15,
       "muestras": 28,
-      "n_entrenamiento": 392
+      "n_entrenamiento": 392,
+      "n_features": 29
+    },
+    {
+      "estrategia": "C: limpias, SIN feats circulares",
+      "auc_roc": 1.0,
+      "auc_pr": 1.0,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 132,
+      "n_features": 21
+    },
+    {
+      "estrategia": "D: todo (cont=0.3), SIN circulares",
+      "auc_roc": 0.923,
+      "auc_pr": 0.923,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 392,
+      "n_features": 21
+    },
+    {
+      "estrategia": "E: control, solo n_eventos",
+      "auc_roc": 0.941,
+      "auc_pr": 0.92,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 132,
+      "n_features": 1
     }
   ]
 }

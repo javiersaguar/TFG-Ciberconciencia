@@ -22,6 +22,12 @@ from ml.anomaly.features import (
 SEED = 42
 EVAL_DATASET = "SDWIN-200501225525"   # apt29 day1
 
+# Caracteristicas que participan en la definicion de "ventana limpia".
+# Se excluyen en la ablacion para comprobar que el modelo no depende de ellas.
+FEATURES_CIRCULARES = [
+    "s_lsass", "s_lsass_sosp", "s_dump_mod", "s_dump_file",
+    "s_log_borrado", "s_logon_remoto", "c_inyecciones", "c_severidad_alta",
+]
 
 def marcar_indicios(df):
     """Marca las ventanas con indicios objetivos de actividad maliciosa."""
@@ -94,30 +100,44 @@ def main():
 
     resultados = []
 
-    # --- Estrategia A: entrenar solo con ventanas limpias (excluyendo eval) ---
-    limpio = df[(~df["indicios"]) & (~es_eval)]
-    if len(limpio) >= 30:
-        scaler_a, model_a = entrenar(limpio[feats].values, contamination=0.05)
-        scores_a = puntuar(scaler_a, model_a, X_eval)
-        r = evaluar("A: solo ventanas limpias", scores_a, y_eval)
-        r["n_entrenamiento"] = len(limpio)
+    def ejecutar(nombre, feats_usar, df_train, contamination):
+        """Entrena con un subconjunto de caracteristicas y evalua."""
+        if len(df_train) < 30:
+            return None
+        scaler, model = entrenar(df_train[feats_usar].values, contamination)
+        scores = puntuar(scaler, model, df_eval[feats_usar].values)
+        r = evaluar(nombre, scores, y_eval)
+        r["n_entrenamiento"] = len(df_train)
+        r["n_features"] = len(feats_usar)
         resultados.append(r)
-        df_eval["score_A"] = scores_a
+        return scores
 
-    # --- Estrategia B: entrenar con todo asumiendo contaminacion ---
+    limpio = df[(~df["indicios"]) & (~es_eval)]
     todo = df[~es_eval]
-    scaler_b, model_b = entrenar(todo[feats].values, contamination=args.contamination)
-    scores_b = puntuar(scaler_b, model_b, X_eval)
-    r = evaluar(f"B: todo, contaminacion={args.contamination}", scores_b, y_eval)
-    r["n_entrenamiento"] = len(todo)
-    resultados.append(r)
-    df_eval["score_B"] = scores_b
 
+    # Conjunto completo de caracteristicas
+    df_eval["score_A"] = ejecutar("A: limpias, todas las feats", feats, limpio, 0.05)
+    df_eval["score_B"] = ejecutar(f"B: todo (cont={args.contamination}), todas", feats,
+                                  todo, args.contamination)
+
+    # ABLACION: sin las caracteristicas que definen "ventana limpia"
+    feats_ablacion = [f for f in feats if f not in FEATURES_CIRCULARES]
+    print(f"Ablacion: {len(feats)} -> {len(feats_ablacion)} caracteristicas")
+    print(f"  excluidas: {', '.join(FEATURES_CIRCULARES)}\n")
+
+    ejecutar("C: limpias, SIN feats circulares", feats_ablacion, limpio, 0.05)
+    ejecutar(f"D: todo (cont={args.contamination}), SIN circulares", feats_ablacion,
+             todo, args.contamination)
+
+    # Control: solo volumen (la caracteristica mas obvia)
+    feats_volumen = ["n_eventos"]
+    ejecutar("E: control, solo n_eventos", feats_volumen, limpio, 0.05)
     # --- Resultados ---
     print("Resultados sobre apt29 day1")
-    print(f"  {'estrategia':34} {'entren.':>8} {'AUC-ROC':>9} {'AUC-PR':>8}")
+    print(f"  {'estrategia':44} {'feats':>6} {'entren.':>8} {'AUC-ROC':>9} {'AUC-PR':>8}")
     for r in resultados:
-        print(f"  {r['estrategia']:34} {r.get('n_entrenamiento',0):8d} "
+        print(f"  {r['estrategia']:44} {r.get('n_features',0):6d} "
+              f"{r.get('n_entrenamiento',0):8d} "
               f"{str(r.get('auc_roc')):>9} {str(r.get('auc_pr')):>8}")
 
     # Importancia aproximada: caracteristicas mas extremas en las ventanas top
