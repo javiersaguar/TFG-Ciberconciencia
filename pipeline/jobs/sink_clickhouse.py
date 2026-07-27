@@ -39,6 +39,19 @@ COLUMNS = [
     "dataset_id", "source_channel", "source_event_id", "raw",
 ]
 
+def clean_ip(value):
+    """Devuelve la IP solo si es valida; None en caso contrario.
+
+    Evita que un valor mal formado en una fuente rompa la insercion del lote
+    completo.
+    """
+    if not value:
+        return None
+    import ipaddress
+    try:
+        return str(ipaddress.ip_address(str(value).strip()))
+    except ValueError:
+        return None
 
 def to_row(e):
     """Aplana un evento OCSF a una fila de la tabla (orden = COLUMNS)."""
@@ -66,8 +79,7 @@ def to_row(e):
         proc.get("name") or "",
         proc.get("pid"),
         (file.get("path") or proc.get("file", {}).get("path")) or "",
-        dst.get("ip"),
-        dst.get("port"),
+        clean_ip(dst.get("ip")),        dst.get("port"),
         bool(tfg.get("signal_lsass_access")),
         bool(tfg.get("signal_suspicious_access")),
         bool(tfg.get("signal_dump_module")),

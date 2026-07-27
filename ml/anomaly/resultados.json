@@ -1,0 +1,21 @@
+{
+  "minutes": 5,
+  "resultados": [
+    {
+      "estrategia": "A: solo ventanas limpias",
+      "auc_roc": 0.979,
+      "auc_pr": 0.981,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 132
+    },
+    {
+      "estrategia": "B: todo, contaminacion=0.3",
+      "auc_roc": 0.933,
+      "auc_pr": 0.933,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 392
+    }
+  ]
+}

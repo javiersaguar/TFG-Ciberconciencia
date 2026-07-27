@@ -21,8 +21,7 @@ CREATE TABLE IF NOT EXISTS tfg.events
     target_process_name String,
     target_process_pid  Nullable(UInt32),
     file_path           String,
-    dst_ip              Nullable(IPv4),
-    dst_port            Nullable(UInt16),
+    dst_ip          Nullable(IPv6),   -- IPv6 cubre tambien IPv4 (mapped)    dst_port            Nullable(UInt16),
 
     -- Señales de deteccion precalculadas (tfg.signal_*)
     signal_lsass_access      Bool DEFAULT false,
