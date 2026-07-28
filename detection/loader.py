@@ -49,12 +49,12 @@ def load_rules(paths, pipeline=None, verbose=False):
 
     return rules, errors
 
-# Tacticas oficiales de MITRE ATT&CK Enterprise
+# Tacticas de MITRE ATT&CK Enterprise (v19)
 ATTACK_TACTICS = {
     "reconnaissance", "resource-development", "initial-access", "execution",
-    "persistence", "privilege-escalation", "defense-evasion", "credential-access",
-    "discovery", "lateral-movement", "collection", "command-and-control",
-    "exfiltration", "impact",
+    "persistence", "privilege-escalation", "stealth", "defense-evasion",
+    "defense-impairment", "credential-access", "discovery", "lateral-movement",
+    "collection", "command-and-control", "exfiltration", "impact",
 }
 
 

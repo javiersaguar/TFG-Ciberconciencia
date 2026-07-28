@@ -1,0 +1,234 @@
+{
+  "name": "TFG - Cobertura observada",
+  "versions": {
+    "attack": "19",
+    "navigator": "5.1.0",
+    "layer": "4.5"
+  },
+  "domain": "enterprise-attack",
+  "description": "Tecnicas ATT&CK efectivamente detectadas sobre los conjuntos de datos procesados. La puntuacion indica el numero de alertas generadas por cada tecnica.",
+  "techniques": [
+    {
+      "techniqueID": "T1003.001",
+      "score": 30,
+      "comment": "30 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.002",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.003",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.004",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.005",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.002",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.003",
+      "score": 3,
+      "comment": "3 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.006",
+      "score": 3,
+      "comment": "3 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1027",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1027.004",
+      "score": 6,
+      "comment": "6 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1036",
+      "score": 6,
+      "comment": "6 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1040",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1048.003",
+      "score": 10,
+      "comment": "10 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1055.011",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059",
+      "score": 7,
+      "comment": "7 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059.001",
+      "score": 45,
+      "comment": "45 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1070.003",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1106",
+      "score": 129,
+      "comment": "129 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1112",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1132.001",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1140",
+      "score": 3,
+      "comment": "3 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1202",
+      "score": 6,
+      "comment": "6 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1204.002",
+      "score": 4,
+      "comment": "4 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1218.011",
+      "score": 10,
+      "comment": "10 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1490",
+      "score": 3,
+      "comment": "3 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1547.001",
+      "score": 22,
+      "comment": "22 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1548.002",
+      "score": 4,
+      "comment": "4 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1560.001",
+      "score": 4,
+      "comment": "4 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1569.002",
+      "score": 6,
+      "comment": "6 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1570",
+      "score": 2,
+      "comment": "2 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1587.001",
+      "score": 8,
+      "comment": "8 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1588.002",
+      "score": 26,
+      "comment": "26 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1685",
+      "score": 159,
+      "comment": "159 alerta(s)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1685.001",
+      "score": 98,
+      "comment": "98 alerta(s)",
+      "enabled": true
+    }
+  ],
+  "gradient": {
+    "colors": [
+      "#ffe8e8",
+      "#e60d0d"
+    ],
+    "minValue": 0,
+    "maxValue": 159
+  },
+  "legendItems": [],
+  "showTacticRowBackground": true,
+  "tacticRowBackground": "#dddddd",
+  "sorting": 3,
+  "layout": {
+    "layout": "side",
+    "showID": true,
+    "showName": true
+  },
+  "hideDisabled": true
+}
