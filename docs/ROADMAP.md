@@ -3,7 +3,7 @@
 **Proyecto:** Plataforma de conciencia cibersituacional — detección de ataques multi-etapa, grafo de ataque razonado y priorización explicable
 **Autor:** Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos, ETSIT-UPM
 **Horizonte:** agosto 2026 → defensa junio 2027
-**Última actualización:** 2026-07-26 · *(rev. 2 — aprendizaje automático integrado en las fases)*
+**Última actualización:** 2026-07-30 · *(rev. 3 — F2 cerrada, laboratorio de emulación propio, arranque de F3)*
 
 ---
 
@@ -26,29 +26,37 @@
 
 ---
 
-## 1. Punto de partida (a 26-07-2026)
+## 1. Punto de partida (a 30-07-2026)
 
 ### Hecho ✅
 
 - **F0 — Entorno:** WSL2 + Ubuntu (systemd), Docker Engine, VS Code. Repo en GitHub privado, hook de autoría. Repositorio separado `tfg-memoria` para documentación.
 - **F1 — Completa:**
   - Redpanda + Console (perfil `core`).
-  - Normalización OCSF: ~20 tipos de evento Windows, **100 % de cobertura** (184/184, 0 DLQ), validada en batch y streaming.
+  - Normalización OCSF: ~20 tipos de evento Windows. **100 %** sobre el dataset de referencia
+    (184/184, 0 DLQ) y **99,4 %** sobre apt29 day1 (195.197 de 196.081, 0 DLQ); el 0,6 %
+    restante es cola larga con rendimiento decreciente claro.
   - ClickHouse con esquema híbrido (columnas + `raw` JSON) y sink funcionando.
   - Observabilidad: Prometheus (5 targets) + Grafana con 3 dashboards aprovisionados.
-  - Flink 2.2.1 operativo; prueba de humo de `MATCH_RECOGNIZE` superada.
-- **F2 — En curso:**
-  - pySigma 1.4.0 + sigma-cli + backend ClickHouse.
-  - **Pipeline propia `detection/pipelines/ocsf-tfg.yml`** (corrige 3 desviaciones de la oficial).
-  - Cargador y **evaluador en memoria**: 2.093 reglas, 10 alertas correctas, 0 falsos positivos.
-  - Optimización medida: **73×** (108,6 s → 1,49 s) sin alterar resultados.
+  - Flink 2.2.1 operativo; prueba de humo de `MATCH_RECOGNIZE` superada
+    (hizo falta `table.exec.source.idle-timeout=5s` para desbloquear el watermark).
+- **F2 — Completa** (ver detalle y pendientes reubicados en la propia fase):
+  - pySigma 1.4.0 + **pipeline propia `detection/pipelines/ocsf-tfg.yml`** (3 desviaciones corregidas).
+  - Evaluador en memoria: 2.093 reglas, **optimización 73×** medida.
+  - Job de streaming `norm.events → det.alerts` + sink a `tfg.alerts`.
+  - **apt29 day1: 741 alertas / 195.197 eventos (0,39 %), 4 hosts, 33 técnicas, 0 a DLQ.**
+  - **Línea base de reducción de alertas (agrupación ingenua): 741 → 87 (88,3 %).**
+  - Matriz de cobertura ATT&CK: 300 técnicas potenciales, 34 observadas (11,3 % de activación).
+  - ML-1: Isolation Forest sobre ventanas de host, **AUC-ROC 0,995**; control solo-volumen **0,941**.
+    10 experimentos en MLflow.
+  - Laboratorio de emulación propio (VirtualBox + Sysmon + Atomic Red Team): dataset etiquetado
+    de 14.895 eventos (14.765 benignos / 130 maliciosos) sobre 4 técnicas.
 - **Memoria:** proyecto LaTeX compilando (54 pág.), con estado del arte y desarrollo hasta F1 redactados.
 
 ### Lo que falta
 
 | Fase | Nombre | Prioridad | Estimación |
 |---|---|---|---|
-| **F2** | Cerrar detección con reglas + **anomalías 🧠** | 🔴 | 2–3 sem |
 | **F3** | **Pilar A** — detección multi-etapa (CEP) + **secuencias 🧠** | 🔴 | 3–4 sem |
 | **F4** | Plano CTI + **extracción de TTPs con NLP 🧠** | 🟠 | 3–4 sem |
 | **F5** | **Pilar B** — grafo razonado + **GNN neurosimbólico 🧠** | 🔴 | 4–5 sem |
@@ -226,9 +234,14 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ---
 
-## F2 — Detección con reglas + anomalías 🔴
+## F2 — Detección con reglas + anomalías 🔴 ✅ CERRADA (30-07-2026)
 
-**Estimación:** 2–3 semanas restantes · **Prerrequisitos:** F1 ✅
+**Prerrequisitos:** F1 ✅ · **Cierre:** 30-07-2026
+
+> **Pendientes reubicados al cerrar la fase** (no bloquean F3, se documentan aquí para no perderlos):
+> validación cruzada evaluador-vs-SQL → **F7**; autoencoder y modelo secuencial de ML-1 → **F3.3/F7**
+> (🟢, solo si el calendario lo permite); publicación en `det.anomalies` → **F3.3**, que es donde
+> se consume; ampliación de técnicas del laboratorio → sesiones sueltas, mecanismo ya barato de repetir.
 
 ### F2.1 — Cerrar la detección basada en reglas
 
@@ -238,57 +251,97 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 - [x] Cargador (`detection/loader.py`) y evaluador en memoria (`detection/evaluator.py`).
 - [x] Validación: 10 alertas correctas, 0 falsos positivos sobre el dataset de referencia.
 - [x] Optimización medida: 73× (precompilación + enrutado por logsource).
-- [ ] **Job de streaming** `norm.events → det.alerts`.
-- [ ] Definir el **esquema de alerta**:
+- [x] **Job de streaming** `norm.events → det.alerts` (`pipeline/jobs/detect_job.py`).
+- [x] Definir el **esquema de alerta**. ⚠️ **Esquema realmente emitido** (`build_alert()`),
+  que es el que debe usar el CEP de F3 — ojo, difiere del borrador inicial de este roadmap:
   ```
-  alert_id · time · rule_id · rule_title · rule_level
-  attack.technique_id · attack.tactic_id
-  device.hostname · actor.user.name
+  alert_id · time (epoch ms) · detected_at
+  rule_id · rule_title · rule_level · rule_status
+  attack.technique_ids[]   ← ARRAY, no escalar
+  attack.tactic_ids[]      ← ARRAY y con NOMBRES ('execution', 'defense-evasion', …),
+                              no identificadores TAxxxx
+  device.hostname
+  actor.user_name · actor.process_name        ← plano, no actor.user.name
+  source_event{ class_uid, type_uid, type_name, channel, event_id }
   matched_fields{}        ← semilla de la explicabilidad
-  tfg.dataset_id
+  tfg.dataset_id · tfg.detector
   ```
-- [ ] Sink de `det.alerts` a ClickHouse.
-- [ ] **Cargar apt29 day1** (~240.000 eventos) y medir con volumen realista:
-  cobertura de normalización, alertas generadas, falsos positivos, rendimiento.
-- [ ] Ampliar mapeadores según lo que revele la cobertura sobre el dataset grande.
-- [ ] **Matriz de cobertura ATT&CK** en formato Navigator.
-- [ ] Validación cruzada: comparar el evaluador en streaming con la vía SQL sobre ClickHouse.
+- [x] Sink de `det.alerts` a ClickHouse (`tfg.alerts`; técnicas y tácticas como `Array`,
+  `matched_fields` serializado como `String` JSON).
+- [x] **Cargar apt29 day1** y medir con volumen realista: 196.081 eventos, 99,4 % de cobertura,
+  741 alertas, 0 a DLQ, 78 ev/s con 2.093 reglas (~163.000 evaluaciones/s).
+- [x] Ampliar mapeadores según lo que revele la cobertura sobre el dataset grande
+  (PowerShell 1009, Sysmon 2/8/9/18/23, Security 4672/4673/4703/4634/4627/4670/4945/5447/5154/5145).
+- [x] **Matriz de cobertura ATT&CK** en formato Navigator (`detection/coverage_matrix.py`).
+- [ ] ↪️ **F7** — Validación cruzada: comparar el evaluador en streaming con la vía SQL sobre ClickHouse.
 
 ### F2.2 🧠 — ML-1: detección de anomalías
 
-- [ ] **1. Definir el papel exacto.** La anomalía **no** genera alerta por sí sola. Sus dos
+- [x] **1. Definir el papel exacto.** La anomalía **no** genera alerta por sí sola. Sus dos
   usos son: (a) elevar la confianza de una campaña ya detectada por CEP; (b) marcar eventos
-  para revisión cuando no hay regla que aplique. *Decisión de diseño a documentar.*
-- [ ] **2. Ingeniería de características** sobre `norm.events`:
+  para revisión cuando no hay regla que aplique. *Decisión de diseño documentada.*
+- [x] **2. Ingeniería de características** sobre `norm.events` — 42 características,
+  separadas en **26 absolutas** y **16 relativas** (proporciones independientes del volumen
+  por construcción, para poder aislar el efecto del volumen):
   - Por evento: clase OCSF, proceso actor, proceso padre, longitud y entropía de la línea de comandos, ruta, usuario, hora del día.
   - Agregadas por host y ventana: nº de procesos únicos, tasa de creación, diversidad de rutas, conexiones salientes.
   - Codificación de categóricas de alta cardinalidad (hashing o *target encoding*).
-- [ ] **3. Línea base no supervisada:** Isolation Forest sobre eventos individuales. Barato
-  e interpretable mediante importancia de características.
-- [ ] **4. Autoencoder** sobre el vector de características: el error de reconstrucción como
-  puntuación de anomalía. Permite comparar contra la línea base.
-- [ ] **5.** 🟢 **Modelo secuencial** (LSTM o Transformer pequeño) sobre secuencias de eventos
-  por host: predecir el siguiente evento y usar la sorpresa como anomalía. Es el que mejor
-  encaja con la naturaleza multi-etapa del problema.
-- [ ] **6. Entrenamiento solo sobre actividad benigna** (los datasets la incluyen), evaluando
-  sobre las porciones con ataque. Es el planteamiento correcto para detección de anomalías.
-- [ ] **7. Registrar experimentos en MLflow**: parámetros, métricas y artefactos. Añadir el
-  perfil `mlops` al compose.
-- [ ] **8. Publicar en `det.anomalies`** con la puntuación y las características que más
-  contribuyen (explicabilidad).
-- [ ] **9. Evaluar:** ¿detecta el ataque que las reglas ven? ¿detecta algo que las reglas
-  **no** ven? ¿cuántos falsos positivos genera sobre tráfico benigno?
+- [x] **3. Línea base no supervisada:** Isolation Forest sobre **ventanas de host de 5 min**
+  (nivel de agregación elegido por su encaje con el problema multi-etapa, no sobre eventos
+  sueltos). **AUC-ROC 0,995** con características limpias.
+- [ ] 🟢 ↪️ **F3.3/F7** — **4. Autoencoder** sobre el vector de características (error de
+  reconstrucción como puntuación). No ejecutado: el Isolation Forest ya satura la métrica
+  sobre estos datasets, así que la comparación solo tiene sentido con datos menos separables.
+- [ ] 🟢 ↪️ **F3.3/F7** — **5. Modelo secuencial** (LSTM o Transformer pequeño) sobre
+  secuencias por host. Es el que mejor encaja con lo multi-etapa; se reevalúa en F3.3.
+- [x] **6. Entrenamiento solo sobre actividad benigna**, evaluando sobre las porciones con
+  ataque, con apt29 day1 reservado para evaluación. Medido: **la pureza del entrenamiento es
+  crítica** (mismas 16 características relativas: 0,867 con datos limpios vs 0,533 —azar— con
+  datos contaminados).
+- [x] **7. Registrar experimentos en MLflow**: 10 experimentos comparables; perfil `mlops`
+  añadido al compose.
+- [ ] ↪️ **F3.3** — **8. Publicar en `det.anomalies`** con la puntuación y las características
+  que más contribuyen. Se traslada a F3.3, que es donde la puntuación se consume como factor
+  de confianza de la campaña.
+- [x] **9. Evaluar.** Hecho, con dos **controles** que son el resultado metodológico de la fase:
+  control de volumen (solo `n_eventos`) **0,941** y solo-ratios **0,867** → volumen y perfil
+  son complementarios, y el **control de volumen queda como línea base permanente para F7**.
+  ⚠️ La separabilidad es en parte **artefacto de los datasets** (el ataque se ejecuta en
+  ráfagas, sin actividad de fondo sostenida): las ventanas con ataque tienen 8× más eventos.
+  Es lo que motiva el laboratorio propio de F2.3.
+
+### F2.3 — Laboratorio de emulación propio (Atomic Red Team) 🧠
+
+- [x] VM aislada de laboratorio (VirtualBox, Windows 11 Pro) con Sysmon (config SwiftOnSecurity) + Atomic Red Team.
+- [x] Auditoría avanzada de creación de procesos + PowerShell Script Block Logging activados y verificados.
+- [x] Mecanismo de captura por ventana temporal (`capture-manifest.ps1`) + etiquetado offline (`label_dataset.py`), sin depender de coincidencia de patrones en vivo.
+- [x] Primera tanda capturada: T1547.001 (19/20 subtests), T1070 (2/2), T1055 (3 intentados, bloqueados por Defender), T1003.001 (comsvcs.dll OK; ProcDump con acceso a LSASS denegado).
+- [x] Diagnosticada y corregida contaminación del dataset: ruido de PowerShell Module Logging (EventID 4103, ~59 % del total) y andamiaje del framework (`whoami.exe`/`HOSTNAME.EXE`, ~62 % de las muestras "maliciosas" a nivel de proceso).
+- [x] Generar línea base de actividad benigna sostenida (`run-lab.ps1 -BenignMinutes 180`) y
+  dataset final limpio: **14.895 eventos (14.765 benignos / 130 maliciosos)**, 4 técnicas
+  (T1547.001=86 con 19 subtests y 48 líneas de comando distintas, T1003.001=26, T1055=10, T1070=8).
+  Tercera fuente de contaminación detectada y filtrada (`svchost.exe` escribiendo
+  `InventoryApplicationFile` durante las ventanas de ataque, 16 filas).
+  Limitación conocida: pico de 5.528 eventos benignos por una instalación real de Windows Update.
+- [ ] ⚠️ **Reproducibilidad — versionar el laboratorio.** Los scripts de `emulation/` en el repo
+  son la versión **previa** a las tres correcciones de contaminación, y `run-lab.ps1` solo existe
+  dentro de la VM (`C:\Lab`). Copiar desde la VM a `\\VBOXSVR\Shared` y de ahí a `emulation/`:
+  `run-lab.ps1`, `export-events-clean.ps1` (sin 4103) y `label_dataset.py` (con los filtros de
+  `whoami.exe`/`HOSTNAME.EXE` y `InventoryApplicationFile`).
+- [ ] Ampliar cobertura: T1055 con variantes que no disparen Defender; T1003.001 con una variante que documente el bloqueo de LSA sin depender de herramientas de volcado reales. Capturar el EventID 1116 de Defender si se quiere señal explícita de "técnica prevenida por control".
+- [ ] Integrar el dataset generado como conjunto adicional de evaluación de ML-1 (además de apt29/LSASS_campaign), aprovechando el volumen benigno sostenido para atacar el problema de "volumen como artefacto" detectado el 27-07. **Requiere ruta de normalización CSV → OCSF**, que hoy no existe.
 
 ### 📦 Entregables F2
 `detection/{loader,evaluator}.py` · `detection/pipelines/ocsf-tfg.yml` · job de streaming ·
 `ml/anomaly/` (features, entrenamiento, inferencia) · perfil `mlops` · matriz de cobertura ATT&CK
 
-### ✅ DoD
-1. Job de streaming publicando en `det.alerts` con el esquema definido.
-2. Resultados sobre apt29 day1 (volumen realista) medidos y documentados.
-3. Detector de anomalías entrenado, evaluado y comparado con línea base.
-4. Matriz de cobertura ATT&CK generada.
-5. Experimentos registrados en MLflow y reproducibles.
+### ✅ DoD — cumplido
+1. ✅ Job de streaming publicando en `det.alerts` con el esquema definido.
+2. ✅ Resultados sobre apt29 day1 medidos y documentados (741 alertas / 195.197 eventos, 0 DLQ).
+3. ✅ Detector de anomalías entrenado, evaluado y comparado con **dos** líneas base
+   (control de volumen 0,941 y solo-ratios 0,867 frente a 0,995).
+4. ✅ Matriz de cobertura ATT&CK generada (300 potenciales / 34 observadas).
+5. ✅ 10 experimentos registrados en MLflow y comparables.
 
 ### ⚠️ Riesgos
 | Riesgo | Mitigación |
@@ -305,10 +358,22 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ### F3.1 — Modelado de escenarios
 
-- [ ] Extraer y reproducir `compound/apt29/day1` y `day2` (367 MB descomprimidos).
+- [x] day1 extraído, normalizado y detectado (F2).
+- [ ] Extraer y cargar **day2** (`apt29_evals_day2_manual.zip`, 43 MB sin extraer;
+  hosts NEWYORK, SCRANTON, UTICA-A/C/D/ONE-DRIVE).
+- [ ] **Inventario de materia prima antes de diseñar patrones** (paso 0 de la fase): qué
+  `dataset_id` hay realmente en `tfg.alerts`, cuántas alertas por técnica ancla y qué claves
+  trae de verdad `matched_fields`. En particular, **verificar si las 7 variantes de
+  LSASS_campaign están ya normalizadas y detectadas** o solo lo están los atómicos: sin sus
+  alertas no se puede validar P1.
 - [ ] Normalizador de red (Zeek) + topic `raw.net.zeek`. **Aquí el pipeline pasa a multi-fuente.**
+  ℹ️ Los logs de Zeek **ya vienen dados** en el dataset (`day1/zeek/combined_zeek.log` +
+  por host, e igual en day2): no hace falta procesar los pcaps ni ejecutar Zeek.
 - [ ] Estudiar los `emulationplans/` de apt29 y reconstruir la cadena real → verdad conocida de la secuencia.
+  ℹ️ El plan viene como **un único `apt29.xlsx`**, no como YAML: hay que parsearlo (o cruzarlo
+  con el plan público de MITRE Evals) para sacar la secuencia paso → hora → host.
 - [ ] `docs/scenarios/apt29-day1.md`: táctica → técnica → evidencia esperada → ventana temporal.
+  **De aquí salen los `WITHIN` de los patrones**, medidos sobre la campaña real; no se fijan a ojo.
 - [ ] Diseñar **3–5 patrones CEP** de valor general:
   - **P1** Robo de credenciales: proceso inusual → acceso a LSASS → volcado a disco → *(opc.)* borrado de log.
   - **P2** Movimiento lateral: logon remoto → creación de proceso/servicio → conexión saliente. **Cruza hosts.**
@@ -319,7 +384,13 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 ### F3.2 — Implementación
 
 - [ ] Implementar con `MATCH_RECOGNIZE` (`PARTITION BY`, `MEASURES`, `PATTERN`, `DEFINE`, `WITHIN`).
-- [ ] Trabajar sobre `det.alerts` además de `norm.events`: correlacionar alertas ya etiquetadas es más semántico.
+- [ ] **Decisión abierta a cerrar en F3.1 — fuente de las etapas.** `det.alerts` es más semántico,
+  pero **deja etapas ciegas**: si ninguna regla Sigma etiqueta la escritura del `.dmp` o la
+  conexión saliente, esas etapas no existen como alerta y el patrón nunca completa. Opción
+  propuesta: **híbrido**, alertas Sigma como **etapas ancla** + un flujo derivado de
+  `norm.events` filtrado por las señales `tfg.signal_*` ya precalculadas en los mapeadores
+  (`signal_lsass_access`, `signal_dump_file`, `signal_log_cleared`, `signal_remote_thread`…)
+  para las etapas de refuerzo. Decidir **con el inventario de F3.1 en la mano**, no antes.
 - [ ] **Esquema de campaña** en `det.campaigns`:
   ```
   campaign_id · first_seen · last_seen · duration · pattern_id

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/javier/proyectos/**)",
+      "Bash(docker compose -f infra/docker-compose.yml exec -T clickhouse clickhouse-client -q ' *)"
+    ]
+  }
+}
