@@ -7,10 +7,10 @@ El consumidor usa grupo de Kafka sin fijar particiones, de modo que varias
 instancias del job pueden ejecutarse en paralelo repartiendose el trabajo.
 """
 import argparse
+import hashlib
 import json
 import signal
 import time
-import uuid
 
 from confluent_kafka import Consumer, Producer, KafkaException
 
@@ -53,20 +53,31 @@ def header_value(headers, key):
     return None
 
 
-def build_alert(compiled_rule, matched, event, dataset_id):
+def build_alert(compiled_rule, matched, event, dataset_id, event_hash):
     """Construye la alerta a partir de la regla que ha casado y el evento.
 
     El campo matched_fields es la semilla de la explicabilidad: indica que
     condiciones concretas dispararon la deteccion.
+
+    El alert_id es **determinista**: se deriva del hash del evento de origen y
+    del identificador de la regla. Volver a procesar el mismo evento produce el
+    mismo identificador, lo que permite deduplicar en destino sin riesgo de
+    colapsar alertas legitimas (dos eventos distintos del mismo milisegundo
+    tienen hashes distintos). El event_hash se conserva ademas como columna
+    propia: permite saber si dos alertas proceden del *mismo* evento, caso
+    habitual cuando una sola accion dispara varias reglas.
     """
     s = compiled_rule.summary or {}
+    rule_id = s.get("rule_id") or s.get("rule_title") or "sin-id"
+    alert_id = hashlib.sha1(f"{event_hash}|{rule_id}".encode("utf-8")).hexdigest()
     device = (event.get("device") or {})
     actor = (event.get("actor") or {})
     actor_user = (actor.get("user") or {})
     actor_proc = (actor.get("process") or {})
 
     return {
-        "alert_id": str(uuid.uuid4()),
+        "alert_id": alert_id,
+        "event_hash": event_hash,
         "time": event.get("time"),
         "detected_at": int(time.time() * 1000),
 
@@ -163,7 +174,11 @@ def main():
         dataset_id = header_value(msg.headers(), "dataset_id")
 
         try:
-            event = json.loads(msg.value().decode("utf-8"))
+            payload = msg.value()
+            # Hash del evento tal y como se publico: identidad estable del
+            # evento de origen, independiente de offsets y de recargas.
+            event_hash = hashlib.sha1(payload).hexdigest()
+            event = json.loads(payload.decode("utf-8"))
             hits = evaluate_all(compiled, event)
         except Exception as exc:
             producer.produce(
@@ -176,7 +191,7 @@ def main():
             continue
 
         for compiled_rule, matched in hits:
-            alert = build_alert(compiled_rule, matched, event, dataset_id)
+            alert = build_alert(compiled_rule, matched, event, dataset_id, event_hash)
             producer.produce(
                 topic=args.sink_topic,
                 key=(alert["device"]["hostname"] or "unknown").encode("utf-8"),

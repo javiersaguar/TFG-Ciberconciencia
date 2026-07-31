@@ -410,7 +410,11 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ### F3.4 — Validación
 
-- [ ] P1 contra los **7 LSASS_campaign** → prueba de **generalización**, no memorización.
+- [x] **P1 contra los 7 LSASS_campaign → 7 de 7 (31-07-2026), en la versión batch.**
+  Prueba de generalización superada. Clave: el ancla es la familia `T1003.*`; con la
+  subtécnica `T1003.001` habrían sido 6 de 7 (falla Mimikatz `logonpasswords`, porque
+  Meterpreter lo ejecuta dentro de su propio proceso y no hay acceso externo a `lsass.exe`).
+  Pendiente repetir la validación sobre la versión en streaming.
 - [ ] P2/P3/P4 contra apt29 day1/day2.
 - [ ] **Falsos positivos** sobre la porción benigna.
 - [ ] **Ratio de reducción de alertas** = 1 − (campañas / alertas individuales) ← *métrica estrella*.

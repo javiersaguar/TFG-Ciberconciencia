@@ -10,7 +10,7 @@ from confluent_kafka import Consumer, KafkaException
 RUNNING = True
 
 COLUMNS = [
-    "alert_id", "time", "detected_at",
+    "alert_id", "event_hash", "time", "detected_at",
     "rule_id", "rule_title", "rule_level", "rule_status",
     "technique_ids", "tactic_ids",
     "device_hostname", "actor_user_name", "actor_process_name",
@@ -44,6 +44,7 @@ def to_row(a):
     tfg = a.get("tfg") or {}
     return [
         a.get("alert_id") or "",
+        a.get("event_hash") or "",
         ts(a.get("time")),
         ts(a.get("detected_at")),
         a.get("rule_id") or "",
