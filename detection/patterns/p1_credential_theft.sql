@@ -150,6 +150,14 @@ WHERE b.time >= c.ancla_primera - toIntervalSecond(ventana_seg)
   AND b.time <= c.ancla_ultima  + toIntervalSecond(ventana_seg)
 GROUP BY c.dataset_id, c.device_hostname, c.campana_seq,
          c.ancla_primera, c.ancla_ultima, c.n_anclas, c.n_eventos_ancla, c.reglas_ancla
--- Requisito de campana: el ancla no basta, hace falta contexto de OTRO evento.
-HAVING eventos_distintos > c.n_eventos_ancla
+-- Requisito de campana: al menos DOS evidencias, sean ancla o refuerzo.
+--
+-- La version anterior exigia "contexto mas alla de las anclas"
+-- (eventos_distintos > n_eventos_ancla), y eso penalizaba justo los casos mas
+-- limpios: en una captura atomica el dataset ES solo la tecnica, sin ruido
+-- alrededor, asi que no hay contexto y la campana se descartaba pese a ser una
+-- deteccion correcta. Detectado el 31-07 al comparar con la version en Flink,
+-- que exige dos filas de evidencia -PATTERN (E C)- y si la encontraba. Es un
+-- caso de la version en streaming corrigiendo a la de referencia, no al reves.
+HAVING evidencia_p1 >= 2
 ORDER BY dataset, inicio;

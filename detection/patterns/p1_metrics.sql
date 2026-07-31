@@ -15,7 +15,7 @@ SELECT
     'cobertura' AS metrica,
     countIf(campanas > 0)  AS variantes_detectadas,
     count()                AS variantes_totales,
-    groupArray(if(campanas = 0, dataset, '')) AS fallos
+    groupArrayIf(dataset, campanas = 0) AS fallos
 FROM (
     SELECT d.dataset AS dataset, countIf(c.dataset != '') AS campanas
     FROM (SELECT DISTINCT dataset_id AS dataset FROM tfg.alerts

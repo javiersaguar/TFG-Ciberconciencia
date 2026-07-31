@@ -383,7 +383,18 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ### F3.2 — Implementación
 
-- [ ] Implementar con `MATCH_RECOGNIZE` (`PARTITION BY`, `MEASURES`, `PATTERN`, `DEFINE`, `WITHIN`).
+- [x] Implementar con `MATCH_RECOGNIZE` (31-07-2026). **P1 funcionando en Flink**, con
+  `PARTITION BY`, `MEASURES`, `PATTERN`, `DEFINE` y `AFTER MATCH`. `WITHIN` **no** se usa: la
+  restricción temporal va en el `DEFINE` como hueco entre evidencias consecutivas, que es lo
+  que reproduce el criterio del oráculo (`WITHIN` acota la duración *total* del match, no el hueco).
+  ⚠️ **Limitaciones de Flink encontradas y documentadas** (`infra/flink/jobs/p1_0*.sql`):
+  no admite subconsultas correlacionadas en `DEFINE`; no admite `COUNT(DISTINCT)` en `MEASURES`;
+  `LAG` no acepta `TIMESTAMP_LTZ`; y **no admite cuantificadores voraces como último elemento
+  del patrón**, lo que impide expresar una racha maximal abierta. Esto último es lo que obliga
+  a la correlación en dos niveles, que deja de ser una opción de diseño para ser un requisito.
+- [x] **Truco de validación:** `'scan.bounded.mode' = 'latest-offset'` + `runtime-mode = batch`
+  convierte la fuente Kafka en acotada. Elimina de raíz el problema del watermark que no avanza
+  sobre datos históricos y da salida final en vez de *changelog*. Imprescindible para iterar.
 - [ ] **Decisión abierta a cerrar en F3.1 — fuente de las etapas.** `det.alerts` es más semántico,
   pero **deja etapas ciegas**: si ninguna regla Sigma etiqueta la escritura del `.dmp` o la
   conexión saliente, esas etapas no existen como alerta y el patrón nunca completa. Opción
@@ -397,8 +408,11 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   stages[] { order, tactic_id, technique_id, time, evidence_alert_ids[], device }
   devices[] · users[] · confidence
   ```
-- [ ] **Movimiento lateral entre hosts:** correlación jerárquica en dos niveles
-  (alerta → campaña local → campaña multi-host), que evita re-particionar.
+- [x] **Correlación jerárquica en dos niveles**, ya implementada para P1 y **no por elegancia,
+  sino porque Flink no puede expresar la racha maximal en un solo patrón**: nivel 1
+  (`MATCH_RECOGNIZE`) reconoce la *transición* evidencia → acceso a credenciales; nivel 2
+  (agregación por hueco) agrupa transiciones en campañas. La misma máquina servirá para el
+  salto a multi-host de P2, sin re-particionar.
 - [ ] Gestión de eventos tardíos (`allowedLateness`) → `dlq.late`, y medir cuántos hay.
 
 ### F3.3 🧠 — Anomalías secuenciales como refuerzo

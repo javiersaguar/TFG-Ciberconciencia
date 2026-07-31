@@ -122,7 +122,10 @@ fi
 
 echo ""
 echo "== Volcando alertas a ClickHouse =="
-# tfg.alerts se vacia antes: el corpus es el estado completo, no un incremento.
+# No hace falta vaciar tfg.alerts: desde el 31-07 el alert_id es determinista
+# (sha1 del evento normalizado + regla) y la tabla es ReplacingMergeTree, asi que
+# re-ejecutar esta carga sobreescribe en lugar de duplicar. Consultar con FINAL
+# -o ejecutar OPTIMIZE TABLE tfg.alerts FINAL- para forzar la deduplicacion.
 $PY -m pipeline.jobs.sink_alerts --group-id "ch-alerts-$SUFIJO" \
   --from-beginning --idle-exit 20 --ch-host 127.0.0.1
 

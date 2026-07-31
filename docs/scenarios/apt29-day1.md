@@ -98,19 +98,44 @@ previstos en el roadmap:
 ## 4. Ventanas temporales observadas
 
 Medidas sobre las alertas reales de `SDWIN-200501225525` (el plan no lleva marcas de tiempo).
-Cifras deduplicadas por `(time, rule_id, host, matched_fields, src_event_id)`.
+
+Recalculadas el 31-07-2026 sobre `tfg.alerts FINAL`, con la deduplicación correcta por
+construcción (`alert_id` determinista + `ReplacingMergeTree`).
+
+> **Nota metodológica.** La primera versión de esta tabla (30-07) deduplicaba a mano por
+> `(time, rule_id, host, matched_fields, src_event_id)`, y ese criterio resultó **demasiado
+> agresivo**: colapsaba alertas legítimas de eventos distintos ocurridos en el mismo
+> milisegundo. El efecto no era menor —`execution` en SCRANTON pasa de 93 a 174 y
+> `defense-impairment` de 86 a 175, casi el doble— y afecta sobre todo a las reglas que
+> disparan muchas veces sobre eventos con los mismos campos coincidentes. Las **marcas de
+> tiempo no se vieron afectadas**, así que las ventanas derivadas de ellas siguen siendo válidas.
 
 **Campaña completa: 02:56:15,884 → 03:22:42,872 = 26 min 27 s.**
 
-| Táctica | Host | Alertas | Duración |
-|---|---|---:|---:|
-| execution | SCRANTON | 93 | 26,0 min |
-| persistence | SCRANTON | 320 | 23,8 min |
-| privilege-escalation | SCRANTON | 25 | 23,3 min |
-| credential-access | SCRANTON | 7 | 19,5 min |
-| exfiltration | SCRANTON | 10 | **1,5 min** |
-| lateral-movement | NASHUA | 4 | **0,1 min** |
-| lateral-movement | SCRANTON | 2 | 0,4 min |
+| Táctica | Host | Alertas | Primera | Duración |
+|---|---|---:|---|---:|
+| execution | SCRANTON | 174 | 02:56:15 | 26,0 min |
+| defense-impairment | SCRANTON | 175 | 02:57:20 | 24,9 min |
+| persistence | SCRANTON | 320 | 02:57:20 | 23,8 min |
+| privilege-escalation | SCRANTON | 26 | 02:58:32 | 23,3 min |
+| stealth | SCRANTON | 22 | 02:58:46 | 23,4 min |
+| **credential-access** | **SCRANTON** | **7** | **03:00:30** | **19,5 min** |
+| resource-development | SCRANTON | 25 | 03:02:06 | 12,6 min |
+| exfiltration | SCRANTON | 10 | 03:08:52 | **1,5 min** |
+| execution | NASHUA | 19 | 03:09:24 | 13,3 min |
+| **lateral-movement** | **NASHUA** | **4** | **03:09:24** | **0,1 min** |
+| defense-impairment | NASHUA | 76 | 03:09:31 | 13,0 min |
+| privilege-escalation | NASHUA | 5 | 03:14:18 | 8,4 min |
+| persistence | NASHUA | 4 | 03:14:18 | 0,0 min |
+| collection | NASHUA | 4 | 03:16:19 | 0,0 min |
+| lateral-movement | SCRANTON | 2 | 03:19:35 | 0,4 min |
+| discovery | SCRANTON | 2 | 03:19:53 | 0,2 min |
+| command-and-control | SCRANTON | 2 | 03:21:32 | 0,0 min |
+
+El orden de aparición reproduce la cadena del plan: ejecución en SCRANTON (02:56) → persistencia
+(02:57) → escalada (02:58) → **credenciales (03:00)** → exfiltración (03:08) → **salto a NASHUA
+(03:09:24)** → recolección en NASHUA (03:16) → cierre en SCRANTON (03:21). NEWYORK aparece con
+pocas alertas y no es objetivo de este día.
 
 ### El bloque de P1, alerta a alerta
 
