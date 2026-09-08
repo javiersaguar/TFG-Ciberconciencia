@@ -127,12 +127,34 @@ más fuerte que fiarse de un solo host.
 | 03:10:25.531 | SCRANTON | → NASHUA:445, `Initiated=true` | Sysmon 3 |
 | 03:11:20.087 | NASHUA | `PSEXESVC.exe` creado (`T1569.002`) | alerta Sigma |
 
-**4. ⚠️ El orden temporal se invierte, y el patrón debe tolerarlo.** La conexión de red
-aparece a las 03:09:27 y el proceso `wsmprovhost.exe` que la atiende a las 03:09:24: **tres
-segundos antes**. Sysmon reporta EID 3 con retardo respecto a la creación de proceso. Un
-patrón que exija "conexión → proceso" en orden estricto **no dispararía**. Es el mismo tipo
-de trampa que obligó a la transición bidireccional de P1: la restricción debe ser de
-proximidad temporal, no de orden.
+**4. ⚠️ Las marcas de tiempo de apt29 son horas de RECOGIDA, no horas de evento.**
+La conexión de red aparece a las 03:09:27 y el proceso `wsmprovhost.exe` que la atiende a las
+03:09:24, **tres segundos antes**. La causa no es un retardo de Sysmon: **apt29 day1 y day2 no
+traen el campo `TimeCreated`** (0 de 196.081 líneas), así que `base_event` cae a `@timestamp`
+(`ocsf_common.py:47-50`), que coincide con `EventReceivedTime` — la hora a la que el colector
+recibió el evento, no aquella en que ocurrió.
+
+Magnitud medida sobre los 143.883 eventos de Sysmon de day1 que sí traen `UtcTime`
+(desfase `@timestamp` − `UtcTime`):
+
+| mediana | p75 | p95 | máximo | desviación |
+|---|---|---|---|---|
+| 6,2 s | 49,7 s | 74,9 s | **101,2 s** | 26,7 s |
+
+El 53 % de los eventos van desviados más de 5 s. Lo grave no es el desfase sino su
+**variabilidad**: con σ = 26,7 s los eventos **se reordenan unos respecto a otros**, así que no
+es un offset constante que se pueda restar.
+
+**Alcance.** Solo afecta a apt29 day1 y day2. El atómico y las 7 campañas LSASS sí traen
+`TimeCreated` y usan la hora correcta, de modo que **el 7 de 7 de P1 no queda en cuestión**.
+Sí quedan en cuestión las ventanas medidas en la sección 4 de este documento y la extensión
+temporal de las campañas de apt29.
+
+**Consecuencia inmediata para los patrones.** Una ventana de 10 min como la de P1 absorbe un
+desfase de 101 s; una de 300 s como la que P2 pide **no**: el desfase sería un tercio de la
+ventana. Mientras no se corrija el origen del tiempo, P2 debe usar restricción de
+**proximidad** (`|dt| <= ventana`), nunca de orden, y su ventana debe elegirse con este
+margen de error en la mano.
 
 **5. `T1570` sí es observable, pero no como alerta.** Las alertas etiquetadas `T1570` son
 `Rundll32 Execution Without Parameters`, cuyo mapeo ATT&CK es amplio: es etiquetado de la
