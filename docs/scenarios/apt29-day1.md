@@ -93,6 +93,58 @@ previstos en el roadmap:
    robadas son las que habilitan el salto. Es exactamente la correlación jerárquica de dos
    niveles que plantea F3.2.
 
+### Consecuencias de diseño para P2  *(medidas el 08-09-2026)*
+
+**1. La arista entre hosts sale de Sysmon EID 3, no del logon.** Los `4624` de tipo 3 traen
+`IpAddress`, `IpPort` y `WorkstationName` a `'-'` en este dataset: son logons Kerberos
+intra-dominio y Windows no rellena el origen. Comprobado contra el fichero de origen, no es
+un fallo del normalizador. Además son ruido de fondo —1.164 en 25 minutos—, así que como
+etapa harían encajar el patrón con cualquier cosa. Sysmon EID 3 sí da la arista: dirigida,
+con puerto y atribuida al proceso que la abre.
+
+**2. Cada conexión se registra dos veces, y eso es un regalo.** El host que inicia la
+registra con `Initiated=true` y el que recibe con `Initiated=false`, con las mismas
+`SourceIp`/`DestinationIp` y ~1 s de diferencia. De ahí sale el mapa host↔IP sin
+configuración externa (el registro `Initiated=false` revela la IP propia del receptor):
+
+| Host | IP | Papel |
+|---|---|---|
+| NEWYORK | 10.0.0.4 | Controlador de dominio |
+| SCRANTON | 10.0.1.4 | Origen del salto |
+| NASHUA | 10.0.1.6 | Destino del salto |
+| UTICA | 10.0.1.5 | — |
+
+El par `(true, false)` permite además **confirmar** la arista desde los dos extremos, que es
+más fuerte que fiarse de un solo host.
+
+**3. La cadena de P2, con evidencia:**
+
+| Hora | Host | Evidencia | Fuente |
+|---|---|---|---|
+| 03:09:27.836 | SCRANTON | `powershell.exe` → NASHUA:5985, `Initiated=true` | Sysmon 3 |
+| 03:09:24.805 | NASHUA | `wsmprovhost.exe` (`T1021.006`) | alerta Sigma |
+| 03:09:31.016 | NASHUA | `wsmprovhost.exe` → `lsass.exe` (`T1003.001`) | alerta Sigma ← **costura con P1** |
+| 03:10:25.531 | SCRANTON | → NASHUA:445, `Initiated=true` | Sysmon 3 |
+| 03:11:20.087 | NASHUA | `PSEXESVC.exe` creado (`T1569.002`) | alerta Sigma |
+
+**4. ⚠️ El orden temporal se invierte, y el patrón debe tolerarlo.** La conexión de red
+aparece a las 03:09:27 y el proceso `wsmprovhost.exe` que la atiende a las 03:09:24: **tres
+segundos antes**. Sysmon reporta EID 3 con retardo respecto a la creación de proceso. Un
+patrón que exija "conexión → proceso" en orden estricto **no dispararía**. Es el mismo tipo
+de trampa que obligó a la transición bidireccional de P1: la restricción debe ser de
+proximidad temporal, no de orden.
+
+**5. `T1570` sí es observable, pero no como alerta.** Las alertas etiquetadas `T1570` son
+`Rundll32 Execution Without Parameters`, cuyo mapeo ATT&CK es amplio: es etiquetado de la
+regla, no evidencia de transferencia. La transferencia real está en la telemetría de red
+—SCRANTON → NASHUA:445 a las 03:10:25, justo antes de que aparezca `PSEXESVC.exe`— y solo
+se ve por Sysmon 3. **Contar etiquetas como etapas infla el patrón con evidencia que nadie
+observó.**
+
+**6. Ventana sugerida.** El núcleo del salto (WinRM → SMB → servicio) ocupa **1 min 53 s**
+(03:09:27 → 03:11:20). La cadena completa hasta rundll32 en SCRANTON son 19 min, pero eso ya
+es otra fase. Para P2 la ventana se mide sobre el núcleo, no sobre la campaña entera.
+
 ---
 
 ## 4. Ventanas temporales observadas

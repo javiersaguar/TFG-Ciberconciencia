@@ -33,7 +33,7 @@ COLUMNS = [
     "type_uid", "severity_id", "device_hostname",
     "actor_process_name", "actor_process_pid", "actor_user_name",
     "target_process_name", "target_process_pid", "file_path",
-    "dst_ip", "dst_port",
+    "src_ip", "src_port", "dst_ip", "dst_port", "direction_id",
     "signal_lsass_access", "signal_suspicious_access", "signal_dump_module",
     "signal_dump_file", "signal_log_cleared", "signal_remote_logon",
     "dataset_id", "source_channel", "source_event_id", "record_number", "raw",
@@ -60,7 +60,9 @@ def to_row(e):
     actor_user = actor.get("user", {}) or {}
     proc = e.get("process", {}) or {}
     file = e.get("file", {}) or {}
+    src = e.get("src_endpoint", {}) or {}
     dst = e.get("dst_endpoint", {}) or {}
+    conn = e.get("connection_info", {}) or {}
     tfg = e.get("tfg", {}) or {}
 
     ts_ms = e.get("time") or 0
@@ -79,7 +81,11 @@ def to_row(e):
         proc.get("name") or "",
         proc.get("pid"),
         (file.get("path") or proc.get("file", {}).get("path")) or "",
-        clean_ip(dst.get("ip")),        dst.get("port"),
+        clean_ip(src.get("ip")),
+        src.get("port"),
+        clean_ip(dst.get("ip")),
+        dst.get("port"),
+        conn.get("direction_id") or 0,
         bool(tfg.get("signal_lsass_access")),
         bool(tfg.get("signal_suspicious_access")),
         bool(tfg.get("signal_dump_module")),

@@ -78,7 +78,15 @@ def base_event(event, class_uid, category_uid, activity_id=0):
         # Extensión propia: trazabilidad a la verdad conocida
         "tfg": {
             "dataset_id": None,  # se rellena desde la cabecera Kafka en el job
-            "source_channel": event.get("Channel"),
+            # En minusculas siempre: el dataset trae el mismo canal con dos
+            # grafias ("Security" 28.627 veces y "security" 12.375 en apt29
+            # day1), de modo que un filtro por el valor exacto se dejaria fuera
+            # un tercio de los eventos sin avisar. registry.py ya normaliza asi
+            # para buscar el mapeador; guardarlo tal cual propagaba la
+            # inconsistencia. Verificado que no introduce colisiones de
+            # identidad: 196.081 eventos, 196.081 ternas distintas con y sin
+            # normalizar la grafia.
+            "source_channel": (event.get("Channel") or "").lower() or None,
             "source_event_id": event.get("EventID"),
             # Identidad del evento en su origen. El numero de registro es unico
             # dentro de (host, canal), asi que la terna identifica el evento sin

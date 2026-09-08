@@ -21,9 +21,20 @@ CREATE TABLE IF NOT EXISTS tfg.events
     target_process_name String,
     target_process_pid  Nullable(UInt32),
     file_path           String,
-    -- IPv6 cubre tambien IPv4 (mapped)
+    -- Extremos de red. IPv6 cubre tambien IPv4 (mapped).
+    -- El ORIGEN es imprescindible para el movimiento lateral (P2): sin el no se
+    -- puede expresar "SCRANTON inicio una conexion hacia NASHUA", que es de lo
+    -- que trata el patron. Antes solo se guardaba el destino y la direccion
+    -- habia que sacarla del JSON de `raw` en cada consulta.
+    src_ip              Nullable(IPv6),
+    src_port            Nullable(UInt16),
     dst_ip              Nullable(IPv6),
     dst_port            Nullable(UInt16),
+    -- OCSF connection_info.direction_id: 1 = entrante, 2 = saliente, 0 = n/a.
+    -- Cada conexion se registra DOS veces, en el host que la inicia (2) y en el
+    -- que la recibe (1); quedarse con las salientes evita contar la arista dos
+    -- veces, y cruzarlas permite confirmarla desde ambos extremos.
+    direction_id        UInt8 DEFAULT 0,
 
     -- Señales de deteccion precalculadas (tfg.signal_*)
     signal_lsass_access      Bool DEFAULT false,
