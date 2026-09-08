@@ -40,6 +40,17 @@ def parse_ts(raw):
     return None
 
 
+def _to_record_number(event):
+    """Numero de registro del evento en su log de origen; 0 si no viene."""
+    raw = event.get("RecordNumber")
+    if raw is None:
+        raw = event.get("EventRecordID")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 0
+
+
 def base_event(event, class_uid, category_uid, activity_id=0):
     """Construye el esqueleto OCSF común a todos los eventos."""
     # TimeCreated es el campo comun y coherente entre canales (Sysmon y Security).
@@ -69,6 +80,14 @@ def base_event(event, class_uid, category_uid, activity_id=0):
             "dataset_id": None,  # se rellena desde la cabecera Kafka en el job
             "source_channel": event.get("Channel"),
             "source_event_id": event.get("EventID"),
+            # Identidad del evento en su origen. El numero de registro es unico
+            # dentro de (host, canal), asi que la terna identifica el evento sin
+            # ambiguedad y permite deduplicar recargas igual que event_hash hace
+            # con las alertas. Sin el, dos eventos distintos del mismo host, hora
+            # y contenido normalizan al mismo JSON y son indistinguibles.
+            # RecordNumber es el nombre en estos datasets; EventRecordID es el
+            # que usan otros exportadores de Sysmon.
+            "record_number": _to_record_number(event),
         },
         "unmapped": {},
     }

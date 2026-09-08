@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS tfg.events
     target_process_name String,
     target_process_pid  Nullable(UInt32),
     file_path           String,
-    dst_ip          Nullable(IPv6),   -- IPv6 cubre tambien IPv4 (mapped)    dst_port            Nullable(UInt16),
+    -- IPv6 cubre tambien IPv4 (mapped)
+    dst_ip              Nullable(IPv6),
+    dst_port            Nullable(UInt16),
 
     -- Señales de deteccion precalculadas (tfg.signal_*)
     signal_lsass_access      Bool DEFAULT false,
@@ -35,6 +37,11 @@ CREATE TABLE IF NOT EXISTS tfg.events
     dataset_id       LowCardinality(String),
     source_channel   LowCardinality(String),
     source_event_id  UInt32,
+
+    -- Identidad del evento en su log de origen (RecordNumber / EventRecordID).
+    -- Unico dentro de (device_hostname, source_channel): la terna identifica el
+    -- evento y es lo que permite deduplicar recargas. 0 = la fuente no lo trae.
+    record_number    UInt64 DEFAULT 0,
 
     -- Evento OCSF completo (flexibilidad total)
     raw              String CODEC(ZSTD)

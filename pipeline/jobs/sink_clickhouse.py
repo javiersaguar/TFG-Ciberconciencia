@@ -36,7 +36,7 @@ COLUMNS = [
     "dst_ip", "dst_port",
     "signal_lsass_access", "signal_suspicious_access", "signal_dump_module",
     "signal_dump_file", "signal_log_cleared", "signal_remote_logon",
-    "dataset_id", "source_channel", "source_event_id", "raw",
+    "dataset_id", "source_channel", "source_event_id", "record_number", "raw",
 ]
 
 def clean_ip(value):
@@ -89,6 +89,7 @@ def to_row(e):
         tfg.get("dataset_id") or "",
         tfg.get("source_channel") or "",
         tfg.get("source_event_id") or 0,
+        tfg.get("record_number") or 0,
         json.dumps(e, ensure_ascii=False),
     ]
 
