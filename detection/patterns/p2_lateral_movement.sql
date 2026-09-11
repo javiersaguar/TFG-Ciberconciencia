@@ -24,12 +24,16 @@
 --     Initiated y el Image del proceso que abre la conexion.
 --
 --   * El mapa host<->IP se DERIVA DE LOS DATOS, sin configuracion externa: cada
---     conexion se registra dos veces, en el origen con Initiated=true (SourceIp
---     = IP propia) y en el destino con Initiated=false (DestinationIp = IP
---     propia). Verificado sobre el fichero de origen: el voto mayoritario da
---     NEWYORK=10.0.0.4 (277 votos), SCRANTON=10.0.1.4 (131), NASHUA=10.0.1.6
---     (428), UTICA=10.0.1.5 (19). El voto es NECESARIO: NEWYORK emite 70
---     registros que nombran 10.0.1.4, y sin mayoria el mapa se corrompe.
+--     conexion se registra dos veces, en el origen con Initiated=true y en el
+--     destino con Initiated=false. Solo se usa la primera cara: SourceIp de un
+--     registro saliente ES la IP propia del emisor, por construccion. La cara
+--     entrante NO sirve, porque un host puede registrar una conexion saliente
+--     con Initiated=false y entonces DestinationIp es el host remoto.
+--     Verificado sobre el fichero de origen (09-09-2026): con solo salientes el
+--     mapa sale sin rivales -SCRANTON=10.0.1.4 (126-0), NASHUA=10.0.1.6 (408-0),
+--     NEWYORK=10.0.0.4 (80-0), UTICA=10.0.1.5 (16-0)- mientras que combinando
+--     ambas caras UTICA ganaba su propia IP por UN voto (19 contra 18 de
+--     NEWYORK). Mismas 17 aristas con las dos reglas.
 --
 --   * El par (true,false) sirve ademas para CONFIRMAR la arista desde los dos
 --     extremos. Medido: la conexion 5985 se ve en SCRANTON a las 03:09:27.836 y
@@ -144,34 +148,61 @@ WITH
     -- =====================================================================
     -- 1) MAPA host <-> IP, derivado de los propios datos
     -- =====================================================================
-    -- Un registro saliente (sentido=2) revela la IP propia del EMISOR en
-    -- SourceIp; uno entrante (sentido=1) revela la del RECEPTOR en
-    -- DestinationIp. Se combinan ambos y se decide por mayoria.
+    -- SOLO se cuentan los registros SALIENTES: si yo inicie la conexion, el
+    -- origen soy yo, y eso es cierto por construccion. La regla simetrica para
+    -- los entrantes ("dst_ip es mi IP") NO es fiable: un host puede registrar
+    -- una conexion saliente con Initiated=false, y entonces dst_ip es el host
+    -- REMOTO. Medido en apt29 day1: NEWYORK aportaba asi 70 votos espurios a
+    -- 10.0.1.4 (SCRANTON) y 18 a 10.0.1.5 (UTICA), y UTICA ganaba su propia IP
+    -- por UN voto (19 contra 18). Contando solo salientes el mapa queda sin
+    -- rivales: SCRANTON 126-0, NASHUA 408-0, NEWYORK 80-0, UTICA 16-0, y las
+    -- 17 aristas resultantes son exactamente las mismas.
     ip_propia AS (
         SELECT
             dataset_id, host,
-            if(sentido = 2, src_ip, dst_ip) AS ip,
+            src_ip AS ip,
             count() AS votos
         FROM red
-        WHERE ip IS NOT NULL
+        WHERE sentido = 2
+          AND ip IS NOT NULL
           -- Se descartan las direcciones que no identifican a una maquina en la
           -- red: loopback (::1 y 127.0.0.0/8, muy frecuentes aqui: ADWS y lsass
           -- hablan consigo mismos por ::1:389), link-local y multicast.
           AND ip != toIPv6('::1')
-          AND NOT isIPAddressInRange(replaceRegexpOne(IPv6NumToString(ip), '^::ffff:', ''), '127.0.0.0/8')
-          AND NOT isIPAddressInRange(IPv6NumToString(ip), 'fe80::/10')
-          AND NOT isIPAddressInRange(replaceRegexpOne(IPv6NumToString(ip), '^::ffff:', ''), '169.254.0.0/16')
-          AND NOT isIPAddressInRange(replaceRegexpOne(IPv6NumToString(ip), '^::ffff:', ''), '224.0.0.0/4')
+          -- OJO CON EL Nullable: `ip` es Nullable(IPv6), IPv6NumToString propaga
+          -- ese Nullable, e isIPAddressInRange exige String NO nullable y aborta
+          -- la consulta entera (ILLEGAL_TYPE_OF_ARGUMENT). El `ip IS NOT NULL`
+          -- de arriba no basta: ClickHouse no estrecha el tipo por el WHERE.
+          -- El ifNull fija un valor inocuo, y '::' no pertenece a ninguno de los
+          -- rangos de abajo, asi que no altera el resultado del filtro.
+          -- El replaceRegexpOne normaliza el prefijo v4-mapped
+          -- (::ffff:10.0.1.4 -> 10.0.1.4) para poder comparar contra CIDR IPv4.
+          AND NOT isIPAddressInRange(ifNull(replaceRegexpOne(IPv6NumToString(ip), '^::ffff:', ''), '::'), '127.0.0.0/8')
+          AND NOT isIPAddressInRange(ifNull(IPv6NumToString(ip), '::'), 'fe80::/10')
+          AND NOT isIPAddressInRange(ifNull(replaceRegexpOne(IPv6NumToString(ip), '^::ffff:', ''), '::'), '169.254.0.0/16')
+          AND NOT isIPAddressInRange(ifNull(replaceRegexpOne(IPv6NumToString(ip), '^::ffff:', ''), '::'), '224.0.0.0/4')
         GROUP BY dataset_id, host, ip
     ),
-    -- Una IP -> el host que mas votos aporta. El voto es imprescindible:
-    -- NEWYORK nombra 10.0.1.4 en 70 registros frente a los 131 de SCRANTON.
+    -- Una IP -> el host que mas votos aporta. Con la regla de arriba no hay
+    -- rivales en apt29 day1, pero el argMax se conserva como red de seguridad
+    -- para capturas con NAT, IPs reasignadas o interfaces compartidas.
     -- El mapa se particiona por dataset_id: cada captura es un laboratorio.
+    -- OJO CON EL SOMBREADO DE ALIAS: escribir `max(votos) AS votos` bautiza el
+    -- agregado con el mismo nombre que la columna de origen, y entonces el
+    -- `votos` de argMax(host, votos) resuelve al agregado en vez de a la
+    -- columna: ClickHouse lo rechaza como agregacion anidada
+    -- (ILLEGAL_AGGREGATION). Lo mismo valdria para `AS host`. Por eso los
+    -- agregados llevan nombres propios en la subconsulta y se renombran fuera.
     mapa_ip_host AS (
-        SELECT dataset_id, ip, argMax(host, votos) AS host, max(votos) AS votos
-        FROM ip_propia
-        GROUP BY dataset_id, ip
-        HAVING votos >= votos_min_ip
+        SELECT dataset_id, ip, host_top AS host, votos_top AS votos
+        FROM (
+            SELECT dataset_id, ip,
+                   argMax(host, votos) AS host_top,
+                   max(votos)          AS votos_top
+            FROM ip_propia
+            GROUP BY dataset_id, ip
+        )
+        WHERE votos_top >= votos_min_ip
     ),
 
     -- =====================================================================
@@ -212,6 +243,13 @@ WITH
         FROM red AS r
         INNER JOIN mapa_ip_host AS m
                 ON m.dataset_id = r.dataset_id AND m.ip = r.dst_ip
+        -- ClickHouse 25.3 NO admite subconsultas correlacionadas: un
+        -- `NOT IN (SELECT ... WHERE dataset_id = r.dataset_id)` aborta con
+        -- UNSUPPORTED_METHOD ("correlated column"). El descarte del controlador
+        -- de dominio se hace por tanto con LEFT JOIN + comprobacion de no-pareja
+        -- (anti-join), que ademas evita reevaluar `controladores` fila a fila.
+        LEFT JOIN controladores AS dc
+               ON dc.dataset_id = r.dataset_id AND dc.host = m.host
         WHERE r.sentido = 2                    -- Initiated = true
           -- Puertos de movimiento lateral. Se enumeran explicitamente para que
           -- la memoria pueda justificar cada uno:
@@ -225,9 +263,12 @@ WITH
           -- Descarta loopback y no enrutables aunque el mapa los hubiera resuelto
           AND r.dst_ip IS NOT NULL
           AND r.dst_ip != toIPv6('::1')
-          AND NOT isIPAddressInRange(replaceRegexpOne(IPv6NumToString(r.dst_ip), '^::ffff:', ''), '127.0.0.0/8')
-          -- Descarta el ruido hacia el controlador de dominio
-          AND m.host NOT IN (SELECT host FROM controladores WHERE dataset_id = r.dataset_id)
+          AND NOT isIPAddressInRange(ifNull(replaceRegexpOne(IPv6NumToString(r.dst_ip), '^::ffff:', ''), '::'), '127.0.0.0/8')
+          -- Descarta el ruido hacia el controlador de dominio. En ClickHouse un
+          -- LEFT JOIN sin pareja rellena con el valor POR DEFECTO y no con NULL
+          -- (join_use_nulls=0), asi que la ausencia se comprueba contra '' —
+          -- mismo idioma que el `e.destino != ''` de la confirmacion bilateral.
+          AND dc.host = ''
     ),
     entrantes AS (
         SELECT dataset_id, host AS destino, time AS t, src_ip AS ip_origen,
@@ -322,12 +363,21 @@ SELECT
     c.origen                                                AS host_origen,
     c.destino                                               AS host_destino,
     min(c.arista_primera)                                   AS first_seen,
-    -- El fin es el ultimo de los dos: la ultima arista o la ultima evidencia en
-    -- el destino (que puede ser POSTERIOR: PSEXESVC.exe aparece 55 s despues de
+    -- El fin es el ultimo de los dos: la ultima arista o la ultima EVIDENCIA en
+    -- el destino (que puede ser posterior: PSEXESVC.exe aparece 55 s despues de
     -- la conexion 445 que lo trajo).
-    greatest(max(c.arista_ultima), max(a.time))             AS last_seen,
-    dateDiff('second', min(c.arista_primera),
-             greatest(max(c.arista_ultima), max(a.time)))   AS duration_s,
+    --
+    -- OJO: NO vale `max(a.time)` a secas. El join arrastra TODAS las alertas del
+    -- destino que caen en la ventana -115 en apt29 day1, de las que solo 8 son
+    -- evidencia- y entonces la duracion la acaba fijando ruido sin relacion.
+    -- Medido: con max(a.time) salian 795 s, con el final puesto por un
+    -- `Internet Explorer Autorun Keys Modification` a las 03:22:42, cuando la
+    -- ultima arista real es a las 03:18:01 y la ultima evidencia a las 03:14:44.
+    -- La extension de una campana la fija SU evidencia, no lo que pase cerca.
+    greatest(max(c.arista_ultima),
+             maxIf(a.time, arrayExists(t -> t LIKE 'T1021%' OR t = 'T1569.002'
+                                            OR t LIKE 'T1003%', a.technique_ids))) AS last_seen,
+    dateDiff('second', first_seen, last_seen)               AS duration_s,
 
     -- ---- Alcance ------------------------------------------------------------
     [c.origen, c.destino]                                   AS devices,

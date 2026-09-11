@@ -145,6 +145,11 @@ def map_sysmon_3(event):
         "direction_id": 2 if str(event.get("Initiated")).lower() == "true" else 1,
     }
     ocsf["actor"] = {
+        # El EID 3 SI trae el usuario que abre la conexion (1.229 de 1.230 en
+        # apt29 day1) y antes se descartaba, con lo que una campana de movimiento
+        # lateral se quedaba sin el DMEVALS\\pbeesly que la origina. Misma
+        # convencion que map_sysmon_1: la cadena DOMINIO\\usuario tal cual.
+        "user": {"name": event.get("User")},
         "process": {
             "name": image.split("\\")[-1] if image else None,
             "pid": _to_int(event.get("ProcessId")),
