@@ -115,10 +115,34 @@ def event_time(event):
 
 
 def _to_record_number(event):
-    """Numero de registro del evento en su log de origen; 0 si no viene."""
+    """Identidad numerica del evento dentro de su captura.
+
+    Primero el numero de registro del log de origen (`RecordNumber` en estos
+    datasets, `EventRecordID` en otros exportadores de Sysmon). Si la fuente no
+    lo trae, el ordinal de la linea en el fichero, propagado por el job de
+    replay en la cabecera `line_no`.
+
+    El respaldo NO es opcional: medido el 11-09-2026, de los nueve datasets del
+    corpus **solo apt29 trae RecordNumber** (196.081 de 196.081); los otros
+    ocho no traen ninguno de los dos campos. Sin respaldo, `record_number`
+    valdria 0 en todos ellos y la clave de `tfg.events` -que ES la identidad-
+    los colapsaria a una fila por (dataset, host, canal): las campanas LSASS
+    pasaron de ~50.000 eventos a **4** en la primera carga tras la migracion.
+
+    Se usa el ordinal y no un hash del contenido porque las lineas repetidas
+    existen en el origen (53.698 lineas y 50.680 distintas en LSASS_campaign_01)
+    y un hash las perderia. El ordinal es ademas reproducible: leer el mismo
+    fichero produce siempre los mismos valores, que es lo que hace que una
+    recarga sobreescriba en vez de duplicar.
+
+    No hay riesgo de colision entre ambas fuentes: un dataset trae RecordNumber
+    en todos sus eventos o en ninguno, nunca a medias.
+    """
     raw = event.get("RecordNumber")
     if raw is None:
         raw = event.get("EventRecordID")
+    if raw is None:
+        raw = event.get("_tfg_ordinal")
     try:
         return int(raw)
     except (TypeError, ValueError):

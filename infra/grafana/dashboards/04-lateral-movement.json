@@ -1,0 +1,407 @@
+{
+  "uid": "tfg-lateral-movement",
+  "title": "4 · Movimiento lateral y grafo de hosts",
+  "tags": [
+    "tfg",
+    "f3",
+    "pilar-a"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-5y",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Resumen de la red observada",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Conexiones de red (Sysmon 3)",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() AS n FROM tfg.events WHERE source_event_id = 3",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "text",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Hosts identificados por IP",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT uniqExact(host) AS n FROM tfg.v_mapa_ip",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "text",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Aristas host -> host",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT uniqExact(concat(origen,' -> ',destino)) AS n FROM tfg.v_aristas_lateral",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "text",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Conexiones de admin. remota",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() AS n FROM tfg.v_aristas_lateral",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "text",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Grafo de movimiento lateral",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "nodeGraph",
+      "title": "Quien se conecta con quien (puertos de administracion remota)",
+      "description": "Aristas dirigidas derivadas de Sysmon EventID 3 con Initiated=true. El mapa IP->host sale de los propios datos: en un registro saliente la IP de origen es la del emisor. Se excluye el trafico de un host consigo mismo.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT id, splitByChar('.', id)[1] AS title, concat(toString(sum(sal)), ' salientes / ', toString(sum(ent)), ' entrantes') AS subtitle, sum(sal) + sum(ent) AS mainstat FROM (SELECT origen AS id, count() AS sal, 0 AS ent FROM tfg.v_aristas_lateral GROUP BY origen UNION ALL SELECT destino AS id, 0 AS sal, count() AS ent FROM tfg.v_aristas_lateral GROUP BY destino) GROUP BY id",
+          "format": 1,
+          "queryType": "table"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT concat(origen,'->',destino) AS id, origen AS source, destino AS target, count() AS mainstat, arrayStringConcat(groupUniqArray(servicio), ' + ') AS secondarystat FROM tfg.v_aristas_lateral GROUP BY id, source, target",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "nodes": {
+          "mainStatUnit": "conexiones"
+        },
+        "edges": {
+          "mainStatUnit": "conexiones"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Detalle de las aristas",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Aristas laterales, con proceso y usuario",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 14,
+        "x": 0,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT origen, destino, servicio, puerto, proceso, usuario, count() AS conexiones, min(momento) AS primera, max(momento) AS ultima FROM tfg.v_aristas_lateral GROUP BY origen, destino, servicio, puerto, proceso, usuario ORDER BY primera",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Procesos que abren la conexion",
+      "description": "'System' son las conexiones SMB del propio kernel; lo revelador es que el salto lo abra powershell.exe o PsExec64.exe.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 10,
+        "x": 14,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT proceso, count() AS n FROM tfg.v_aristas_lateral WHERE proceso != '' GROUP BY proceso ORDER BY n DESC LIMIT 10",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Conexiones laterales en el tiempo, por servicio",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 0,
+        "y": 28
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toStartOfInterval(momento, INTERVAL 10 SECOND) AS t, servicio, count() AS n FROM tfg.v_aristas_lateral GROUP BY t, servicio ORDER BY t",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "table",
+      "title": "Mapa IP -> host, derivado de los datos",
+      "description": "No hay configuracion externa: cada host se identifica por la IP de origen de las conexiones que el mismo inicia.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 14,
+        "y": 28
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT dataset_id AS dataset, host, IPv6NumToString(ip) AS ip, votos FROM tfg.v_mapa_ip ORDER BY host",
+          "format": 1,
+          "queryType": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

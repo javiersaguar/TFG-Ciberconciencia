@@ -105,6 +105,14 @@ def main():
                 headers={
                     "dataset_id": args.dataset_id,
                     "source": "otrf-security-datasets",
+                    # Ordinal de la linea en el fichero de origen. Es la
+                    # identidad de reserva para las fuentes que NO traen
+                    # RecordNumber ni EventRecordID -- que son todas menos
+                    # apt29-, y es reproducible: leer el mismo fichero produce
+                    # siempre los mismos ordinales, asi que una recarga
+                    # deduplica en vez de duplicar. Preserva ademas las lineas
+                    # repetidas del origen, que un hash del contenido perderia.
+                    "line_no": str(line_no),
                 },
                 on_delivery=delivery_report,
             )

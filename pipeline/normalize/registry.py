@@ -55,11 +55,18 @@ class UnmappedEvent(Exception):
     """No hay mapeador para este (canal, EventID)."""
 
 
-def normalize(event, dataset_id=None):
+def normalize(event, dataset_id=None, ordinal=None):
     """Normaliza un evento crudo a OCSF.
 
     Lanza UnmappedEvent si no existe mapeador, para que el job lo derive a DLQ.
+
+    `ordinal` es el numero de linea en el fichero de origen, que el job de
+    replay propaga en la cabecera `line_no`. Se inyecta en el evento para que
+    `_to_record_number` pueda usarlo como identidad de reserva sin tener que
+    cambiar la firma de los ~25 mapeadores.
     """
+    if ordinal is not None:
+        event["_tfg_ordinal"] = ordinal
     channel = str(event.get("Channel", "")).strip().lower()
     try:
         event_id = int(event.get("EventID"))

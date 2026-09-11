@@ -78,10 +78,11 @@ def main():
         idle = 0.0
         stats["in"] += 1
         dataset_id = header_value(msg.headers(), "dataset_id")
+        ordinal = header_value(msg.headers(), "line_no")
 
         try:
             raw = json.loads(msg.value().decode("utf-8"))
-            ocsf = normalize(raw, dataset_id=dataset_id)
+            ocsf = normalize(raw, dataset_id=dataset_id, ordinal=ordinal)
         except (UnmappedEvent, json.JSONDecodeError, ValueError) as exc:
             producer.produce(
                 topic=args.dlq_topic,
