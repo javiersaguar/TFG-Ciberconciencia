@@ -57,7 +57,22 @@ CREATE TABLE IF NOT EXISTS tfg.events
     -- Evento OCSF completo (flexibilidad total)
     raw              String CODEC(ZSTD)
 )
-ENGINE = MergeTree
+-- ReplacingMergeTree sobre la IDENTIDAD del evento, no sobre (host, time).
+-- La clave de ordenacion ES la identidad: `record_number` es unico dentro de
+-- (device_hostname, source_channel), y el dataset_id delante separa capturas.
+-- Verificado sobre apt29 day1: 194.829 eventos, 194.829 ternas distintas, cero
+-- colisiones. Con esto una recarga sobreescribe en vez de duplicar, igual que
+-- ya ocurre en tfg.alerts con alert_id.
+--
+-- OJO: la deduplicacion ocurre en las FUSIONES, no en la insercion. Para
+-- garantia inmediata, consultar con FINAL u `OPTIMIZE TABLE tfg.events FINAL`.
+--
+-- LIMITE CONOCIDO: si una fuente no trajera RecordNumber ni EventRecordID,
+-- record_number valdria 0 en todos sus eventos y la clave los colapsaria en uno
+-- por (dataset, host, canal). Por eso la carga debe verificarse siempre con
+--   SELECT dataset_id, count() FROM tfg.events GROUP BY dataset_id
+-- contra el numero de lineas del fichero de origen.
+ENGINE = ReplacingMergeTree
 PARTITION BY toYYYYMM(time)
-ORDER BY (device_hostname, time)
+ORDER BY (dataset_id, device_hostname, source_channel, record_number)
 SETTINGS index_granularity = 8192;

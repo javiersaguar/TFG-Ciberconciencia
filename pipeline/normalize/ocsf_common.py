@@ -40,6 +40,80 @@ def parse_ts(raw):
     return None
 
 
+def _desfase_colector_ms(event):
+    """Desfase horario del colector, derivado del PROPIO evento.
+
+    `@timestamp` viene en UTC y `EventReceivedTime` en la hora local de la
+    maquina que recogio el evento, de modo que su diferencia ES el desfase de
+    esa zona. Al derivarlo evento a evento no hace falta tabla de zonas ni una
+    pasada previa sobre el dataset, y se adapta solo al horario de verano y a
+    capturas hechas en otro huso.
+
+    Medido sobre apt29 day1: +4,00 h EXACTAS en los 196.081 eventos, sin una
+    sola excepcion.
+    """
+    ts = parse_ts(event.get("@timestamp"))
+    recibido = parse_ts(event.get("EventReceivedTime"))
+    if ts is None or recibido is None:
+        return None
+    # Al cuarto de hora mas cercano: cubre los husos a :30 y :45 y absorbe de
+    # paso el desfase de subsegundo entre ambos campos (EventReceivedTime tiene
+    # resolucion de segundo y @timestamp de milisegundo).
+    return round((ts - recibido) / 900_000) * 900_000
+
+
+def event_time(event):
+    """Instante en que OCURRIO el evento, en epoch-ms UTC, y de donde sale.
+
+    Devuelve (epoch_ms, origen). El orden es por fiabilidad decreciente y NO es
+    arbitrario: cada eslabon se eligio midiendo, no suponiendo.
+
+      1. `TimeCreated` — hora del evento en UTC, explicita. La traen todos los
+         datasets menos apt29 (verificado: 100 % en el atomico y en las 7
+         campanas LSASS).
+
+      2. `UtcTime` — la hora que registra Sysmon, en UTC y con milisegundos.
+         Solo se llega aqui si NO hay TimeCreated, y eso hoy solo pasa en apt29.
+         La distincion importa: en las campanas LSASS `UtcTime` va **19 horas**
+         desviado respecto a `TimeCreated` (reloj mal configurado en aquella VM),
+         asi que usarlo por delante de TimeCreated seria desastroso. Verificado
+         que fuera de apt29 no existe ni un evento con UtcTime y sin TimeCreated.
+
+      3. `EventTime` + desfase — hora local de escritura en el log, con
+         resolucion de segundo, corregida de zona con `_desfase_colector_ms`.
+         Es la unica opcion para los eventos de Security y PowerShell de apt29,
+         que no traen UtcTime. Validado contra UtcTime en los 143.883 eventos de
+         apt29 day1 donde ambos existen: mediana **-0,4 s** y el **94 % dentro
+         de un segundo**. Queda una cola del 4,9 % que se desvia mas de 5 s
+         (maximo 27 s), que es el retardo entre que Sysmon registra el evento y
+         el log lo escribe.
+
+      4. `@timestamp` — ULTIMO RECURSO, y hay que saber lo que se acepta al
+         llegar aqui: coincide con `EventReceivedTime`, es decir, la hora a la
+         que el colector RECIBIO el evento, no aquella en que ocurrio. Medido en
+         apt29 day1 frente a UtcTime: mediana 6,2 s, p95 74,9 s, maximo 101,2 s
+         y desviacion 26,7 s. Lo grave de ese ultimo numero es que los eventos
+         se REORDENAN entre si, asi que no es un desfase constante que se pueda
+         restar despues. Hasta el 09-09-2026 este era el eslabon que se usaba de
+         hecho para todo apt29, porque `@timestamp` iba por delante de `UtcTime`
+         en la cadena y apt29 no trae `TimeCreated`.
+    """
+    ts = parse_ts(event.get("TimeCreated"))
+    if ts is not None:
+        return ts, "TimeCreated"
+
+    ts = parse_ts(event.get("UtcTime"))
+    if ts is not None:
+        return ts, "UtcTime"
+
+    ts = parse_ts(event.get("EventTime"))
+    desfase = _desfase_colector_ms(event)
+    if ts is not None and desfase is not None:
+        return ts + desfase, "EventTime+tz"
+
+    return parse_ts(event.get("@timestamp")), "@timestamp"
+
+
 def _to_record_number(event):
     """Numero de registro del evento en su log de origen; 0 si no viene."""
     raw = event.get("RecordNumber")
@@ -53,12 +127,11 @@ def _to_record_number(event):
 
 def base_event(event, class_uid, category_uid, activity_id=0):
     """Construye el esqueleto OCSF común a todos los eventos."""
-    # TimeCreated es el campo comun y coherente entre canales (Sysmon y Security).
-    # No usar UtcTime: en estos datasets viene desfasado respecto a TimeCreated,
-    # lo que desincroniza el orden entre fuentes y romperia la correlacion CEP.
-    ts = (parse_ts(event.get("TimeCreated"))
-          or parse_ts(event.get("@timestamp"))
-          or parse_ts(event.get("UtcTime")))
+    # Ver event_time(): la cadena va por fiabilidad decreciente y esta medida.
+    # La version anterior ponia @timestamp por delante de UtcTime, con lo que
+    # todo apt29 -que no trae TimeCreated- acababa fechado con la hora de
+    # RECOGIDA del colector en vez de con la del evento.
+    ts, origen_ts = event_time(event)
     return {
         "class_uid": class_uid,
         "category_uid": category_uid,
@@ -96,6 +169,10 @@ def base_event(event, class_uid, category_uid, activity_id=0):
             # RecordNumber es el nombre en estos datasets; EventRecordID es el
             # que usan otros exportadores de Sysmon.
             "record_number": _to_record_number(event),
+            # De donde sale la marca de tiempo. Permite medir que fraccion del
+            # corpus tiene hora exacta y cual va reconstruida, en vez de tener
+            # que fiarse de que todas valen lo mismo.
+            "time_source": origen_ts,
         },
         "unmapped": {},
     }
