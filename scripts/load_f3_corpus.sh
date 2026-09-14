@@ -129,11 +129,14 @@ echo "== Volcando alertas a ClickHouse =="
 $PY -m pipeline.jobs.sink_alerts --group-id "ch-alerts-$SUFIJO" \
   --from-beginning --idle-exit 20 --ch-host 127.0.0.1
 
-# El volcado de eventos normalizados NO se hace por defecto: tfg.events ya
-# contiene apt29 y los 1,22 M eventos atomicos con los que se entreno ML-1, y
-# el sink no es idempotente, asi que volver a volcar duplicaria apt29 y
-# falsearia el conjunto de entrenamiento. Solo con --con-eventos y sabiendo
-# lo que se hace (p. ej. tras limpiar los dataset_id afectados).
+# El volcado de eventos normalizados va detras de --con-eventos. Hasta el
+# 11-09-2026 era peligroso activarlo: tfg.events guardaba tambien los 1,22 M
+# eventos atomicos con los que se entreno ML-1 y el sink no era idempotente,
+# de modo que volcar dos veces duplicaba apt29. Tras la migracion
+# (infra/clickhouse/migrations/2026-09-11_identidad_y_tiempo.sql) ya no es asi:
+# esos eventos estan en tfg.events_legacy, y tfg.events es ReplacingMergeTree
+# sobre la identidad del evento, asi que volcar dos veces SOBRESCRIBE.
+# Se conserva la opcion por coste (son ~530.000 eventos), no por riesgo.
 if [[ $CON_EVENTOS -eq 1 ]]; then
   echo ""
   echo "== Volcando eventos normalizados a ClickHouse =="
@@ -141,7 +144,25 @@ if [[ $CON_EVENTOS -eq 1 ]]; then
     --from-beginning --idle-exit 20 --ch-host 127.0.0.1
 fi
 
+# --- Fusion final --------------------------------------------------------------
+# tfg.events y tfg.alerts son ReplacingMergeTree: la deduplicacion ocurre en las
+# FUSIONES, que ClickHouse hace en segundo plano y cuando le parece. Hasta que
+# ocurren, un count() sin FINAL cuenta los duplicados. Medido el 14-09-2026 tras
+# volcar el corpus dos veces: 784.823 filas sin FINAL frente a 530.401 con FINAL,
+# y la vista de movimiento lateral daba 65 conexiones en vez de 39. Los paneles
+# de Grafana consultan sin FINAL, asi que estaban contando un 48 % de mas.
+# Forzar la fusion al terminar deja los recuentos exactos sin tener que poner
+# FINAL en cada consulta. Es seguro: solo elimina duplicados exactos por identidad.
+echo ""
+echo "== Fusionando duplicados (OPTIMIZE ... FINAL) =="
+for tabla in tfg.events tfg.alerts; do
+  docker exec clickhouse clickhouse-client --user tfg --password tfg \
+    --query "OPTIMIZE TABLE $tabla FINAL"
+  echo "   $tabla: $(docker exec clickhouse clickhouse-client --user tfg --password tfg \
+    --query "SELECT count() FROM $tabla") filas"
+done
+
 echo ""
 echo "Carga completada. Comprueba el resultado con:"
-echo "  docker compose -f infra/docker-compose.yml exec clickhouse clickhouse-client -q \\"
+echo "  docker exec clickhouse clickhouse-client --user tfg --password tfg --query \\"
 echo "    \"SELECT dataset_id, count() FROM tfg.alerts GROUP BY dataset_id ORDER BY 2 DESC\""

@@ -31,7 +31,10 @@ FROM (
            max(votos)       AS votos_top
     FROM (
         SELECT dataset_id, src_ip AS ip, device_hostname AS h, count() AS votos
-        FROM tfg.events
+        -- FINAL: las vistas son logica de analisis y no deben depender de si
+        -- ClickHouse ya ha fusionado los duplicados. Sin el, tras volcar el
+        -- corpus dos veces esta vista dio 65 conexiones laterales en vez de 39.
+        FROM tfg.events FINAL
         WHERE source_event_id = 3 AND direction_id = 2 AND src_ip IS NOT NULL
           -- Fuera las direcciones que NO identifican a una maquina de la red.
           -- Sin esto, `::1` recibe votos de todos los hosts, argMax se lo
@@ -70,7 +73,7 @@ SELECT
     e.actor_process_name                           AS proceso,
     e.actor_user_name                              AS usuario,
     e.time                                         AS momento
-FROM tfg.events AS e
+FROM tfg.events AS e FINAL
 INNER JOIN tfg.v_mapa_ip AS m
         ON m.dataset_id = e.dataset_id AND m.ip = e.dst_ip
 WHERE e.source_event_id = 3
