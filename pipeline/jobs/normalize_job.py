@@ -28,6 +28,49 @@ def parse_args():
     return p.parse_args()
 
 
+def clave_particion(ocsf):
+    """Clave de particion de norm.events: la IDENTIDAD del evento.
+
+    Hasta el 14-09-2026 se particionaba por `device.hostname`. Con los pocos
+    hosts distintos del corpus de F3 eso concentraba los mensajes en muy pocas
+    particiones, y encima las dos claves mas grandes -MKT01, que suma cuatro
+    campanas LSASS, y SCRANTON en apt29- colisionaban en la misma: 350.118 de
+    530.401 mensajes (66 %) en la particion 1. Como una particion solo la
+    consume una instancia, el paralelismo de la deteccion era decorativo: la
+    carga del 11-09 no termino.
+
+    Particionar por host no protegia nada que se usara. Los dos consumidores de
+    norm.events no dependen del orden: `detect_job` evalua reglas Sigma evento
+    a evento sin estado, y `sink_clickhouse` inserta en una tabla que deduplica.
+    Flink NO lee este topic: lee `det.alerts`, cuya clave construye `detect_job`
+    por su cuenta, y ademas impone su propio orden (PARTITION BY dataset, host
+    + ORDER BY ts con marca de agua).
+
+    La identidad del evento es la eleccion natural:
+      - DETERMINISTA: el mismo evento cae siempre en la misma particion, asi que
+        una recarga reproduce el reparto exacto.
+      - UNIFORME por cardinalidad, no por suerte: ~530.000 valores distintos en
+        vez de 12, sin claves indivisibles que marquen un minimo de tiempo.
+      - Es la misma identidad que la clave de ordenacion de tfg.events.
+
+    Simulado en ClickHouse con CRC32 % 6 -validado antes reproduciendo al
+    evento el reparto real de la clave por host-: 87.948 a 88.629 mensajes por
+    particion, todas entre el 16,6 y el 16,7 %.
+
+    Los valores por defecto (`or ""`, `or 0`) son deliberadamente los MISMOS que
+    usa `sink_clickhouse.to_row` al rellenar esas columnas: es lo que hace que la
+    cadena coincida byte a byte con la simulada.
+    """
+    tfg = ocsf.get("tfg", {}) or {}
+    host = (ocsf.get("device", {}) or {}).get("hostname") or ""
+    return "|".join((
+        tfg.get("dataset_id") or "",
+        host,
+        tfg.get("source_channel") or "",
+        str(tfg.get("record_number") or 0),
+    )).encode("utf-8")
+
+
 def header_value(headers, key):
     for k, v in (headers or []):
         if k == key:
@@ -94,7 +137,7 @@ def main():
         else:
             producer.produce(
                 topic=args.sink_topic,
-                key=(ocsf.get("device", {}).get("hostname") or "unknown").encode("utf-8"),
+                key=clave_particion(ocsf),
                 value=json.dumps(ocsf, ensure_ascii=False).encode("utf-8"),
                 timestamp=ocsf.get("time") or 0,
                 headers={
