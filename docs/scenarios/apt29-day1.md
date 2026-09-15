@@ -171,59 +171,101 @@ es otra fase. Para P2 la ventana se mide sobre el núcleo, no sobre la campaña 
 
 ## 4. Ventanas temporales observadas
 
-Medidas sobre las alertas reales de `SDWIN-200501225525` (el plan no lleva marcas de tiempo).
+Medidas sobre las alertas reales de `SDWIN-200501225525` (el plan no lleva marcas de tiempo),
+en los dos hosts de la cadena principal, SCRANTON y NASHUA.
 
-Recalculadas el 31-07-2026 sobre `tfg.alerts FINAL`, con la deduplicación correcta por
-construcción (`alert_id` determinista + `ReplacingMergeTree`).
+**Recalculadas el 15-09-2026** sobre `tfg.alerts FINAL`, con la **hora del evento** (no la de
+recogida) y la identidad de evento completa (741 alertas).
 
-> **Nota metodológica.** La primera versión de esta tabla (30-07) deduplicaba a mano por
-> `(time, rule_id, host, matched_fields, src_event_id)`, y ese criterio resultó **demasiado
-> agresivo**: colapsaba alertas legítimas de eventos distintos ocurridos en el mismo
-> milisegundo. El efecto no era menor —`execution` en SCRANTON pasa de 93 a 174 y
-> `defense-impairment` de 86 a 175, casi el doble— y afecta sobre todo a las reglas que
-> disparan muchas veces sobre eventos con los mismos campos coincidentes. Las **marcas de
-> tiempo no se vieron afectadas**, así que las ventanas derivadas de ellas siguen siendo válidas.
+> **Nota sobre las marcas de tiempo.** La versión del 31-07 de esta sección afirmaba que las
+> marcas de tiempo "no se habían visto afectadas". Era cierto respecto a la deduplicación, pero
+> **falso por otro motivo**, descubierto el 08-09: apt29 no trae `TimeCreated` y el normalizador
+> caía a `@timestamp`, que es la hora a la que el colector **recibió** el evento, con un desfase
+> de hasta 101 s y σ 26,7 s. Corregido el 11-09 en `ocsf_common.event_time`. Todas las cifras
+> de abajo usan ya la hora del evento.
+>
+> **Nota sobre la deduplicación (30-07).** La primera versión de la tabla deduplicaba a mano
+> por `(time, rule_id, host, matched_fields, src_event_id)`, criterio demasiado agresivo que
+> colapsaba alertas legítimas del mismo milisegundo (`execution` en SCRANTON pasaba de 93 a
+> 174). Desde el 31-07 la deduplicación es correcta por construcción.
+>
+> **Nota sobre la tabla del 31-07.** Tenía 17 filas y **le faltaban cuatro** de NASHUA
+> (`impact`, `credential-access`, `stealth`, `resource-development`). Se comprobó contra
+> `tfg.alerts_legacy` que esas alertas ya existían entonces: la tabla se montó a mano y se
+> quedó corta. Por eso ahora cada tabla va acompañada de la consulta que la genera.
 
-**Campaña completa: 02:56:15,884 → 03:22:42,872 = 26 min 27 s.**
+**Campaña completa: 02:56:14,000 † → 03:22:41,798 = 26 min 27 s.** Duración **idéntica** a la
+medida con horas de recogida (1.587 s en ambos casos); el inicio se adelanta 1,9 s y el final 1,1 s.
+
+† = hora reconstruida con **resolución de segundo** (`EventTime` + desfase horario, eventos de
+Security y PowerShell). El resto lleva hora de Sysmon con milisegundos.
 
 | Táctica | Host | Alertas | Primera | Duración |
 |---|---|---:|---|---:|
-| execution | SCRANTON | 174 | 02:56:15 | 26,0 min |
-| defense-impairment | SCRANTON | 175 | 02:57:20 | 24,9 min |
-| persistence | SCRANTON | 320 | 02:57:20 | 23,8 min |
-| privilege-escalation | SCRANTON | 26 | 02:58:32 | 23,3 min |
-| stealth | SCRANTON | 22 | 02:58:46 | 23,4 min |
-| **credential-access** | **SCRANTON** | **7** | **03:00:30** | **19,5 min** |
-| resource-development | SCRANTON | 25 | 03:02:06 | 12,6 min |
-| exfiltration | SCRANTON | 10 | 03:08:52 | **1,5 min** |
-| execution | NASHUA | 19 | 03:09:24 | 13,3 min |
-| **lateral-movement** | **NASHUA** | **4** | **03:09:24** | **0,1 min** |
-| defense-impairment | NASHUA | 76 | 03:09:31 | 13,0 min |
-| privilege-escalation | NASHUA | 5 | 03:14:18 | 8,4 min |
-| persistence | NASHUA | 4 | 03:14:18 | 0,0 min |
-| collection | NASHUA | 4 | 03:16:19 | 0,0 min |
-| lateral-movement | SCRANTON | 2 | 03:19:35 | 0,4 min |
-| discovery | SCRANTON | 2 | 03:19:53 | 0,2 min |
-| command-and-control | SCRANTON | 2 | 03:21:32 | 0,0 min |
+| execution | SCRANTON | 174 | 02:56:14 † | 25,2 min |
+| persistence | SCRANTON | 322 | 02:57:18 | 22,5 min |
+| defense-impairment | SCRANTON | 175 | 02:57:18 | 24,9 min |
+| privilege-escalation | SCRANTON | 28 | 02:58:30 | 22,5 min |
+| stealth | SCRANTON | 22 | 02:58:44 | 22,8 min |
+| impact | NASHUA | 3 | 02:59:37 | 16,7 min |
+| **credential-access** | **SCRANTON** | **7** | **03:00:29** | **18,8 min** |
+| resource-development | SCRANTON | 25 | 03:02:04 | 12,6 min |
+| exfiltration | SCRANTON | 10 | 03:08:50 † | 1,6 min |
+| execution | NASHUA | 19 | 03:09:23 † | 13,3 min |
+| **lateral-movement** | **NASHUA** | **4** | **03:09:23 †** | **0,1 min** |
+| credential-access | NASHUA | 1 | 03:09:29 | 0,0 min |
+| defense-impairment | NASHUA | 76 | 03:09:29 | 13,0 min |
+| privilege-escalation | NASHUA | 5 | 03:14:17 | 8,4 min |
+| persistence | NASHUA | 4 | 03:14:17 | 0,0 min |
+| stealth | NASHUA | 2 | 03:14:19 | 0,0 min |
+| collection | NASHUA | 4 | 03:16:19 † | 0,0 min |
+| resource-development | NASHUA | 9 | 03:16:52 | 0,8 min |
+| lateral-movement | SCRANTON | 2 | 03:19:14 † | 0,0 min |
+| discovery | SCRANTON | 2 | 03:19:17 † | 0,0 min |
+| command-and-control | SCRANTON | 2 | 03:21:29 † | 0,0 min |
 
 El orden de aparición reproduce la cadena del plan: ejecución en SCRANTON (02:56) → persistencia
 (02:57) → escalada (02:58) → **credenciales (03:00)** → exfiltración (03:08) → **salto a NASHUA
-(03:09:24)** → recolección en NASHUA (03:16) → cierre en SCRANTON (03:21). NEWYORK aparece con
-pocas alertas y no es objetivo de este día.
+(03:09:23)** → recolección en NASHUA (03:16) → segundo volcado de credenciales en SCRANTON
+(03:19:09) → cierre en SCRANTON (03:21). NEWYORK y UTICA aparecen con pocas alertas y no son
+objetivo de este día.
+
+**Qué ha cambiado respecto a las horas de recogida:**
+
+- **Los eventos del final se desplazan más que los del principio.** Casi todo se adelanta 1-2 s,
+  pero lo de las 03:19 en SCRANTON se adelanta **21 s** (`lateral-movement`) y **36 s**
+  (`discovery`). Encaja con un colector que se iba retrasando a medida que crecía el volumen, y
+  explica que las duraciones de las tácticas de SCRANTON encojan entre 0,7 y 1,3 min.
+- **Cambia un orden a las 03:19.** Con horas de recogida, el movimiento lateral en SCRANTON
+  (03:19:35) iba *antes* que el segundo volcado de LSASS (03:19:42). Con la hora del evento, el
+  volcado va primero (03:19:09,803) y el movimiento lateral después (03:19:14 †). Es lo coherente
+  —primero se roban credenciales, luego se usan—, pero la alerta de movimiento lateral tiene hora
+  de resolución de segundo, así que con 4,2 s de diferencia el orden es **muy probable, no seguro**.
+
+> **❓ Pregunta abierta.** NASHUA tiene **3 alertas de `impact` desde las 02:59:37**, diez
+> minutos **antes** del salto de SCRANTON a las 03:09:23. No están en la cadena del plan, y la
+> campaña P1 de NASHUA también arranca a esa hora, así que las está absorbiendo. Hasta
+> explicarlas no puede afirmarse que NASHUA entra en juego con el salto lateral.
 
 ### El bloque de P1, alerta a alerta
 
 ```
-03:00:30,614  Cred Dump Tools Dropped Files            high     T1003.001-005  SCRANTON
-03:00:36,937  Cred Dump Tools Dropped Files            high     T1003.001-005  SCRANTON
-03:05:17,687  Potential Credential Dumping Via LSASS   medium   T1003.001      SCRANTON
-03:09:31,016  Remote LSASS Access Through WinRM        high     T1003.001      NASHUA
-03:19:42,693  Potential Credential Dumping Via LSASS   medium   T1003.001      SCRANTON
-03:19:53,186  New Network Trace Capture Via Netsh.EXE  medium   T1040          SCRANTON
-03:20:02,096  New Network Trace Capture Via Netsh.EXE  medium   T1040          SCRANTON
+03:00:29,705    Cred Dump Tools Dropped Files            high     T1003.001-005  SCRANTON
+03:00:31,064    Cred Dump Tools Dropped Files            high     T1003.001-005  SCRANTON
+03:05:16,654    Potential Credential Dumping Via LSASS   medium   T1003.001      SCRANTON
+03:09:29,430    Remote LSASS Access Through WinRM        high     T1003.001      NASHUA
+03:19:09,803    Potential Credential Dumping Via LSASS   medium   T1003.001      SCRANTON  (×2)
+03:19:17,000 †  New Network Trace Capture Via Netsh.EXE  medium   T1040          SCRANTON
+03:19:17,154    New Network Trace Capture Via Netsh.EXE  medium   T1040          SCRANTON
 ```
 
-**Núcleo de la secuencia: volcado de la herramienta → acceso a LSASS = 4 min 47 s.**
+La fila `(×2)` son **dos alertas distintas en el mismo milisegundo**: dos eventos de acceso a
+LSASS que antes normalizaban idénticos y colapsaban en uno. Es una de las tres parejas que
+reaparecieron al pasar de 738 a 741 alertas (14-09).
+
+**Núcleo de la secuencia: volcado de la herramienta → acceso a LSASS = 4 min 47 s**
+(03:00:29,705 → 03:05:16,654). **Idéntico** al medido con horas de recogida
+(03:00:30,614 → 03:05:17,687).
 
 Tres consecuencias directas para el `DEFINE` de P1:
 
@@ -232,11 +274,40 @@ Tres consecuencias directas para el `DEFINE` de P1:
    tipo `A.technique <> 'T1003.001'`, que es lo natural al escribir el patrón, **elimina
    precisamente la mejor evidencia**. La separación entre etapas tiene que hacerse por otra vía
    (clase de evento de origen, o `file.path` frente a `unmapped.GrantedAccess`).
-2. **El acceso a LSASS ocurre dos veces**, separadas 14 min. Son dos acciones distintas y deben
-   producir **dos campañas**, no una: es un argumento a favor de `AFTER MATCH SKIP PAST LAST ROW`.
+2. **El acceso a LSASS ocurre dos veces**, separadas **13 min 53 s** (14 min 25 s con horas de
+   recogida). Son dos acciones distintas y deben producir **dos campañas**, no una: es un
+   argumento a favor de `AFTER MATCH SKIP PAST LAST ROW`. Queda un margen de **3 min 53 s**
+   sobre la ventana de 10 min, suficiente para que la separación no dependa del redondeo.
 3. **`WITHIN` propuesto para P1: 10 minutos** — el doble del núcleo observado (4 min 47 s),
    suficiente para no partir la secuencia y lo bastante estrecho para que las dos instancias de
-   volcado no se fusionen.
+   volcado no se fusionen. **Sigue siendo válido con la hora del evento.**
+
+### Cómo se regeneran estas cifras
+
+Las tablas de esta sección salen de consultas, no se editan a mano:
+
+```sql
+-- Duración de la campaña (SCRANTON y NASHUA)
+SELECT min(time), max(time), dateDiff('second', min(time), max(time))
+FROM tfg.alerts FINAL
+WHERE dataset_id = 'SDWIN-200501225525'
+  AND splitByChar('.', device_hostname)[1] IN ('SCRANTON', 'NASHUA');
+
+-- Tabla de tácticas por host
+SELECT tactica, host, count() AS alertas, min(time) AS primera,
+       round(dateDiff('second', min(time), max(time)) / 60, 1) AS duracion_min
+FROM (SELECT arrayJoin(tactic_ids) AS tactica, splitByChar('.', device_hostname)[1] AS host, time
+      FROM tfg.alerts FINAL WHERE dataset_id = 'SDWIN-200501225525')
+WHERE host IN ('SCRANTON', 'NASHUA')
+GROUP BY tactica, host ORDER BY primera;
+
+-- Bloque de P1
+SELECT time, rule_title, rule_level, technique_ids, device_hostname
+FROM tfg.alerts FINAL
+WHERE dataset_id = 'SDWIN-200501225525'
+  AND arrayExists(t -> t LIKE 'T1003%' OR t = 'T1040', technique_ids)
+ORDER BY time;
+```
 
 ### ⚠️ Limitación importante de esta calibración
 
