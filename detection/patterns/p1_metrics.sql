@@ -26,24 +26,32 @@ FROM (
 );
 
 -- 2) Reduccion de alertas dentro del alcance de P1, por dataset
+--
+-- Las absorbidas se cuentan DISTINTAS (uniqExactArray sobre ids_absorbidos) y NO
+-- sumando alertas_absorbidas: dos campanas del mismo host pueden solaparse y la
+-- misma alerta contaria en ambas. Hasta el 15-09-2026 se sumaba, y daba 743
+-- absorbidas en apt29 day1 -un dataset de 741 alertas- y 1.186 en el total. La
+-- columna `contadas_dos_veces` deja la correccion a la vista en vez de esconderla.
 SELECT
     dataset,
     count()                        AS campanas,
-    sum(alertas_absorbidas)        AS n_absorbidas,
+    uniqExactArray(ids_absorbidos) AS n_absorbidas,
+    toInt64(sum(alertas_absorbidas)) - toInt64(uniqExactArray(ids_absorbidos)) AS contadas_dos_veces,
     sum(evidencia_p1)              AS n_evidencia,
-    round(1 - count() / sum(alertas_absorbidas), 3) AS ratio_reduccion,
+    round(1 - count() / uniqExactArray(ids_absorbidos), 3) AS ratio_reduccion,
     round(avg(confianza), 2)       AS confianza_media,
     round(avg(duracion_min), 1)    AS duracion_media_min
 FROM tfg.p1_campanas
 GROUP BY dataset
 ORDER BY dataset;
 
--- 3) Total agregado
+-- 3) Total agregado (alertas absorbidas DISTINTAS, ver la nota de la consulta 2)
 SELECT
     'TOTAL' AS dataset,
-    count()                 AS campanas,
-    sum(alertas_absorbidas) AS n_absorbidas,
-    round(1 - count() / sum(alertas_absorbidas), 3) AS ratio_reduccion
+    count()                        AS campanas,
+    uniqExactArray(ids_absorbidos) AS n_absorbidas,
+    toInt64(sum(alertas_absorbidas)) - toInt64(uniqExactArray(ids_absorbidos)) AS contadas_dos_veces,
+    round(1 - count() / uniqExactArray(ids_absorbidos), 3) AS ratio_reduccion
 FROM tfg.p1_campanas;
 
 -- 4) Falsos positivos: campanas cuya unica evidencia es el ancla, sin ninguna

@@ -35,7 +35,7 @@
 -- Uso:
 --   docker compose -f infra/docker-compose.yml exec -T clickhouse \
 --     clickhouse-client --multiquery < detection/patterns/p1_credential_theft.sql
---   SELECT * FROM tfg.p1_campanas ORDER BY dataset, inicio;
+--   SELECT * EXCEPT (reglas_del_ancla, ids_absorbidos) FROM tfg.p1_campanas ORDER BY dataset, inicio;
 -- =============================================================================
 
 CREATE OR REPLACE VIEW tfg.p1_campanas AS
@@ -110,6 +110,15 @@ SELECT
     --                         de credenciales: son contexto absorbido.
     count()                                        AS alertas_absorbidas,
     uniqExact(b.event_hash)                        AS eventos_distintos,
+    -- Identificadores de las alertas absorbidas. Hacen falta para contar
+    -- alertas DISTINTAS entre campanas: dos campanas del mismo host pueden estar
+    -- separadas (sus anclas distan mas de la ventana) y aun asi SOLAPARSE, porque
+    -- cada una absorbe +-10 min alrededor de sus anclas. Medido el 15-09-2026 en
+    -- apt29: las dos campanas de SCRANTON comparten 22 alertas (03:10:22 a
+    -- 03:14:42), y sumar `alertas_absorbidas` daba 1.186 en un corpus que solo
+    -- tiene 1.184. Las metricas cuentan con uniqExactArray sobre esta columna.
+    -- Las campanas NO se modifican: siguen reconciliadas con la version en Flink.
+    groupUniqArray(b.alert_id)                     AS ids_absorbidos,
     c.n_anclas                                     AS anclas,
 
     -- Etapas. Se reconocen por el TIPO DE EVENTO DE ORIGEN y se restringen a
