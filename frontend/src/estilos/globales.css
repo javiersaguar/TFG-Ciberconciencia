@@ -1,0 +1,297 @@
+/*
+ * Sistema de diseño del portal (README §Diseño).
+ *
+ * Parte del de PIDS, con un cambio de fondo: **ningún plano grande es blanco**. El portal está pensado para un SOC,
+ * donde se mira la pantalla durante turnos largos; las superficies blancas y brillantes cansan la vista y hacen que
+ * los colores de severidad destaquen menos. Por eso el fondo es un gris medio, las tarjetas un gris claro (nunca
+ * #fff) y el texto un pizarra oscuro en vez de negro puro, manteniendo el contraste mínimo WCAG AA (4,5:1) en el texto.
+ *
+ * Los tokens se declaran como variables CSS (--fondo, --superficie, --acento, …), se mapean a las de shadcn/ui
+ * (--background, --card, --primary, …) para que los componentes de `componentes/ui` los hereden sin tocarlos, y se
+ * exponen como colores de Tailwind (bg-fondo, text-texto-suave, border-borde, text-sev-alta, …).
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Inter servida desde el propio paquete: sin llamadas a terceros. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* --- 1. Tokens ---------------------------------------------------------------------------------------------- */
+:root {
+  /* Planos: de más oscuro a más claro. Ninguno llega al blanco. */
+  --fondo: #dde2e8;             /* fondo de la aplicación */
+  --superficie: #eceff3;        /* tarjetas y paneles */
+  --superficie-alterna: #e2e6ec;/* cabeceras de tabla, filas alternas, skeletons */
+  --superficie-hundida: #d3d9e1;/* pistas de barras, zonas inactivas */
+  --lateral: #e4e8ed;           /* barra lateral */
+  --borde: #c9d1db;
+
+  /* Texto: pizarra, no negro. */
+  --texto: #1d2632;
+  --texto-suave: #4f5b6a;       /* 5,2:1 sobre --superficie */
+  --primario: #22324a;          /* títulos */
+
+  /* Acento: un azul apagado; en un SOC el color fuerte se reserva para la severidad. */
+  --acento: #345f9e;
+  --acento-suave: #d3deec;
+
+  /* Estado. */
+  --ok: #2b6f52;
+  --aviso: #94600f;
+  --peligro: #a3302a;
+
+  /* Severidad (OCSF `severity_id`), la escala que comparten alertas, campañas e incidentes. */
+  --sev-info: #5f6b7a;
+  --sev-baja: #3a6aa8;
+  --sev-media: #a06a10;
+  --sev-alta: #b4531c;
+  --sev-critica: #a3302a;
+
+  /* --- 2. Variables de shadcn/ui, alimentadas por los tokens ----------------------------------------- */
+  --background: var(--fondo);
+  --foreground: var(--texto);
+  --card: var(--superficie);
+  --card-foreground: var(--texto);
+  --popover: var(--superficie);
+  --popover-foreground: var(--texto);
+  --primary: var(--acento);
+  --primary-foreground: #eef2f7;
+  --secondary: var(--superficie-alterna);
+  --secondary-foreground: var(--primario);
+  --muted: var(--superficie-alterna);
+  --muted-foreground: var(--texto-suave);
+  --accent: var(--acento-suave);
+  --accent-foreground: var(--primario);
+  --destructive: var(--peligro);
+  --border: var(--borde);
+  --input: var(--borde);
+  --ring: var(--acento);
+  --chart-1: #3f6fae;
+  --chart-2: #3f8f6e;
+  --chart-3: #7560a8;
+  --chart-4: #3d8f97;
+  --chart-5: #b07d2a;
+  --radius: 0.75rem;
+  --sombra-tarjeta: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 22px rgb(15 23 42 / 0.05);
+}
+
+/* --- 3. Tokens como utilidades de Tailwind --------------------------------------------------------------- */
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-sans);
+
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-superficie-alterna: var(--superficie-alterna);
+  --color-superficie-hundida: var(--superficie-hundida);
+  --color-lateral: var(--lateral);
+  --color-borde: var(--borde);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-primario: var(--primario);
+  --color-acento: var(--acento);
+  --color-acento-suave: var(--acento-suave);
+  --color-ok: var(--ok);
+  --color-aviso: var(--aviso);
+  --color-peligro: var(--peligro);
+  --color-sev-info: var(--sev-info);
+  --color-sev-baja: var(--sev-baja);
+  --color-sev-media: var(--sev-media);
+  --color-sev-alta: var(--sev-alta);
+  --color-sev-critica: var(--sev-critica);
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --shadow-tarjeta: var(--sombra-tarjeta);
+}
+
+/* --- 4. Base ---------------------------------------------------------------------------------------------- */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+    color-scheme: light;
+  }
+  body {
+    @apply bg-background text-foreground text-sm leading-normal;   /* 14 px de base */
+  }
+  h1, h2, h3, h4 {
+    @apply font-semibold tracking-tight text-primario;
+  }
+  h1 { @apply text-2xl; }
+  h2 { @apply text-xl; }
+  h3 { @apply text-lg; }
+  /* Las cifras siempre alineadas en columna (tablas, KPIs, ejes). */
+  table, tbody, td, th {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+/* --- 5. Utilidades propias -------------------------------------------------------------------------------- */
+@utility cifra {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+@utility sombra-tarjeta {
+  box-shadow: var(--sombra-tarjeta);
+}
+
+/* Lienzo del grafo: el gris se desplaza despacio y unas manchas apagadas lo cruzan; los puntos van por encima.
+ * Mismo movimiento que en PIDS, con los tonos bajados para no deslumbrar. */
+@keyframes marea-color {
+  0% { background-position: 0% 40%; }
+  50% { background-position: 100% 60%; }
+  100% { background-position: 0% 40%; }
+}
+@keyframes deriva-puntos {
+  from { background-position: 0 0; }
+  to { background-position: 22px 22px; }
+}
+@keyframes orbita-a {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  40% { transform: translate3d(28%, 18%, 0) scale(1.18); }
+  75% { transform: translate3d(8%, 32%, 0) scale(0.9); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes orbita-b {
+  0% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(-26%, -20%, 0) scale(0.82); }
+  100% { transform: translate3d(0, 0, 0) scale(1.05); }
+}
+@keyframes orbita-c {
+  0% { transform: translate3d(0, 0, 0) scale(0.95); }
+  35% { transform: translate3d(-18%, 24%, 0) scale(1.2); }
+  70% { transform: translate3d(12%, 8%, 0) scale(1); }
+  100% { transform: translate3d(0, 0, 0) scale(0.95); }
+}
+.fondo-marea {
+  background-color: #d9dee5;
+  background-image: linear-gradient(120deg, #d8dde4 0%, #e0e4ea 22%, #d6dce4 42%, #dbe1e0 62%, #e0e4ea 80%, #d4dae3 100%);
+  background-size: 320% 320%;
+  animation: marea-color 18s ease-in-out infinite;
+}
+.fondo-puntos {
+  background-image: radial-gradient(circle, rgb(71 85 105 / 0.28) 1.1px, transparent 1.2px);
+  background-size: 22px 22px;
+  animation: deriva-puntos 16s linear infinite;
+}
+.orbita {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  pointer-events: none;
+  will-change: transform;
+}
+.orbita-azul {
+  top: -14%;
+  left: -10%;
+  width: 46%;
+  height: 46%;
+  background: #c7d3e3;
+  opacity: 0.7;
+  animation: orbita-a 18s ease-in-out infinite;
+}
+.orbita-verde {
+  right: -12%;
+  bottom: -16%;
+  width: 42%;
+  height: 42%;
+  background: #c9dad2;
+  opacity: 0.65;
+  animation: orbita-b 22s ease-in-out infinite;
+}
+.orbita-cielo {
+  top: 30%;
+  left: 36%;
+  width: 34%;
+  height: 34%;
+  background: #d2dae6;
+  opacity: 0.75;
+  animation: orbita-c 20s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fondo-marea,
+  .fondo-puntos,
+  .orbita {
+    animation: none;
+  }
+}
+
+/* --- 6. La plataforma en marcha: tramos del lienzo, piezas que trabajan ---------------------------------- */
+/* Trazo discontinuo que avanza en el sentido del dato. */
+@keyframes fluir {
+  to { stroke-dashoffset: -48; }
+}
+.arista-flujo {
+  stroke-dasharray: 10 14;
+  animation: fluir 1.1s linear infinite;
+}
+.punto-flujo {
+  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 0.3));
+}
+/* Anillo que late alrededor de una pieza que está trabajando. */
+@keyframes latido {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(1.035); opacity: 0.9; }
+}
+.anillo-activo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 1.35rem;
+  border: 2px solid;
+  pointer-events: none;
+  animation: latido 1.6s ease-in-out infinite;
+}
+/* Punto «en vivo» de los indicadores. */
+@keyframes pulso-punto {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.9); opacity: 0; }
+}
+.punto-vivo {
+  animation: pulso-punto 1.4s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .arista-flujo,
+  .anillo-activo,
+  .punto-vivo {
+    animation: none;
+  }
+}

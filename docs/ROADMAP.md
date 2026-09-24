@@ -697,6 +697,12 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
 - [ ] **F8.0** Nombre y marca · 2–3 *personas* · `docs/product-brief.md`.
 - [ ] **F8.1** React 18 + TypeScript + Vite · Tailwind + shadcn/ui · TanStack Query ·
   Recharts · Cytoscape.js (grafo) · Zustand. Sistema de diseño (tema oscuro, códigos de severidad).
+  ↪️ **Base hecha (23-09-2026), con el stack del portal de PIDS:** React 19 + Vite 8 + Tailwind 4 +
+  shadcn/ui + TanStack Query + Recharts; el grafo del pipeline en SVG propio. Cytoscape.js se aplaza
+  al grafo de ataque (F5, cientos de nodos) y Zustand no hace falta aún. En vez del tema oscuro, una
+  **paleta gris de baja luminancia** (sin superficies blancas, pensada para turnos largos en un SOC)
+  con escala de severidad propia. Sin backend: datos simulados con la procedencia de cada cifra
+  marcada. Detalle en `frontend/README.md`.
 - [ ] **F8.2** Multi-tenancy (`tenant_id` filtrado **en la capa de datos**) + JWT con roles.
   Sembrar 2–3 organizaciones de demostración.
 - [ ] **F8.3 MVF:** Panel de situación · Cola de incidentes · **Detalle de incidente**

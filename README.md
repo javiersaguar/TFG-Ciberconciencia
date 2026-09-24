@@ -104,6 +104,7 @@ Plan detallado en [`docs/ROADMAP.md`](docs/ROADMAP.md) · La memoria y el regist
 ├── scoring/        Priorización explicable de incidentes
 ├── eval/           Protocolo de evaluación, métricas y resultados
 ├── emulation/      Escenarios de emulación de adversario
+├── frontend/       Portal web (F8): base con datos simulados, ver frontend/README.md
 ├── docs/           Documentación técnica y roadmap
 ├── Memoria/        Memoria del TFG (LaTeX)
 └── data/           Datasets y reglas (no versionado)
