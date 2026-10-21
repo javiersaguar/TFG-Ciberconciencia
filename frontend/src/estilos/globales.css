@@ -9,6 +9,11 @@
  * Los tokens se declaran como variables CSS (--fondo, --superficie, --acento, …), se mapean a las de shadcn/ui
  * (--background, --card, --primary, …) para que los componentes de `componentes/ui` los hereden sin tocarlos, y se
  * exponen como colores de Tailwind (bg-fondo, text-texto-suave, border-borde, text-sev-alta, …).
+ *
+ * DOS TEMAS (README §Temas). El claro (`:root`) es el gris de baja luminancia y es el de por defecto. El oscuro
+ * (`.dark` en <html>, lo pone `componentes/tema`) redefine los MISMOS tokens: ningún componente cambia de clases.
+ * El contraste de cada par texto/fondo (≥ 4,5:1) y gráfico/fondo (≥ 3:1) de los dos temas lo comprueba
+ * `src/estilos/contraste.test.ts` leyendo este fichero; si se toca un color, ese test dice si sigue cumpliendo.
  */
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -41,17 +46,64 @@
   --acento: #345f9e;
   --acento-suave: #d3deec;
 
-  /* Estado. */
+  /* Estado. (`--aviso` era #94600f: 4,1:1 sobre su propio tinte; ajustado al mínimo que da 4,5:1.) */
   --ok: #2b6f52;
-  --aviso: #94600f;
+  --aviso: #8a590e;
   --peligro: #a3302a;
 
-  /* Severidad (OCSF `severity_id`), la escala que comparten alertas, campañas e incidentes. */
+  /* Severidad (OCSF `severity_id`), la escala que comparten alertas, campañas e incidentes.
+   * Media y alta eran #a06a10 y #b4531c (4,0 y 4,3:1 como texto): mismo tono, el mínimo más oscuro que cumple AA. */
   --sev-info: #5f6b7a;
   --sev-baja: #3a6aa8;
-  --sev-media: #a06a10;
-  --sev-alta: #b4531c;
+  --sev-media: #85580d;
+  --sev-alta: #9e4919;
   --sev-critica: #a3302a;
+  /* Texto sobre color intenso (chips de severidad y de urgencia). */
+  --sobre-intenso: #f3f5f8;
+
+  /* Lienzos de los grafos, zonas y bordes de tarjeta. */
+  --lienzo: #d9dee5;
+  --zona: #e3e7ec;
+  --borde-tarjeta: #cfd6df;
+  --borde-discontinuo: #aeb8c5;
+  --separador: #c3cbd5;
+  --linea-red: #757e89;          /* era #9aa6b4 (1,8:1 sobre el lienzo); ahora 3,0:1 */
+  --linea-bloqueada: #7d8997;
+
+  /* Fundamento de una relación del grafo de ataque (además del trazo, el icono y el texto). */
+  --fund-observado: #3b4a5e;
+  --fund-inferido: #5b4a99;
+  --fund-hipotesis: #8a590e;
+
+  /* Familias de las piezas del pipeline: fondo del icono, texto y línea. Las líneas se oscurecieron lo justo
+   * para llegar a 3:1 sobre el lienzo (antes 2,1–2,8:1). */
+  --fam-verde-fondo: #d5e6dc;   --fam-verde-texto: #22674a;   --fam-verde-linea: #438b6c;
+  --fam-azul-fondo: #d5dfec;    --fam-azul-texto: #2c5592;    --fam-azul-linea: #567eb6;
+  --fam-ambar-fondo: #ebdfc8;   --fam-ambar-texto: #80561a;   --fam-ambar-linea: #9d7634;
+  --fam-violeta-fondo: #dfd9ea; --fam-violeta-texto: #57458c; --fam-violeta-linea: #8473b7;
+  --fam-cian-fondo: #d2e5e5;    --fam-cian-texto: #1d6466;    --fam-cian-linea: #39898a;
+  --fam-coral-fondo: #ecd9d0;   --fam-coral-texto: #8d4526;   --fam-coral-linea: #ae6d4e;
+  --fam-pizarra-fondo: #d9dee5; --fam-pizarra-texto: #44505f; --fam-pizarra-linea: #747f8c;
+
+  /* Estados de un activo en la demo de conciencia situacional. */
+  --estado-riesgo: #efe8da;
+  --estado-comprometido: #ecdcd9;
+  --estado-aislado: #dbe3ee;
+  --estado-protegido: #d9e7df;
+  /* La tarjeta del atacante es oscura en los dos temas: se reconoce de un vistazo. */
+  --atacante-fondo: #3b2b2c;
+  --atacante-borde: #5a3a38;
+  --atacante-texto: #f3e9e7;
+  --atacante-icono: #e8a39a;
+  --atacante-suave: #d9c3bf;
+
+  /* Colores con nombre de los cuadros de Grafana (umbrales), en la paleta apagada del portal. */
+  --graf-verde: #2b6f52;
+  --graf-naranja: #a8690f;
+  --graf-rojo: #a3302a;
+  --graf-amarillo: #8f7412;
+  --graf-azul: #345f9e;
+  --graf-morado: #5f4a96;
 
   /* --- 2. Variables de shadcn/ui, alimentadas por los tokens ----------------------------------------- */
   --background: var(--fondo);
@@ -77,14 +129,130 @@
   --chart-3: #7560a8;
   --chart-4: #3d8f97;
   --chart-5: #b07d2a;
+  --chart-6: #5c6f86;
+  --chart-7: #8a5a44;
+  --chart-8: #4f7d3a;
   --radius: 0.75rem;
   --sombra-tarjeta: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 22px rgb(15 23 42 / 0.05);
+}
+
+/* --- 1b. Tema oscuro ------------------------------------------------------------------------------------------
+ * Pizarra profunda, sin negro puro ni neón: en un SOC se mira durante horas y el color intenso sigue reservado a
+ * la severidad. Punto de partida: el estilo «Minimalism & Swiss» que propone ui-ux-pro-max para dashboards
+ * (fondo de la gama #0F172A, tarjeta #192134, texto suave #94A3B8), con el acento azul apagado del portal en vez de
+ * su verde de llamada a la acción. La severidad sube de luminancia para leerse sobre fondo oscuro. */
+.dark {
+  --fondo: #0e131a;
+  --superficie: #161d26;
+  --superficie-alterna: #1c2430;
+  --superficie-hundida: #10161d;
+  --lateral: #121820;
+  --borde: #2a3441;
+
+  --texto: #e3e9f1;
+  --texto-suave: #9eabbb;
+  --primario: #f0f4f9;
+
+  --acento: #86aee8;
+  --acento-suave: #1f3150;
+
+  --ok: #5dbb8f;
+  --aviso: #d9a64e;
+  --peligro: #ec8478;
+
+  --sev-info: #93a0b0;
+  --sev-baja: #74a5e6;
+  --sev-media: #dda34a;
+  --sev-alta: #ec8e5a;
+  --sev-critica: #f07468;
+  --sobre-intenso: #0e131a;
+
+  --lienzo: #121921;
+  --zona: #1a222c;
+  --borde-tarjeta: #2f3a48;
+  --borde-discontinuo: #4a5869;
+  --separador: #364352;
+  --linea-red: #616c7a;
+  --linea-bloqueada: #6d7a8a;
+
+  --fund-observado: #b4c0cf;
+  --fund-inferido: #a996e6;
+  --fund-hipotesis: #d9a64e;
+
+  --fam-verde-fondo: #163026;   --fam-verde-texto: #8fd3b2;   --fam-verde-linea: #4fa883;
+  --fam-azul-fondo: #172a44;    --fam-azul-texto: #9cbcec;    --fam-azul-linea: #6b93d0;
+  --fam-ambar-fondo: #33270f;   --fam-ambar-texto: #e2b66a;   --fam-ambar-linea: #c49444;
+  --fam-violeta-fondo: #261f3d; --fam-violeta-texto: #b9a9e8; --fam-violeta-linea: #9584cc;
+  --fam-cian-fondo: #10302f;    --fam-cian-texto: #84cfd0;    --fam-cian-linea: #4aa9aa;
+  --fam-coral-fondo: #36211a;   --fam-coral-texto: #eba98c;   --fam-coral-linea: #cf8566;
+  --fam-pizarra-fondo: #1f2630; --fam-pizarra-texto: #b4bfcc; --fam-pizarra-linea: #7f8b99;
+
+  --estado-riesgo: #33291a;
+  --estado-comprometido: #3a2120;
+  --estado-aislado: #1d2c44;
+  --estado-protegido: #183126;
+  --atacante-fondo: #3b2224;
+  --atacante-borde: #6b3f3b;
+
+  --graf-verde: #5dbb8f;
+  --graf-naranja: #e0a04a;
+  --graf-rojo: #ef7e72;
+  --graf-amarillo: #d6c050;
+  --graf-azul: #86aee8;
+  --graf-morado: #ab98e0;
+
+  --primary-foreground: #0e1622;
+  --chart-1: #79a3e2;
+  --chart-2: #5fb894;
+  --chart-3: #a593db;
+  --chart-4: #5fbcc4;
+  --chart-5: #d4a650;
+  --chart-6: #93a5bd;
+  --chart-7: #cc9478;
+  --chart-8: #8fbc72;
+  --sombra-tarjeta: 0 1px 2px rgb(0 0 0 / 0.45), 0 8px 22px rgb(0 0 0 / 0.25);
 }
 
 /* --- 3. Tokens como utilidades de Tailwind --------------------------------------------------------------- */
 @theme inline {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-heading: var(--font-sans);
+  /* IDs, hashes, rutas y líneas de comandos: la monoespaciada del sistema (sin paquete ni petición a terceros). */
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --color-sobre-intenso: var(--sobre-intenso);
+  --color-lienzo: var(--lienzo);
+  --color-zona: var(--zona);
+  --color-borde-tarjeta: var(--borde-tarjeta);
+  --color-borde-discontinuo: var(--borde-discontinuo);
+  --color-separador: var(--separador);
+  --color-linea-red: var(--linea-red);
+  --color-fund-observado: var(--fund-observado);
+  --color-fund-inferido: var(--fund-inferido);
+  --color-fund-hipotesis: var(--fund-hipotesis);
+  --color-fam-verde-fondo: var(--fam-verde-fondo);
+  --color-fam-verde-texto: var(--fam-verde-texto);
+  --color-fam-azul-fondo: var(--fam-azul-fondo);
+  --color-fam-azul-texto: var(--fam-azul-texto);
+  --color-fam-ambar-fondo: var(--fam-ambar-fondo);
+  --color-fam-ambar-texto: var(--fam-ambar-texto);
+  --color-fam-violeta-fondo: var(--fam-violeta-fondo);
+  --color-fam-violeta-texto: var(--fam-violeta-texto);
+  --color-fam-cian-fondo: var(--fam-cian-fondo);
+  --color-fam-cian-texto: var(--fam-cian-texto);
+  --color-fam-coral-fondo: var(--fam-coral-fondo);
+  --color-fam-coral-texto: var(--fam-coral-texto);
+  --color-fam-pizarra-fondo: var(--fam-pizarra-fondo);
+  --color-fam-pizarra-texto: var(--fam-pizarra-texto);
+  --color-estado-riesgo: var(--estado-riesgo);
+  --color-estado-comprometido: var(--estado-comprometido);
+  --color-estado-aislado: var(--estado-aislado);
+  --color-estado-protegido: var(--estado-protegido);
+  --color-atacante-fondo: var(--atacante-fondo);
+  --color-atacante-borde: var(--atacante-borde);
+  --color-atacante-texto: var(--atacante-texto);
+  --color-atacante-icono: var(--atacante-icono);
+  --color-atacante-suave: var(--atacante-suave);
 
   --color-fondo: var(--fondo);
   --color-superficie: var(--superficie);
@@ -146,6 +314,10 @@
   html {
     @apply font-sans antialiased;
     color-scheme: light;
+  }
+  /* Barras de desplazamiento, controles nativos y autocompletado del navegador en oscuro. */
+  html.dark {
+    color-scheme: dark;
   }
   body {
     @apply bg-background text-foreground text-sm leading-normal;   /* 14 px de base */
@@ -247,6 +419,17 @@
   opacity: 0.75;
   animation: orbita-c 20s ease-in-out infinite;
 }
+/* El mismo lienzo en oscuro: tonos pizarra que apenas se distinguen entre sí, para que el movimiento no deslumbre. */
+.dark .fondo-marea {
+  background-color: #121921;
+  background-image: linear-gradient(120deg, #121921 0%, #151d26 22%, #111820 42%, #131c1f 62%, #151d26 80%, #10161e 100%);
+}
+.dark .fondo-puntos {
+  background-image: radial-gradient(circle, rgb(148 163 184 / 0.16) 1.1px, transparent 1.2px);
+}
+.dark .orbita-azul { background: #1b2a40; opacity: 0.55; }
+.dark .orbita-verde { background: #17302a; opacity: 0.45; }
+.dark .orbita-cielo { background: #1a2433; opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) {
   .fondo-marea,
   .fondo-puntos,
@@ -294,4 +477,110 @@
   .punto-vivo {
     animation: none;
   }
+}
+
+/* --- 7. React Flow (explorador del grafo de ataque) ------------------------------------------------------------
+ * Sus variables (`--xy-*`) se alimentan de los tokens, así que el lienzo, los controles y el minimapa siguen al tema
+ * igual que el resto del portal; `colorMode` se sincroniza además con el tema en la página. */
+.react-flow {
+  --xy-background-color: var(--lienzo);
+  --xy-background-pattern-dots-color: var(--separador);
+  --xy-node-color: var(--texto);
+  --xy-node-background-color: transparent;
+  --xy-node-border: none;
+  --xy-node-boxshadow-selected: none;
+  --xy-node-boxshadow-hover: none;
+  --xy-edge-stroke: var(--linea-red);
+  --xy-edge-stroke-selected: var(--acento);
+  --xy-edge-label-background-color: var(--superficie);
+  --xy-edge-label-color: var(--texto);
+  --xy-minimap-background-color: var(--superficie);
+  --xy-minimap-mask-background-color: rgb(15 23 42 / 0.12);
+  --xy-minimap-mask-stroke-color: var(--acento);
+  --xy-minimap-node-background-color: var(--superficie-alterna);
+  --xy-minimap-node-stroke-color: var(--borde-discontinuo);
+  --xy-controls-button-background-color: var(--superficie);
+  --xy-controls-button-background-color-hover: var(--superficie-alterna);
+  --xy-controls-button-color: var(--texto);
+  --xy-controls-button-color-hover: var(--texto);
+  --xy-controls-button-border-color: var(--borde);
+  --xy-controls-box-shadow: var(--sombra-tarjeta);
+  --xy-attribution-background-color: transparent;
+}
+.dark .react-flow {
+  --xy-minimap-mask-background-color: rgb(0 0 0 / 0.35);
+}
+/* Foco de teclado visible en nodos y aristas (React Flow los hace enfocables con Tab). */
+.react-flow__node:focus-visible,
+.react-flow__edge:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+/* --- 8. Movimiento con significado (reproducción del ataque) ---------------------------------------------------
+ * El tramo del paso actual se dibuja en el sentido del ataque y el nodo que se alcanza late dos veces. Nada en bucle:
+ * cuando no pasa nada, no se mueve nada. Con movimiento reducido, sin animación (el paso se ve resaltado igualmente). */
+@keyframes trazo-avance {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.trazo-avance {
+  fill: none;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: trazo-avance 900ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+@keyframes pulso-nodo {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fund-hipotesis) 60%, transparent); }
+  to { box-shadow: 0 0 0 14px transparent; }
+}
+.pulso-nodo {
+  position: absolute;
+  inset: -2px;
+  border-radius: 0.8rem;
+  pointer-events: none;
+  animation: pulso-nodo 1.1s ease-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trazo-avance,
+  .pulso-nodo {
+    animation: none;
+  }
+}
+
+/* El fondo del lienzo del pipeline solo se mueve mientras pasa algo (el replay): quieto, no distrae. */
+.lienzo-quieto .fondo-marea,
+.lienzo-quieto .fondo-puntos,
+.lienzo-quieto .orbita {
+  animation-play-state: paused;
+}
+
+/* Entrada breve al cambiar de página y escalonado corto de tarjetas: menos de 300 ms en total. */
+@keyframes entrada-pagina {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.entrada-pagina {
+  animation: entrada-pagina 180ms ease-out both;
+}
+.entrada-escalonada > * {
+  animation: entrada-pagina 180ms ease-out both;
+  animation-delay: calc(min(var(--i, 0), 4) * 30ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .entrada-pagina,
+  .entrada-escalonada > * {
+    animation: none;
+  }
+}
+
+/* Rayado para distinguir niveles sin depender solo del color (barras y leyendas de severidad). */
+.rayado {
+  background-image: repeating-linear-gradient(45deg, transparent 0 3px, color-mix(in srgb, var(--superficie) 38%, transparent) 3px 5px);
 }

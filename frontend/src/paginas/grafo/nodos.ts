@@ -367,16 +367,17 @@ export const ARISTAS: Arista[] = [
 
 /**
  * Tonos apagados: los fondos de icono son pasteles grisáceos y las líneas de luminancia media, para que sobre el
- * lienzo gris no brillen (README §Diseño).
+ * lienzo gris no brillen (README §Diseño). Todo sale de los tokens `--fam-*` de `globales.css`, que cambian con el
+ * tema; las líneas son `var(--…)` porque se usan como atributo SVG y en estilos en línea.
  */
 export const TONOS: Record<Tono, { fondo: string; texto: string; pastilla: string; linea: string }> = {
-  verde: { fondo: 'bg-[#d5e6dc]', texto: 'text-[#22674a]', pastilla: 'bg-[#d5e6dc] text-[#22674a]', linea: '#4a9a78' },
-  azul: { fondo: 'bg-[#d5dfec]', texto: 'text-[#2c5592]', pastilla: 'bg-[#d5dfec] text-[#2c5592]', linea: '#5b85c0' },
-  ambar: { fondo: 'bg-[#ebdfc8]', texto: 'text-[#80561a]', pastilla: 'bg-[#ebdfc8] text-[#80561a]', linea: '#c09040' },
-  violeta: { fondo: 'bg-[#dfd9ea]', texto: 'text-[#57458c]', pastilla: 'bg-[#dfd9ea] text-[#57458c]', linea: '#8a78bf' },
-  cian: { fondo: 'bg-[#d2e5e5]', texto: 'text-[#1d6466]', pastilla: 'bg-[#d2e5e5] text-[#1d6466]', linea: '#3f9899' },
-  coral: { fondo: 'bg-[#ecd9d0]', texto: 'text-[#8d4526]', pastilla: 'bg-[#ecd9d0] text-[#8d4526]', linea: '#c47a58' },
-  pizarra: { fondo: 'bg-[#d9dee5]', texto: 'text-[#44505f]', pastilla: 'bg-[#d9dee5] text-[#44505f]', linea: '#7d8997' },
+  verde: { fondo: 'bg-fam-verde-fondo', texto: 'text-fam-verde-texto', pastilla: 'bg-fam-verde-fondo text-fam-verde-texto', linea: 'var(--fam-verde-linea)' },
+  azul: { fondo: 'bg-fam-azul-fondo', texto: 'text-fam-azul-texto', pastilla: 'bg-fam-azul-fondo text-fam-azul-texto', linea: 'var(--fam-azul-linea)' },
+  ambar: { fondo: 'bg-fam-ambar-fondo', texto: 'text-fam-ambar-texto', pastilla: 'bg-fam-ambar-fondo text-fam-ambar-texto', linea: 'var(--fam-ambar-linea)' },
+  violeta: { fondo: 'bg-fam-violeta-fondo', texto: 'text-fam-violeta-texto', pastilla: 'bg-fam-violeta-fondo text-fam-violeta-texto', linea: 'var(--fam-violeta-linea)' },
+  cian: { fondo: 'bg-fam-cian-fondo', texto: 'text-fam-cian-texto', pastilla: 'bg-fam-cian-fondo text-fam-cian-texto', linea: 'var(--fam-cian-linea)' },
+  coral: { fondo: 'bg-fam-coral-fondo', texto: 'text-fam-coral-texto', pastilla: 'bg-fam-coral-fondo text-fam-coral-texto', linea: 'var(--fam-coral-linea)' },
+  pizarra: { fondo: 'bg-fam-pizarra-fondo', texto: 'text-fam-pizarra-texto', pastilla: 'bg-fam-pizarra-fondo text-fam-pizarra-texto', linea: 'var(--fam-pizarra-linea)' },
 }
 
 /** ¿Es un tramo de una fase futura? Lo es si toca alguna pieza planificada. */

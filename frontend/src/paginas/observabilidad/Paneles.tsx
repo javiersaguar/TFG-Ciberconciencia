@@ -10,7 +10,7 @@
  */
 import { FlaskConical, Info, NotebookText } from 'lucide-react'
 import { useId, type CSSProperties, type ReactNode } from 'react'
-import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ReferenceArea, Tooltip, XAxis, YAxis } from 'recharts'
 
 import type { NodoGrafo, PanelCuadro } from '@/api/observabilidad'
 import { useMovimientoReducido } from '@/componentes/datos/useMovimientoReducido'
@@ -22,7 +22,7 @@ import { TooltipGrafico } from '@/componentes/graficos/TooltipGrafico'
 import { Tooltip as Ayuda, TooltipContent, TooltipTrigger } from '@/componentes/ui/tooltip'
 import { cn } from '@/lib/utils'
 
-import { aFilas, altoGrafica, colorPorUmbral, formatear } from './formatoUnidad'
+import { aFilas, altoGrafica, color, colorPorUmbral, formatear } from './formatoUnidad'
 
 const DURACION_MS = 700
 const hora = (segundos: number) => new Date(segundos * 1000).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
@@ -30,6 +30,8 @@ const hora = (segundos: number) => new Date(segundos * 1000).toLocaleTimeString(
 function Procedencia({ panel }: { panel: PanelCuadro }) {
   if (!panel.procedencia) return null
   const documentada = panel.procedencia === 'documentada'
+  // en paneles estrechos (4 columnas o menos) el chip se queda en su icono: el texto se recortaba («document…»)
+  const compacta = panel.ancho <= 4
   const Icono = documentada ? NotebookText : FlaskConical
   return (
     <Ayuda>
@@ -42,7 +44,7 @@ function Procedencia({ panel }: { panel: PanelCuadro }) {
           )}
         >
           <Icono className="size-3" aria-hidden />
-          {documentada ? 'documentado' : 'ilustrativo'}
+          {compacta ? <span className="sr-only">{documentada ? 'documentado' : 'ilustrativo'}</span> : documentada ? 'documentado' : 'ilustrativo'}
         </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">
@@ -59,14 +61,14 @@ function Tarjeta({ panel, indice, children, className }: { panel: PanelCuadro; i
       aria-label={panel.titulo}
       data-procedencia={panel.procedencia}
       className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-borde bg-superficie p-4 shadow-[0_1px_2px_rgba(15,23,42,0.05)]',
-        'animate-in fade-in-0 slide-in-from-bottom-2 duration-500',
+        'flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-borde bg-superficie px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)]',
+        'animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none',
         className,
       )}
       style={estilo}
     >
-      <header className="mb-2 flex shrink-0 items-start justify-between gap-2">
-        <h3 className="text-[13px] leading-tight font-semibold text-texto">{panel.titulo}</h3>
+      <header className="mb-1.5 flex shrink-0 items-start justify-between gap-2">
+        <h3 className="min-w-0 text-[13px] leading-tight font-semibold text-texto">{panel.titulo}</h3>
         <span className="flex shrink-0 items-center gap-1.5">
           <Procedencia panel={panel} />
           {panel.descripcion && (
@@ -101,7 +103,7 @@ function ValorStat({ panel, valor, grande }: { panel: PanelCuadro; valor: number
   const largo = texto.length > 8
   return (
     <span
-      className={cn('shrink-0 font-semibold tracking-tight whitespace-nowrap tabular-nums', grande ? (largo ? 'text-2xl leading-none' : 'text-[1.9rem] leading-none') : 'text-sm leading-none')}
+      className={cn('shrink-0 font-semibold tracking-tight whitespace-nowrap tabular-nums', grande ? (largo ? 'text-[1.4rem] leading-none' : 'text-[1.65rem] leading-none') : 'text-sm leading-none')}
       style={{ color: tono }}
     >
       {texto}
@@ -120,7 +122,13 @@ export function PanelStat({ panel, indice }: { panel: PanelCuadro; indice: numbe
       ) : valores.length === 1 ? (
         <div className="flex h-full items-end justify-between gap-3 overflow-hidden">
           <ValorStat panel={panel} valor={principal} grande />
-          {panel.chispa && panel.chispa.length > 1 && <MiniSerie valores={panel.chispa} color={tono} className="h-10 w-24 min-w-0 shrink" />}
+          {/* tendencia solo en paneles ilustrativos, y dicho: una cifra documentada no tiene serie medida detrás */}
+          {panel.procedencia === 'ilustrativa' && panel.chispa && panel.chispa.length > 1 && (
+            <span className="flex min-w-0 shrink flex-col items-end">
+              <MiniSerie valores={panel.chispa} color={tono} className="h-8 w-24 min-w-0" />
+              <span className="text-[10px] text-texto-suave">tendencia ilustrativa</span>
+            </span>
+          )}
         </div>
       ) : (
         <ul className="flex h-full min-h-0 flex-col justify-start gap-1 overflow-y-auto">
@@ -174,6 +182,11 @@ export function PanelSerie({ panel, indice }: { panel: PanelCuadro; indice: numb
                     ))}
                   </defs>
                   <CartesianGrid stroke={COLOR_BORDE} strokeDasharray="3 3" vertical={false} />
+                  {/* bandas de umbral, solo si el panel de Grafana define pasos (hoy ninguna serie lo hace: no se inventan) */}
+                  {panel.umbrales.length > 1 &&
+                    panel.umbrales.slice(1).map((u, i) => (
+                      <ReferenceArea key={`${u.color}-${u.desde}`} y1={u.desde ?? undefined} y2={panel.umbrales[i + 2]?.desde ?? undefined} fill={color(u.color)} fillOpacity={0.08} stroke="none" ifOverflow="extendDomain" />
+                    ))}
                   <XAxis dataKey="t" type="number" domain={['dataMin', 'dataMax']} tickFormatter={hora} tick={ESTILO_TICK}
                          axisLine={false} tickLine={false} minTickGap={48} />
                   <YAxis tickFormatter={(v: number) => formatear(v, panel.unidad, true)} tick={ESTILO_TICK} axisLine={false}

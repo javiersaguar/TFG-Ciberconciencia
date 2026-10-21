@@ -172,6 +172,7 @@ export default function PaginaConciencia() {
           aplicadas={sim.acciones}
           empezado={ultimo !== undefined}
           alAplicar={(rec) => aplicar(org.id, { clave: rec.clave, titulo: rec.titulo, efecto: rec.efecto })}
+          enlaceRespuesta={`/respuesta?caso=${org.id}${ev.tiempo > 0 ? `&t=${Math.round(ev.tiempo)}` : ''}`}
         />
       </div>
     </div>

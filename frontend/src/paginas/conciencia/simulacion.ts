@@ -54,7 +54,10 @@ export function evaluar(org: Organizacion, tiempo: number, acciones: readonly Ac
   const comprometidos = new Set<string>()
   const pasos: PasoEvaluado[] = []
 
-  const vigentes = (t: number) => acciones.filter((a) => a.t <= t).map((a) => a.efecto)
+  // Para los PASOS, estricto: un paso de instante t ya se ve como ocurrido en t, así que una acción aplicada en ese
+  // mismo instante llega tarde para él (con `<=` lo «des-ocurría» si se pulsaba en el mismo tic en que aparecía).
+  // Para el estado de AHORA, inclusivo: lo que se acaba de aplicar ya está en vigor.
+  const vigentes = (t: number, incluido = false) => acciones.filter((a) => (incluido ? a.t <= t : a.t < t)).map((a) => a.efecto)
 
   for (const paso of [...org.pasos].sort((a, b) => a.t - b.t)) {
     if (paso.t > tiempo) break
@@ -94,7 +97,7 @@ export function evaluar(org: Organizacion, tiempo: number, acciones: readonly Ac
     pasos.push(evaluado)
   }
 
-  const efectosAhora = vigentes(tiempo)
+  const efectosAhora = vigentes(tiempo, true)
   const estado = new Map<string, EstadoActivo>()
   for (const activo of org.activos) {
     if (activo.tipo === 'atacante') continue

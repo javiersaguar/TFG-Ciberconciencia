@@ -25,7 +25,8 @@ import { useZoomLienzo } from './zoom'
 /** Segundos que tarda un punto en recorrer una arista activa. */
 const DURACION_RECORRIDO_S = 2.2
 /** Color de relleno de tarjetas y etiquetas: el de `--superficie`, nunca blanco. */
-const SUPERFICIE = '#eceff3'
+/** Color del plano de las tarjetas: un token, para que el halo y los rótulos sigan al tema. */
+const SUPERFICIE = 'var(--superficie)'
 
 const DIR: Record<Lado, { x: number; y: number }> = {
   derecha: { x: 1, y: 0 },
@@ -160,7 +161,7 @@ function Ficha({ nodo, alCerrar }: { nodo: Nodo; alCerrar: () => void }) {
             <a
               href={nodo.enlace.url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="rounded-full bg-acento-suave px-3 py-1.5 text-xs font-semibold text-acento hover:bg-acento/20"
             >
               {nodo.enlace.texto}
@@ -240,7 +241,7 @@ export function Lienzo({ flujos = SIN_FLUJOS }: { flujos?: Flujos }) {
   return (
     <div
       ref={marco}
-      className={cn('relative h-full w-full touch-none overflow-hidden rounded-2xl border border-borde select-none', arrastrando ? 'cursor-grabbing' : 'cursor-grab')}
+      className={cn('relative h-full w-full touch-none overflow-hidden rounded-2xl border border-borde select-none', arrastrando ? 'cursor-grabbing' : 'cursor-grab', flujos.aristas.size === 0 && flujos.nodos.size === 0 && 'lienzo-quieto')}
       role="region"
       aria-label="Grafo del pipeline"
     >
@@ -313,7 +314,7 @@ export function Lienzo({ flujos = SIN_FLUJOS }: { flujos?: Flujos }) {
               aria-label={`${nodo.nombre ?? nodo.titulo} · ${TEXTO_ESTADO[nodo.estado]} (${nodo.fase})`}
               className={cn(
                 'absolute flex flex-col rounded-2xl border px-3.5 py-3 text-left shadow-[0_6px_18px_rgba(15,23,42,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.11)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento',
-                planificada ? 'border-dashed border-[#aeb8c5] bg-[#e4e8ed]' : 'border-[#cfd6df] bg-[#eceff3]',
+                planificada ? 'border-dashed border-borde-discontinuo bg-lateral' : 'border-borde-tarjeta bg-superficie',
                 hayFlujos && !realce && !seleccionado && 'opacity-65',
                 !hayFlujos && planificada && !seleccionado && 'opacity-80',
               )}
@@ -328,9 +329,11 @@ export function Lienzo({ flujos = SIN_FLUJOS }: { flujos?: Flujos }) {
               {realce && (
                 <>
                   <span className="anillo-activo" style={{ borderColor: colorRealce }} aria-hidden />
+                  {/* Pastilla de su familia (fondo claro + texto oscuro, o al revés en oscuro): con texto claro sobre el color
+                      de la línea no llegaba a 4,5:1. El borde mantiene el color del tramo. */}
                   <span
-                    className="absolute -top-2.5 right-3 max-w-[88%] truncate rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#f1f4f8] shadow-sm"
-                    style={{ backgroundColor: colorRealce }}
+                    className={cn('absolute -top-2.5 right-3 max-w-[88%] truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm', TONOS[realce.tono].pastilla)}
+                    style={{ borderColor: colorRealce }}
                   >
                     {realce.texto}
                   </span>
@@ -345,7 +348,7 @@ export function Lienzo({ flujos = SIN_FLUJOS }: { flujos?: Flujos }) {
                   <span className="mt-0.5 block text-[11.5px] leading-snug text-texto-suave">{nodo.subtitulo}</span>
                 </span>
               </span>
-              <span className="mt-auto flex items-center justify-between gap-2 border-t border-dashed border-[#c3cbd5] pt-1.5">
+              <span className="mt-auto flex items-center justify-between gap-2 border-t border-dashed border-separador pt-1.5">
                 <span className="truncate text-[11px] text-texto-suave/90">{nodo.tecnologia}</span>
                 {planificada ? (
                   <span className="shrink-0 rounded-full bg-superficie-hundida px-2 py-0.5 text-[10px] font-semibold text-texto-suave">{nodo.fase}</span>

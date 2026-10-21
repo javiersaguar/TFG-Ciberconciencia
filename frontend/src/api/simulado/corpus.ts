@@ -23,6 +23,29 @@ export const REF = {
   escenario: 'docs/scenarios/apt29-day1.md §1 y §3',
   topics: 'scripts/load_f3_corpus.sh + infra/flink/jobs/p1_05_emision.sql',
   flink: 'infra/docker-compose.yml',
+  f2Apt29: 'BITÁCORA 27-07-2026 (F2: resultados de apt29 day1)',
+  lineaBase: 'Memoria, desarrollo.tex (línea base de F2: regla + host + 10 min) · BITÁCORA 31-07-2026',
+  etiquetas: 'BITÁCORA 11-09-2026 (punto ciego del etiquetado ATT&CK)',
+  laboratorio: 'BITÁCORA 30-07-2026 (cierre del dataset)',
+  alertasDay1: 'eval/portal/alertas-apt29-day1.jsonl (exportación del 21-10-2026)',
+  aristasP2: 'eval/portal/aristas-p2.jsonl (exportación del 21-10-2026)',
+  p1Campanas: 'eval/portal/p1-campanas.jsonl (vista tfg.p1_campanas, 21-10-2026)',
+  p2Campanas: 'eval/portal/p2-campanas.jsonl (vista tfg.p2_campanas, 21-10-2026)',
+  tecnicasActuales: 'eval/portal/tecnicas-observadas.jsonl (corpus actual, 21-10-2026)',
+  catalogo: 'eval/portal/attack-catalogo-v19.json (MITRE ATT&CK Enterprise v19)',
+  t1685: 'BITÁCORA 21-10-2026 (2): T1685 verificado en ATT&CK v19',
+  evaluador: 'BITÁCORA 26-07-2026 · memoria, tabla de optimización',
+  ml1: 'ml/anomaly/resultados.json · BITÁCORA 27-07-2026 (4)',
+  mlflow: 'BITÁCORA 28-07-2026',
+  cobertura: 'eval/attack-coverage/*.json · BITÁCORA 28-07-2026',
+  p1Batch: 'BITÁCORA 31-07-2026',
+  p1Flink: 'BITÁCORA 31-07-2026 (2)',
+  reconciliacion: 'BITÁCORA 31-07-2026 (3)',
+  escenarioActores: 'docs/scenarios/apt29-day1.md §1',
+  escenarioLectura: 'docs/scenarios/apt29-day1.md §3',
+  bloqueP1: 'docs/scenarios/apt29-day1.md §4 (bloque de P1, alerta a alerta)',
+  p1Sql: 'detection/patterns/p1_credential_theft.sql',
+  p2Sql: 'detection/patterns/p2_lateral_movement.sql',
 } as const
 
 /** Recarga del corpus del 11-09 (verificada contra el origen) y detección del 14-09. */
@@ -170,7 +193,7 @@ export const MAPA_IP: readonly { host: string; ip: string; rol: string; votos: n
   { host: 'NEWYORK', ip: '10.0.0.4', rol: 'Controlador de dominio', votos: 80 },
   { host: 'SCRANTON', ip: '10.0.1.4', rol: 'Origen del salto', votos: 126 },
   { host: 'NASHUA', ip: '10.0.1.6', rol: 'Destino del salto', votos: 408 },
-  { host: 'UTICA', ip: '10.0.1.5', rol: '—', votos: 16 },
+  { host: 'UTICA', ip: '10.0.1.5', rol: 'Máquina del dominio, no es objetivo en day1', votos: 16 },
 ]
 
 export interface Campana {
@@ -206,3 +229,188 @@ export const CAMPANAS: readonly Campana[] = [
     nota: d.descripcion,
   })),
 ]
+
+/* ---------------------------------------------------------------------------------------------------------------
+ * Añadido el 21-10-2026 para el explorador del grafo de ataque, la línea temporal y los incidentes. Mismo criterio:
+ * solo lo que está escrito, con su referencia. Lo que no está documentado se deja fuera (o a `null`) en vez de
+ * deducirlo.
+ * ------------------------------------------------------------------------------------------------------------- */
+
+/**
+ * Resolución de una hora del dataset (UTC, 2020-05-02):
+ *   - `ms`: hora del evento con milisegundos (Sysmon);
+ *   - `segundo`: el documento la da al segundo aunque el evento tuviera milisegundos (tabla del escenario §4);
+ *   - `reconstruida`: la marcada con † en el escenario: hora reconstruida con `EventTime` + desfase, con resolución
+ *     de segundo de verdad (eventos de Security y PowerShell). No se puede ordenar con precisión dentro del segundo.
+ */
+export type Resolucion = 'ms' | 'segundo' | 'reconstruida'
+
+export interface HoraDataset {
+  /** `HH:MM:SS` o `HH:MM:SS.mmm`, UTC del dataset. */
+  hora: string
+  resolucion: Resolucion
+}
+
+export type NivelRegla = 'critical' | 'high' | 'medium' | 'low' | 'informational'
+
+export interface AlertaDocumentada {
+  id: string
+  hora: HoraDataset
+  regla: string
+  nivel: NivelRegla
+  /** Técnicas tal como las etiqueta la regla (`technique_ids[]` del esquema de alerta). */
+  tecnicas: string[]
+  host: string
+  /** Alertas distintas en esa misma línea (dos eventos en el mismo milisegundo cuentan 2). */
+  veces: number
+  /** Campaña P1 en la que es evidencia, si lo es. */
+  campana?: string
+  nota?: string
+  fuente: string
+}
+
+/**
+ * El bloque de P1 de apt29 day1, alerta a alerta, con la hora del evento (escenario §4, recalculado el 15-09).
+ * Los títulos de regla van como los escribe la bitácora (el escenario los abrevia en su tabla).
+ */
+export const BLOQUE_P1: readonly AlertaDocumentada[] = [
+  {
+    id: 'al-0300-drop',
+    hora: { hora: '03:00:29.705', resolucion: 'ms' },
+    regla: 'Cred Dump Tools Dropped Files',
+    nivel: 'high',
+    tecnicas: ['T1003.001', 'T1003.002', 'T1003.003', 'T1003.004', 'T1003.005'],
+    host: 'SCRANTON',
+    veces: 1,
+    campana: 'p1-scranton-1',
+    nota: 'Herramienta de volcado escrita a disco: el mejor precursor de P1 (el escenario abrevia sus técnicas como «T1003.001-005»).',
+    fuente: REF.bloqueP1,
+  },
+  {
+    id: 'al-0300-drop-2',
+    hora: { hora: '03:00:31.064', resolucion: 'ms' },
+    regla: 'Cred Dump Tools Dropped Files',
+    nivel: 'high',
+    tecnicas: ['T1003.001', 'T1003.002', 'T1003.003', 'T1003.004', 'T1003.005'],
+    host: 'SCRANTON',
+    veces: 1,
+    campana: 'p1-scranton-1',
+    fuente: REF.bloqueP1,
+  },
+  {
+    id: 'al-0305-lsass',
+    hora: { hora: '03:05:16.654', resolucion: 'ms' },
+    regla: 'Potential Credential Dumping Activity Via LSASS',
+    nivel: 'medium',
+    tecnicas: ['T1003.001'],
+    host: 'SCRANTON',
+    veces: 1,
+    campana: 'p1-scranton-1',
+    nota: 'Acceso a LSASS: 4 min 47 s después del primer volcado de la herramienta (el núcleo de P1 en apt29).',
+    fuente: REF.bloqueP1,
+  },
+  {
+    id: 'al-0309-remota',
+    hora: { hora: '03:09:29.430', resolucion: 'ms' },
+    regla: 'Remote LSASS Process Access Through Windows Remote Management',
+    nivel: 'high',
+    tecnicas: ['T1003.001', 'T1059.001', 'T1021.006'],
+    host: 'NASHUA',
+    veces: 1,
+    campana: 'p1-nashua',
+    nota: 'wsmprovhost.exe → lsass.exe. Es evidencia de P1 en NASHUA y de P2 a la vez: la costura entre los dos patrones. Lleva T1003.001 y T1021.006, así que en P2 cuenta como credenciales y como ejecución remota.',
+    fuente: `${REF.bloqueP1} · ${REF.p2} · ${REF.alertasDay1}`,
+  },
+  {
+    id: 'al-0319-lsass',
+    hora: { hora: '03:19:09.803', resolucion: 'ms' },
+    regla: 'Potential Credential Dumping Activity Via LSASS',
+    nivel: 'medium',
+    tecnicas: ['T1003.001'],
+    host: 'SCRANTON',
+    veces: 2,
+    campana: 'p1-scranton-2',
+    nota: 'Dos alertas distintas en el mismo milisegundo: dos accesos a LSASS que antes normalizaban idénticos (reaparecieron al pasar de 738 a 741 alertas). Abre la segunda campaña P1 de SCRANTON, 13 min 53 s después del primer acceso.',
+    fuente: `${REF.bloqueP1} · ${REF.p1Revalidado}`,
+  },
+  {
+    id: 'al-0319-netsh',
+    hora: { hora: '03:19:17', resolucion: 'reconstruida' },
+    regla: 'New Network Trace Capture Started Via Netsh.EXE',
+    nivel: 'medium',
+    tecnicas: ['T1040'],
+    host: 'SCRANTON',
+    veces: 1,
+    nota: 'Sale en la consulta del bloque de P1 porque incluye T1040, pero no es evidencia de P1 (que se ancla en T1003.* y refuerza con T1070.*).',
+    fuente: REF.bloqueP1,
+  },
+  {
+    id: 'al-0319-netsh-2',
+    hora: { hora: '03:19:17.154', resolucion: 'ms' },
+    regla: 'New Network Trace Capture Started Via Netsh.EXE',
+    nivel: 'medium',
+    tecnicas: ['T1040'],
+    host: 'SCRANTON',
+    veces: 1,
+    fuente: REF.bloqueP1,
+  },
+]
+
+/** Alertas de day1 por host, medidas en F2 (27-07). El total (741) es el mismo tras la recarga del 14-09. */
+export const ALERTAS_POR_HOST_DAY1: Readonly<Record<string, number>> = { SCRANTON: 606, NASHUA: 117, NEWYORK: 16, UTICA: 2 }
+
+/** Papel de cada máquina y cuenta según el plan de emulación y el escenario. */
+export const ACTORES_DAY1 = {
+  hosts: [
+    { host: 'SCRANTON', fqdn: 'SCRANTON.dmevals.local', papel: 'Víctima inicial · origen del salto' },
+    { host: 'NASHUA', fqdn: 'NASHUA.dmevals.local', papel: 'Víctima secundaria · destino del salto' },
+    { host: 'NEWYORK', fqdn: 'NEWYORK.dmevals.local', papel: 'Controlador de dominio (identificado por comportamiento: recibe LDAP y Kerberos de SCRANTON, NASHUA y UTICA)' },
+    { host: 'UTICA', fqdn: 'UTICA.dmevals.local', papel: 'Máquina del dominio; no es objetivo en day1 (2 alertas)' },
+  ],
+  cuentas: [
+    { cuenta: 'DMEVALS\\pbeesly', papel: 'Usuaria legítima. Sysmon EID 3 la atribuye a la conexión WinRM del salto a NASHUA.' },
+    { cuenta: 'admin', papel: 'Cuenta con la que opera el atacante tras la escalada (plan de emulación, paso 1.B en adelante).' },
+  ],
+  fuente: `${REF.escenarioActores} · ${REF.escenarioLectura}`,
+} as const
+
+/**
+ * P2 con la hora del EVENTO (corregida el 11-09). El escenario §3 da otras horas para el mismo salto, pero son las
+ * de recogida, anteriores a la corrección: no se usan.
+ */
+export const P2_DETALLE = {
+  conexionWinrm: { hora: { hora: '03:09:23.801', resolucion: 'ms' as const }, proceso: 'powershell.exe', usuario: 'DMEVALS\\pbeesly', puerto: 5985, confirmadaPorAmbosExtremos: true, fuente: REF.tiempo },
+  wsmprovhost: { hora: { hora: '03:09:23.885', resolucion: 'ms' as const }, regla: 'Remote PowerShell Session Host Process (WinRM)', nivel: 'medium' as const, tecnicas: ['T1059.001', 'T1021.006'], nota: '84 ms después de la conexión que lo provoca (antes de corregir la hora aparecía 3 s ANTES, lo cual es imposible).', fuente: `${REF.tiempo} · ${REF.alertasDay1}` },
+  ultimaArista: { hora: { hora: '03:17:59.493', resolucion: 'ms' as const }, fuente: REF.p2Revalidado },
+  /** Proceso que abre las conexiones de cada puerto. Las horas una a una de las 17 aristas no están documentadas. */
+  procesoPorPuerto: [
+    { puerto: 5985, servicio: 'WinRM', proceso: 'powershell.exe', fuente: `${REF.tiempo} · ${REF.esquemaRed}` },
+    { puerto: 135, servicio: 'RPC / DCOM', proceso: 'PsExec64.exe', fuente: `${REF.p2Sql} (filtro de puertos: «observado: PsExec64.exe»)` },
+    { puerto: 445, servicio: 'SMB', proceso: 'System', fuente: `${REF.p2Sql} («System abre las conexiones 445 del propio SMB del kernel»)` },
+  ],
+  /** Confianza descompuesta de P2 (pesos de la vista). En apt29 day1 se cumplen los seis factores: confianza 1,0. */
+  confianza: [
+    { factor: 'Arista dirigida en un puerto de movimiento lateral hacia un host que no es el DC', peso: 0.3 },
+    { factor: 'Arista vista desde los dos extremos (Initiated=true y false)', peso: 0.15 },
+    { factor: 'La abre un proceso que no es de sistema (powershell.exe, PsExec64.exe)', peso: 0.1 },
+    { factor: 'Ejecución remota en el destino (T1021.*): 4 alertas', peso: 0.2 },
+    { factor: 'Servicio en el destino (T1569.002): 4 alertas', peso: 0.15 },
+    { factor: 'Credenciales en el destino (T1003.*): 1 alerta, la costura con P1', peso: 0.1 },
+  ],
+  fuenteConfianza: `${REF.p2Sql} · ${REF.p2}`,
+} as const
+
+/** Pesos de la confianza descompuesta de P1 (oráculo en batch y emisión de Flink usan los mismos). */
+export const P1_CONFIANZA = {
+  base: { factor: 'Ancla (T1003.*) y contexto', peso: 0.4 },
+  etapas: [
+    { factor: 'Acceso a LSASS (Process Activity: Open)', peso: 0.25 },
+    { factor: 'Herramienta o volcado en disco (File System Activity)', peso: 0.2 },
+    { factor: 'Ejecución de la herramienta (Process Activity: Launch)', peso: 0.1 },
+    { factor: 'Limpieza de rastro (T1070.*)', peso: 0.15 },
+  ],
+  fuente: `${REF.p1Sql} · infra/flink/jobs/p1_05_emision.sql`,
+} as const
+
+/* La confianza de cada campaña ya no se copia aquí a mano: sale de `eval/portal/p1-campanas.jsonl` y
+ * `p2-campanas.jsonl` (exportaciones del 21-10-2026), a través de `src/api/exportaciones.ts`. */

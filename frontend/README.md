@@ -1,163 +1,236 @@
-# Portal web (F8) — base
+# Portal web (F8)
 
-Base del frontend de la plataforma: el shell, el **grafo del pipeline**, la **observabilidad** con los cuatro cuadros de
-Grafana redibujados, una portada de situación y una **demo de conciencia situacional** con ataques simulados y un
-asistente de respuesta. Es un extra del TFG, no parte de su núcleo: sirve para enseñar hacia dónde va. **No está conectado a ningún backend**: la API (F6.3) aún no
-existe, así que todos los datos salen de `src/api/simulado/` y cada cifra dice si está documentada o es ilustrativa.
+Portal de la plataforma de conciencia cibersituacional. Es un **extra del TFG**, no parte de su núcleo: un escaparate
+para enseñar hacia dónde va. **No está conectado a ningún backend**: la API (F6.3) y el WebSocket de alertas aún no
+existen, así que todos los datos salen de `src/api/` (cifras documentadas del corpus de F3 y resultados copiados del
+repositorio) y cada cifra dice si está **documentada** (con su fuente) o es **ilustrativa**.
 
-Parte del portal de PIDS (`PIDS-Proyecto1/parte4_frontend/web`): mismo stack, mismo lienzo del grafo, mismo
-redibujado de los cuadros de Grafana en la rejilla de 24 columnas. Lo que cambia está en [Diseño](#diseño) y
-[Datos](#datos).
+Parte del portal de PIDS (`PIDS-Proyecto1/parte4_frontend/web`): mismo stack, mismo lienzo del grafo del pipeline y
+mismo redibujado de los cuadros de Grafana. Las convenciones para trabajar en él están en la skill del proyecto
+(`../.claude/skills/cybersecurity-dashboard/SKILL.md`) y el plan de la última mejora en `docs/plan-mejora.md`.
 
-| Sección | Ruta | Qué hace |
-|---|---|---|
-| Situación | `/` | Cifras del corpus de F3 (530.401 eventos, 1.184 alertas, 12 campañas, 99,1 % de reducción), las doce campañas del oráculo en batch y el avance de las fases |
-| Conciencia situacional | `/conciencia?org=<id>&t=<s>` | **Demo** de los Pilares B y C: la organización como grafo (zonas de red, áreas de negocio, joyas de la corona), un botón para **simular un ciberataque** que se ve avanzar paso a paso, la ruta más probable hacia la siguiente joya y un **asistente de respuesta** que en cada instante dice qué hacer ya. Aplicar sus acciones cambia el curso del ataque. Varias organizaciones, cada una con su simulación en paralelo |
-| Grafo del pipeline | `/grafo` | Las 14 piezas del pipeline con su ficha (qué es, qué hace, cómo se conecta, ficheros del repo). Las de fases futuras (CTI, grafo de ataque, priorización, API) van en discontinua con su fase. «Simular replay de apt29 day1» ilumina los tramos por los que pasa el dato hasta los totales medidos. Zoom con rueda, panel táctil, arrastre o botones |
-| Observabilidad | `/observabilidad?cuadro=<uid>` | Los cuatro cuadros de `infra/grafana/dashboards` (salud del pipeline, seguridad, cobertura y calidad, movimiento lateral) con la misma disposición que en Grafana. El cuadro abierto va en la URL para poder enlazarlo |
-| Incidentes · Matriz ATT&CK | `/incidentes` · `/attack` | Páginas «próximamente»: en qué fase se construyen, qué enseñarán y de dónde saldrán sus datos. Fijan la navegación final desde la base |
+## Secciones
 
-## Puesta en marcha
+| Grupo | Sección | Ruta | Qué hace |
+|---|---|---|---|
+| Investigación | Situación | `/` | Panel SOC que cabe en 1440 × 900 sin desplazarse: tres indicadores principales y tres secundarios (la reducción de P1, con su nota de no comparabilidad), alertas de APT29 day1 por minuto apiladas por nivel, reparto por severidad (263 altas, 413 medias, 55 bajas, 10 informativas), mapa de calor táctica × host y las campañas de day1 con enlace a su incidente |
+| | Incidentes | `/incidentes?id=<campaña>` | Maestro-detalle de las 12 campañas, agrupadas por dataset (las 7 variantes LSASS en un grupo plegable), sin columna de prioridad (el Pilar C no existe aún) y con el detalle al lado: confianza con sus factores, evidencia por etapa, técnicas, conexiones y enlaces al grafo, a la línea temporal y al asistente |
+| | Grafo de ataque | `/ataque?sel=<id>` | React Flow en carriles por host con el tiempo de izquierda a derecha; campañas como bandas de su ventana; las 17 conexiones de P2 con su hora real; fundamento de cada relación (observado, inferido, hipótesis); «Reproducir ataque» paso a paso; zoom semántico, minimapa plegable |
+| | Línea temporal | `/cronologia?sel=<id>&desde=HH:MM&hasta=HH:MM` | Las 741 alertas de day1 en carriles por host, coloreadas por nivel, con las campañas como bandas y P2 como conectores; selector de rango arrastrando (y atajos accesibles), lista compacta sincronizada y detalle con «Ver en el grafo» |
+| | Matriz ATT&CK | `/attack?tecnica=<ID>` | Una columna por táctica (orden del catálogo v19), subtécnicas plegables, tres capas fechadas (potencial; observada en F2, 28-07, 34; observada hoy, 21-10, 47), punto de «observada» y tooltip con nombre, reglas, alertas y datasets |
+| Respuesta | Asistente de respuesta | `/respuesta?caso=<id>` | Para cada campaña real o caso de la demo: situación, HECHOS OBSERVADOS, INFERENCIAS DEL SISTEMA y RECOMENDACIONES (técnica ATT&CK → acción NIST SP 800-61 y D3FEND, con porqué y coste), con la procedencia por bloque. No ejecuta nada: copiar el plan como texto o, en la demo, ver su efecto en la simulación |
+| | Copiloto | `/copiloto?org=<id>` | Preguntas sobre la evidencia de una organización; respuesta por partes (streaming), una cita en cada afirmación, sin acciones (las mitigaciones remiten a `/respuesta`). Proveedor local hoy; LLM con RAG declarado, en el servidor (`docs/copiloto-rag.md`) |
+| Plataforma | Evaluación | `/evaluacion` | Solo lo medido; lo de la fase F7, pendiente y sin números |
+| | Grafo del pipeline | `/grafo` | Las 14 piezas del pipeline; el fondo solo se mueve durante el replay |
+| | Observabilidad | `/observabilidad?cuadro=<uid>` | Los cuatro cuadros de Grafana, más densos: filas de un número compactadas sin romper la disposición, chip de procedencia sin recortes |
+| | Proyecto | `/proyecto` | Avance de las fases del TFG y estado documentado del pipeline (antes, en el centro de la portada) |
+| Demo | Conciencia situacional | `/conciencia?org=<id>&t=<s>` | Demo de los Pilares B y C; su panel lateral es un resumen con enlace a `/respuesta` |
+| Próximamente | Inteligencia de amenazas | `/inteligencia` | Página «próximamente» (F4 · F8.3) |
+
+## Puesta en marcha y pruebas
 
 ```bash
 cd frontend
-npm ci              # dependencias exactas del package-lock.json
-npm run dev         # http://localhost:5173
+npm ci                     # dependencias exactas del package-lock.json
+npm run dev                # http://localhost:5173
 ```
 
-No hace falta levantar ningún servicio: el portal funciona sin docker compose. Los enlaces de las fichas del grafo
-(Redpanda Console, Flink, ClickHouse, Grafana, Prometheus) y «Abrir en Grafana» sí necesitan el perfil
-correspondiente levantado en el mismo equipo.
+No hace falta levantar ningún servicio. Los enlaces de las fichas del grafo del pipeline y «Abrir en Grafana» sí
+necesitan el perfil correspondiente de docker compose en el mismo equipo.
 
 ```bash
-npm test -- --run   # 81 tests (Vitest + Testing Library)
-npm run lint        # ESLint
-npm run build       # tsc + vite build → dist/
-npx vite preview    # sirve dist/ en http://localhost:4173
+npm test -- --run          # 368 tests (Vitest + Testing Library), en 34 ficheros
+npm run lint               # ESLint
+npm run build              # tsc + vite build → dist/
+npm run e2e                # Playwright contra `vite preview` (requiere un build previo)
+npm run sincronizar-datos  # vuelve a copiar a src/api/datos/ los resultados medidos del repositorio
 ```
 
-## Stack
+**Playwright** (`e2e/portal.spec.ts`, 13 escenarios × 3 anchos: 1280, 1440 y 1920 px) recorre la navegación, el
+cambio de tema (recordado al recargar y aplicado antes del primer pintado), los filtros, la selección y la reproducción del
+grafo de ataque, el brush de la línea temporal, el maestro-detalle de incidentes, Ctrl+K, la matriz por táctica, el
+copiloto, la demo de conciencia situacional, el peso de la primera carga, la ausencia de errores en
+consola y de desbordamiento horizontal, y hace **capturas de cada pantalla en los dos temas** en `capturas/` (ignorado
+por git). `@playwright/test` va fijado a la 1.63.0 porque usa el Chromium 1243 que ya está en `~/.cache/ms-playwright`:
+no hace falta descargar navegadores. En otro equipo: `npx playwright install chromium`.
 
-React 19 · TypeScript · Vite 8 · Tailwind 4 · shadcn/ui (Radix) · TanStack Query · Recharts · lucide-react. El grafo del
-pipeline es SVG propio (curvas de Bézier, animaciones SMIL), sin librería de grafos: con 14 nodos colocados a mano no
-la necesita.
+## Stack y dependencias
 
-**Desviación del ROADMAP F8.1** (que decía React 18 + Cytoscape.js + Zustand), decidida el 23-09-2026: se reutiliza el
-stack de PIDS porque ya está probado y porque el lienzo y los paneles se trasladan casi tal cual. Cytoscape.js se deja
-para el grafo de ataque de F5, que sí tendrá cientos de nodos con disposición automática. Zustand no hace falta todavía:
-el estado del servidor lo lleva TanStack Query y el de la interfaz cabe en `useState` y en la URL.
+React 19 · TypeScript estricto · Vite 8 (rolldown) · Tailwind 4 · shadcn/ui (Radix) · TanStack Query · Recharts 3 ·
+react-router 7 · lucide-react · `@fontsource/inter`. Sin Zustand: el estado del servidor lo lleva TanStack Query y el de
+la interfaz cabe en `useState` y en la URL.
 
-## Diseño
+| Dependencia nueva | Tipo | Por qué |
+|---|---|---|
+| `@xyflow/react` ^12.12.0 | producción | El explorador del grafo de ataque necesita zoom, desplazamiento, minimapa, nodos agrupados (procesos dentro de su host), selección accesible por teclado y aristas con etiqueta propia. Hacerlo a mano en SVG habría sido reescribir React Flow. Solo se carga en `/ataque` (chunk `flujo`). La atribución de React Flow queda visible (abajo a la izquierda) |
+| `@playwright/test` 1.63.0 (exacta) | desarrollo | Pruebas de extremo a extremo y capturas en los dos temas y tres anchos. Versión fijada para reutilizar el Chromium ya descargado |
 
-**Tonos grises, no blancos.** El portal está pensado para un SOC, donde se mira la pantalla durante turnos largos. Las
-superficies blancas y brillantes cansan la vista y además hacen que los colores de severidad destaquen menos, que es
-justo lo que un analista tiene que ver primero. Por eso, frente a PIDS:
+**Grafos**: el del pipeline, el de la demo y el panel de movimiento lateral siguen en SVG propio (funcionan y no ganan
+nada con una librería). React Flow solo en el explorador del grafo de ataque, que es interactivo y de unos veinte
+nodos. **Cytoscape.js sigue reservado para el grafo real de F5** (Neo4j, cientos de nodos y disposición automática).
 
-- Ningún plano grande es blanco. Fondo `#dde2e8`, tarjetas `#eceff3`, barra lateral `#e4e8ed`; el lienzo del grafo,
-  con sus manchas y puntos en movimiento, está en la misma gama.
-- El texto es pizarra (`#1d2632`) y no negro puro, y el suave (`#4f5b6a`) mantiene un contraste de 5,2:1 sobre las
-  tarjetas: por encima del mínimo WCAG AA de 4,5:1.
-- El acento es un azul apagado (`#345f9e`). El color intenso se reserva para la **escala de severidad**
-  (`--sev-info` → `--sev-critica`), que es común a alertas, campañas e incidentes y no se usa para series de gráficos.
-- Los tonos de los tramos del grafo y de los gráficos son de luminancia media, para que no brillen sobre el gris.
+## Diseño: dos temas
 
-Todos los colores son tokens CSS en `src/estilos/globales.css`, mapeados a las variables de shadcn/ui y expuestos como
-utilidades de Tailwind (`bg-superficie`, `text-texto-suave`, `text-sev-alta`…). Un tema oscuro completo se puede añadir
-redefiniendo los tokens, sin tocar componentes.
+Botón **Modo claro / Modo oscuro** siempre visible: al pie de la barra lateral y, con ella cerrada, debajo del botón de
+abrirla. `aria-label` con la acción («Cambiar a modo oscuro»), `aria-pressed`, foco visible y uso con teclado.
 
-Las animaciones (números que recorren el camino hasta su valor, paneles que entran escalonados, tramos que fluyen)
-respetan `prefers-reduced-motion`.
+- **Claro (por defecto)**: la paleta gris de baja luminancia de la decisión del proyecto. Ningún plano grande es blanco:
+  en un SOC se mira la pantalla durante turnos largos y las superficies brillantes cansan y apagan los colores de
+  severidad.
+- **Oscuro (opcional)**: pizarra profunda (`#0e131a` de fondo, `#161d26` en tarjetas), sin negro puro ni neón, con el
+  acento azul apagado y la escala de severidad con más luminancia para leerse sobre fondo oscuro.
 
-## Datos
+Todo sale de los tokens de `src/estilos/globales.css`: el tema oscuro (`.dark` en `<html>`) redefine los mismos tokens y
+**ningún componente cambia de clases**. Para eso se convirtieron en tokens los ~80 colores fijos que había repartidos por
+los componentes (familias del grafo del pipeline, estados de la demo, tarjeta del atacante, colores de Grafana, series
+de los gráficos). React Flow lee sus variables `--xy-*` de los mismos tokens y su `colorMode` sigue al tema.
 
-Hoy no hay backend. La única puerta de datos es `src/api/`: las páginas consumen hooks de TanStack Query
-(`useSituacion`, `useCuadros`, `useCuadro`) y nunca el simulador directamente. Cada hook resuelve contra
-`src/api/simulado/` con una latencia ficticia de 250 ms (0 en los tests), así que las páginas ya pasan por sus estados
-de carga. Cuando exista la API de F6.3, cada `queryFn` pasará a ser un `fetch('/api/…')` con el mismo tipo de
-respuesta (Vite ya reenvía `/api` al puerto 8000) y ninguna página cambiará.
+La elección se guarda en `localStorage` (`tfg-tema`, con try/catch: si el navegador lo bloquea, el portal sigue en
+claro). Un script en línea en `index.html` aplica el tema, `color-scheme` y `theme-color` **antes del primer pintado**,
+así que no parpadea (Playwright lo comprueba).
 
-**Procedencia de cada cifra.** Para que ninguna captura haga pasar un dato inventado por uno medido, cada panel y cada
-cifra lleva un chip:
+**Contraste AA comprobado, no a ojo**: `src/estilos/contraste.test.ts` lee los tokens de los dos temas y mide cada par
+texto/fondo (≥ 4,5:1) y gráfico/fondo (≥ 3:1) que se usa de verdad. Al medir apareció que el tema claro original ya
+incumplía AA en varios pares: severidad media (3,99:1) y alta (4,34:1) como texto, el aviso sobre su propio tinte, el
+texto claro sobre severidad media, las líneas de red del grafo de la demo (1,8:1), las líneas de las familias del grafo
+del pipeline (2,1–2,8:1), la pastilla de realce de ese grafo y el texto suave al 80 % de la barra lateral (3,7:1). Se
+corrigieron con el ajuste mínimo de luminancia, **sin cambiar el tono**, y cada cambio está anotado en `globales.css`.
 
-- **documentado** — la cifra está medida y escrita. Sale de `src/api/simulado/corpus.ts`, que reúne en un solo sitio
-  las cifras del corpus de F3 con la referencia de dónde está cada una (entrada de la `BITACORA.md`,
-  `docs/scenarios/apt29-day1.md` o fichero del repo). Los tests (`corpus.test.ts`) comprueban que cuadran entre sí igual
-  que se comprobaron en la bitácora: las alertas por dataset suman 1.184, consumidos = normalizados + DLQ, etc.
-- **ilustrativo** — solo las métricas de Prometheus (tráfico de Kafka, memoria y CPU de Flink, consultas y memoria de
-  ClickHouse), que nunca se han guardado. Se generan con azar determinista y avanzan con el reloj para que la gráfica
-  tenga forma.
+Severidad, fundamento y tipo nunca van solo por color (texto, icono o trazo). Cifras tabulares, monoespaciada del
+sistema para IDs, hashes, rutas y procesos, y `prefers-reduced-motion` respetado.
 
-Donde un cuadro de Grafana consulta algo que el corpus documentado no da (por ejemplo, «Hosts monitorizados»), el
-panel se ha sustituido por uno equivalente que sí está documentado, en vez de inventar la cifra. Lo que no está
-documentado se deja vacío: los eventos por campaña LSASS aparecen como «—» porque la bitácora da la lista sin decir
-cuál es cuál.
+## Navegación y lectura
 
-El replay del grafo también es simulado: el progreso es una rampa lineal, pero los totales a los que llega son los
-medidos (196.081 líneas, 194.829 eventos, 741 alertas, 3 campañas de P1 y 1 de P2).
+- **Barra superior** fina en todas las páginas: dónde estás (grupo › sección), qué datos se ven (APT29 day1 · corpus F3),
+  el aviso de datos simulados y el botón de búsqueda.
+- **Paleta de comandos** con **Ctrl/Cmd + K**: secciones, los cuatro hosts, las 12 campañas y las 47 técnicas observadas,
+  buscando sin tildes (por ID o por nombre: «lsass memory» → T1003.001). Patrón combobox de WAI-ARIA sobre el diálogo de
+  Radix, sin dependencias nuevas; su índice se descarga la primera vez que se abre.
+- **Barra lateral** reagrupada (Investigación, Respuesta, Plataforma, Demo, Próximamente) y sin etiquetas recortadas.
+- **El contexto se conserva**: la selección va en la URL (`?sel=`, `?id=`, `?caso=`, `?desde=`…) y los filtros de
+  `/ataque`, `/incidentes`, `/cronologia` y `/attack` se guardan en `sessionStorage` (validados al leerlos), así que al ir
+  y volver siguen ahí.
+- **Menos texto**: cada página abre con una frase; el resto está en «Cómo leer esta página». La jerga interna se explica
+  en su primera mención (F2, F6, F7, CEP, RAG) y la procedencia se marca por bloque o por panel.
+
+## Movimiento
+
+Las animaciones cuentan lo que pasa y nada se mueve en bucle cuando no pasa nada: la reproducción del ataque dibuja cada
+tramo en el sentido del ataque y hace latir el nodo alcanzado, con la hora del paso sobre el lienzo; el fondo del grafo
+del pipeline solo se mueve durante el replay; las series de Observabilidad se dibujan al entrar; las páginas entran con
+un fundido de 180 ms y las tarjetas, escalonadas, en menos de 300 ms. **Para desactivarlas**, basta con la preferencia
+del sistema «reducir movimiento» (`prefers-reduced-motion`): el portal la respeta en todas (un test lo comprueba).
+
+## Datos y procedencia
+
+La única puerta de datos es `src/api/`: las páginas consumen hooks de TanStack Query (`useSituacion`, `useIncidentes`,
+`useGrafoAtaque`, `useCronologia`, `useCoberturaAttack`, `useEvaluacion`, `useCuadro`…) y nunca el simulador.
+`fuente.ts` resuelve con una latencia ficticia de 250 ms (0 en los tests). Cuando exista la API de F6.3, cada `queryFn`
+pasará a ser un `fetch('/api/…')` tipado con `src/api/tipos.ts`, que ya recoge el contrato copiado de los esquemas
+reales (`build_alert()`, `p1_05_emision.sql` y la vista de P2), y ninguna página cambiará.
+
+- **documentado**: medido y escrito, con su referencia. Sale de `src/api/simulado/corpus.ts` (cifras del corpus de F3,
+  ampliado ahora con el bloque de P1 alerta a alerta, las horas de P2 con la hora del evento, el proceso de cada puerto,
+  las confianzas que la bitácora da con valor, las alertas por host y los papeles del escenario) o de las copias de
+  `src/api/datos/`.
+- **ilustrativo**: las métricas de Prometheus de Observabilidad, el estado en vivo del pipeline y los escenarios de la
+  demo (salvo los pasos de DMEVALS hasta las 03:19).
+- **no documentado**: se dice así («—» o «no documentada»), nunca se rellena.
+
+`npm run sincronizar-datos` copia a `src/api/datos/` las dos capas ATT&CK (`eval/attack-coverage/*.json`) y los
+resultados de ML-1 (`ml/anomaly/resultados.json`), sin tocar los originales, y anota en `procedencia.json` la ruta de
+origen, el SHA-256, el tamaño y la fecha. Un test comprueba que cada copia coincide con su huella.
+
+Lo que **no** se enseña porque no está medido: precisión, exhaustividad, F1, falsos positivos y latencia (F3.4/F7), la
+prioridad de incidentes reales (Pilar C) y la confianza de las campañas P1 de apt29. Y la reducción 0,991 de P1 va
+siempre con su advertencia: **no es comparable** con la línea base 741 → 87 (88,3 %).
+
+### Datos exportados de ClickHouse (21-10-2026)
+
+`eval/portal/` trae, medidos el 21-10: las 741 alertas de day1 una a una, las 17 aristas de P2 con su hora, las 11
+campañas P1 y la P2 de los detectores en lote (con host, ventana y confianza de todas), las 47 técnicas observadas en el
+corpus actual y el catálogo de ATT&CK v19. Su `README.md` explica cada fichero y **las consultas para regenerarlos**.
+`npm run sincronizar-datos` los copia a `src/api/datos/` (los `.jsonl`, validados línea a línea; huella SHA-256 y filas
+en `procedencia.json`, comprobadas por un test) y `src/api/exportaciones.ts` los carga bajo demanda, cada uno en su chunk.
+
+Consecuencias ya reflejadas: T1685 verificado (*Disable or Modify Tools*); confianza de las campañas P1 de apt29
+(0,85 · 0,80 · 0,65); y técnicas observadas **47 en el corpus actual (21-10) frente a 34 en la capa de F2 (28-07)**, cada
+cifra con su fecha.
 
 ## Conciencia situacional (demo)
 
-Enseña cómo se vería la parte de conciencia cibersituacional cuando existan los Pilares B y C, sobre escenarios
-simulados. Dos organizaciones, intercambiables desde la cabecera y cada una con su propia simulación (se puede lanzar un
-ataque en una, cambiar a otra y volver; la tarjeta de cada una dice en qué estado está):
+Enseña cómo se vería la conciencia cibersituacional cuando existan los Pilares B y C, sobre escenarios simulados:
+**Helios Farmacéutica** (`?org=helios`, ficticia) y **DMEVALS** (`?org=dmevals`, APT29 day1: medido hasta las 03:19 y
+extrapolación ilustrativa después). `?t=<segundo>` abre la simulación en pausa en ese instante (acotado a la duración
+del escenario).
 
-- **Helios Farmacéutica** (`?org=helios`), **ficticia**, diseñada para enseñar la esencia del TFG en un solo ataque:
-  phishing → ejecución → mando y control → robo de credenciales (P1) → movimiento lateral (P2) → DCSync →
-  exfiltración de fórmulas de I+D, borrado de copias, sabotaje de la planta y ransomware. Tres joyas de la corona en
-  ramas distintas, y decisiones con coste de negocio real.
-- **DMEVALS** (`?org=dmevals`), el dominio de **APT29 day1** ampliado con áreas de negocio y activos críticos. Los pasos
-  hasta las 03:19 son los **medidos** (horas del evento, escenario §4 y bitácora) y van marcados como documentados; lo
-  que sigue es una extrapolación ilustrativa de qué habría pasado sin respuesta.
+Todo se recalcula a partir de (organización, instante, acciones aplicadas) con funciones puras
+(`simulacion.ts`, `razonamiento.ts`, `asistente/puntuacion.ts`, `asistente/reglas.ts`, `asistente/redactor.ts`).
 
-`?t=<segundo>` abre la simulación en pausa en ese momento, para enseñar un instante concreto sin esperar (por ejemplo,
-`/conciencia?org=helios&t=62`, justo después del DCSync).
+El panel lateral de la demo es ahora un **resumen** (situación, gravedad y las acciones que se pueden probar en la simulación) con enlace a `/respuesta`, donde está el razonamiento completo. El asistente separa:
 
-**Todo se recalcula a partir de (organización, instante, acciones aplicadas) con funciones puras**, en
-`src/paginas/conciencia/`:
+- **Hechos observados**: los pasos ocurridos, con hora, técnica y procedencia, enlazados a su paso en la cronología.
+- **Inferencias del sistema**: patrones CEP reconocidos, ruta probable (búsqueda en anchura; en F5, Datalog), la
+  incertidumbre (confianza de la detección) y la gravedad descompuesta en sus cinco factores.
+- **Recomendaciones**: del motor de reglas, con su porqué y su coste de negocio. «Aplicar» **solo cambia la
+  simulación** y lo dice; nada se aplica sin una acción explícita.
+- **Redacción**: hoy plantillas. Las reglas deciden y el LLM (F6) solo redactará, sin poder inventar acciones ni cifras.
 
-| Módulo | Qué decide | Anticipa |
-|---|---|---|
-| `simulacion.ts` | Qué pasos ocurren y cuáles impide la respuesta (y por qué: activo aislado, cuenta bloqueada, canal cortado…). Una acción solo afecta a lo posterior | — |
-| `razonamiento.ts` | La ruta más probable hacia una joya de la corona (búsqueda en anchura sobre la alcanzabilidad de red) y los activos en riesgo | Pilar B: en F5, Datalog/MulVAL con trazabilidad |
-| `asistente/puntuacion.ts` | Gravedad 0–100 descompuesta en cinco factores legibles (criticidad, avance en la kill chain, cercanía a una joya, amplitud, confianza de la detección) | Pilar C (F6.1) |
-| `asistente/reglas.ts` | Qué hacer ahora: acciones por fase de respuesta (NIST SP 800-61) y táctica D3FEND, priorizadas, con su evidencia y su coste de negocio | Pilar C |
-| `asistente/redactor.ts` | El texto de la situación. Hoy plantillas; **aquí va el LLM** | F6 |
+**Niveles de autonomía (demo de la propuesta en estudio, F6.4)**: nivel 0 «recomienda» (por defecto) y nivel 1
+«ejecuta con aprobación», que abre una confirmación explícita con efecto, evidencia, regla y coste. Los niveles 2 y 3
+están deshabilitados (en estudio) y el 4 está descartado por diseño.
 
-**Reparto de papeles entre reglas y LLM**, deliberado: las reglas **deciden** qué hacer, de forma determinista y
-auditable; un LLM con RAG sobre ATT&CK, D3FEND y los playbooks solo **redactará** la explicación, con el mismo contexto
-y sin poder inventar acciones ni cifras (solo inferencia, como fija `AGENTS.md`). El sitio está preparado:
-`redactorLLM` existe y la interfaz ya lo muestra como «pendiente».
+## Seguridad
 
-Los tests de esta sección comprueban, además de la lógica, la **coherencia de los escenarios**: que el atacante no se
-teletransporta (todo salto sigue un enlace de red), que ningún paso se queda sin respuesta propuesta y que, con el
-dominio robado, lo primero que se recomienda es expulsar al atacante (krbtgt) y no blindar activos.
+La telemetría la escribe el atacante: procesos, reglas, cuentas y rutas se pintan siempre como texto de React (cero
+`dangerouslySetInnerHTML`). Todos los parámetros de URL se validan contra listas cerradas o un formato y lo inválido se
+ignora (`?sel`, `?campana`, `?id`, `?tecnica`, `?host`, `?org`, `?cuadro`; `?t` acotado). `localStorage` siempre en
+try/catch. Ningún secreto en variables `VITE_*`. Enlaces externos con `rel="noopener noreferrer"`.
+
+## Rendimiento
+
+Cada página es un chunk aparte y `vite.config.ts` separa `react`, `consultas`, `utilidades`, `d3-comun`, `flujo` (React
+Flow) y `graficos` (Recharts). La paleta de comandos y cada fichero de datos se cargan bajo demanda.
+
+| Medida (sin comprimir) | 23-09 | 21-10 (ronda 1) | 21-10 (ronda 2) |
+|---|---:|---:|---:|
+| JS al abrir la portada (Playwright) | 979,3 kB | 483,7 kB | 816,1 kB, de ellos **302 kB son datos** (las 741 alertas, 44,6 kB con gzip) para la actividad por minuto |
+| Chunk de entrada `index` | 268,8 kB | 55,6 kB | 61,1 kB |
+| React Flow (`flujo`) | — | solo en `/ataque` | solo en `/ataque` (+230 kB al abrirlo) |
+| Recharts (`graficos`) | siempre | solo en Observabilidad | solo en Observabilidad |
+
+La portada sigue sin descargar React Flow ni Recharts (lo comprueba Playwright); sus gráficos son HTML. Las alertas se
+procesan una vez, en el hook (`useActividadDay1`), no en cada render.
 
 ## Estructura
 
 ```
 frontend/
+├── e2e/                  pruebas de Playwright
+├── scripts/              sincronizar-datos.mjs
+├── docs/                 plan-mejora.md, copiloto-rag.md
 ├── src/
-│   ├── api/            hooks por sección (observabilidad, situacion) y fuente.ts, la única puerta de datos
-│   │   └── simulado/   corpus.ts (cifras documentadas), cuadros.ts (los 4 cuadros), aleatorio.ts
-│   ├── componentes/    shell (barra lateral, aviso de datos simulados), ui (shadcn), datos y graficos
-│   ├── paginas/
-│   │   ├── situacion/        portada
-│   │   ├── conciencia/       demo: organizaciones, simulación, razonamiento, asistente
-│   │   ├── grafo/            nodos.ts (piezas y aristas), Lienzo, zoom, actividad (replay simulado)
-│   │   ├── observabilidad/   CuadroNativo (rejilla de 24 columnas), Paneles, formatoUnidad
-│   │   └── proximamente/     secciones de fases futuras
-│   ├── estilos/        globales.css: tokens del sistema de diseño
-│   └── pruebas/        configuración de Vitest y utilidades de render
-└── public/             favicon
+│   ├── api/              hooks por sección, exportaciones.ts (datos de eval/portal), tipos.ts, fuente.ts
+│   │   ├── simulado/     corpus.ts, actividad.ts, campanas.ts y los constructores de cada sección
+│   │   └── datos/        copias de resultados del repositorio + procedencia.json
+│   ├── componentes/      shell (barras, paleta Ctrl+K, ComoLeer), tema, datos (chips, horas, estado de sesión), graficos, ui
+│   ├── paginas/          situacion, incidentes, ataque (carriles, reproducción), cronologia (linea.ts), attack, respuesta
+│   │                     (plan.ts), copiloto, proyecto, evaluacion, grafo, observabilidad (compactar.ts), conciencia…
+│   ├── estilos/          globales.css (tokens de los dos temas), contraste.test.ts, movimiento.test.ts
+│   └── pruebas/          configuración de Vitest y utilidades de render
+└── playwright.config.ts
 ```
 
-## Pendiente
+## Limitaciones y pendiente
 
-- Conectar a la API de F6.3 y quitar `src/api/simulado` (salvo `corpus.ts`, que pasará a ser el oráculo de la primera
-  prueba de integración: la API debe devolver esas mismas cifras).
+- Sin backend: la API (F6.3), la autenticación y la separación por organización en el servidor (F8.2) y el WebSocket de
+  alertas siguen fuera de este frontend. El copiloto con LLM y RAG está diseñado (`docs/copiloto-rag.md`), no construido.
+- El grafo de ataque y la línea temporal cubren APT29 day1; las campañas LSASS solo tienen su evidencia por etapa (no hay
+  alertas una a una exportadas de esos datasets).
+- Ninguna serie de los cuadros de Grafana define umbrales: el soporte de bandas existe, pero no se dibuja ninguna (no se
+  inventan). Solo hay un panel de un número ilustrativo y su valor es constante, así que no lleva minigráfica.
+- La portada descarga el chunk de las 741 alertas (302 kB, 44,6 kB con gzip); con la API, la agregación por minuto la hará
+  ClickHouse y bajará a unos cientos de bytes.
 - F8.0: nombre y marca definitivos (el logotipo y «Ciberconciencia» son provisionales).
-- F8.2 y F8.3: multi-tenancy (las organizaciones de la demo saldrán del backend filtradas por `tenant_id`), JWT, cola y
-  detalle de incidentes, matriz ATT&CK, grafo de ataque real (Neo4j) con Cytoscape.js.
-- Conciencia situacional: sustituir el escenario simulado por las campañas reales de `det.campaigns`, la ruta BFS por
-  la de Datalog (F5) y conectar el redactor LLM (F6).
-- Tema oscuro completo, si en las pruebas con uso prolongado el gris no basta.
+- `npm audit`: 11 avisos en dependencias que ya estaban (cadena de `shadcn` y `vite`); esta ronda no añade dependencias.
+

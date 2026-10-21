@@ -69,7 +69,7 @@ export default function PaginaObservabilidad() {
           <a
             href={urlCuadro(uid)}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-full border border-borde bg-superficie px-3 py-1.5 text-xs font-semibold text-acento shadow-sm hover:bg-acento-suave"
           >
             Abrir en Grafana

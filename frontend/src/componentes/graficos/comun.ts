@@ -12,9 +12,9 @@ export const COLORES_SERIES = [
   'var(--chart-3)',
   'var(--chart-4)',
   'var(--chart-5)',
-  '#5c6f86',
-  '#8a5a44',
-  '#4f7d3a',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
 ] as const
 
 export function colorSerie(indice: number): string {

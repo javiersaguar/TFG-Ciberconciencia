@@ -27,10 +27,10 @@ describe('shell y navegación', () => {
   })
 
   it('una sección futura dice en qué fase llega y qué enseñará', async () => {
-    renderizarRutas('/incidentes')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Incidentes' })).toBeInTheDocument()
-    expect(screen.getByText('Se construye en F6 · F8.3')).toBeInTheDocument()
-    expect(screen.getByText(/API FastAPI/)).toBeInTheDocument()
+    renderizarRutas('/inteligencia')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Inteligencia de amenazas' })).toBeInTheDocument()
+    expect(screen.getByText('Se construye en F4 · F8.3')).toBeInTheDocument()
+    expect(screen.getByText(/OpenCTI \(STIX 2.1\)/)).toBeInTheDocument()
   })
 
   it('una ruta desconocida da «Página no encontrada» dentro del shell', async () => {

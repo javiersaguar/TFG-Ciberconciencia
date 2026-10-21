@@ -42,10 +42,11 @@ const ICONO: Record<TipoActivo, LucideIcon> = {
   ot: Factory,
 }
 
+/** Colores de las líneas: tokens, para que cambien con el tema (la de red cumple 3:1 sobre el lienzo en los dos). */
 const COLOR = {
-  red: '#9aa6b4',
+  red: 'var(--linea-red)',
   ataque: 'var(--sev-critica)',
-  bloqueado: '#7d8997',
+  bloqueado: 'var(--linea-bloqueada)',
   ruta: 'var(--sev-media)',
 } as const
 
@@ -99,21 +100,21 @@ function trazo(a: Activo, b: Activo, entre: readonly Activo[], desplazamiento = 
 }
 
 const ESTILO_ESTADO: Record<EstadoActivo | 'riesgo', { tarjeta: string; pastilla?: { texto: string; clase: string; icono: LucideIcon } }> = {
-  normal: { tarjeta: 'border-[#cfd6df] bg-[#eceff3]' },
+  normal: { tarjeta: 'border-borde-tarjeta bg-superficie' },
   riesgo: {
-    tarjeta: 'border-dashed border-sev-media bg-[#efe8da]',
+    tarjeta: 'border-dashed border-sev-media bg-estado-riesgo',
     pastilla: { texto: 'En riesgo', clase: 'bg-sev-media', icono: TriangleAlert },
   },
   comprometido: {
-    tarjeta: 'border-2 border-sev-critica bg-[#ecdcd9]',
+    tarjeta: 'border-2 border-sev-critica bg-estado-comprometido',
     pastilla: { texto: 'Comprometido', clase: 'bg-sev-critica', icono: Bug },
   },
   aislado: {
-    tarjeta: 'border-2 border-acento bg-[#dbe3ee]',
+    tarjeta: 'border-2 border-acento bg-estado-aislado',
     pastilla: { texto: 'Aislado', clase: 'bg-acento', icono: Unplug },
   },
   protegido: {
-    tarjeta: 'border-2 border-ok bg-[#d9e7df]',
+    tarjeta: 'border-2 border-ok bg-estado-protegido',
     pastilla: { texto: 'Protegido', clase: 'bg-ok', icono: ShieldCheck },
   },
 }
@@ -214,7 +215,7 @@ export function GrafoOrganizacion({ org, ev, ruta, riesgo }: Props) {
       ref={marco}
       role="region"
       aria-label={`Grafo de ${org.nombre}`}
-      className={cn('relative h-full w-full touch-none overflow-hidden rounded-2xl border border-borde bg-[#d9dee5] select-none', arrastrando ? 'cursor-grabbing' : 'cursor-grab')}
+      className={cn('relative h-full w-full touch-none overflow-hidden rounded-2xl border border-borde bg-lienzo select-none', arrastrando ? 'cursor-grabbing' : 'cursor-grab')}
     >
       <div className="fondo-puntos absolute inset-0" aria-hidden />
       <div
@@ -232,7 +233,7 @@ export function GrafoOrganizacion({ org, ev, ruta, riesgo }: Props) {
 
           {zonas.map((zona) => (
             <g key={zona.id}>
-              <rect x={zona.cx - ANCHO_ZONA / 2} y={8} width={ANCHO_ZONA} height={alto - 16} rx={18} fill="#e3e7ec" fillOpacity={0.55} stroke="#c9d1db" strokeDasharray="4 6" />
+              <rect x={zona.cx - ANCHO_ZONA / 2} y={8} width={ANCHO_ZONA} height={alto - 16} rx={18} fill="var(--zona)" fillOpacity={0.55} stroke="var(--borde)" strokeDasharray="4 6" />
               <text x={zona.cx} y={34} textAnchor="middle" style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.04em', fill: 'var(--texto-suave)' }}>
                 {zona.titulo.toUpperCase()}
               </text>
@@ -303,34 +304,34 @@ export function GrafoOrganizacion({ org, ev, ruta, riesgo }: Props) {
               className={cn(
                 'absolute flex flex-col justify-center rounded-2xl border px-3 py-2 text-left shadow-[0_6px_16px_rgba(15,23,42,0.08)] transition-colors duration-500',
                 'hover:shadow-[0_10px_24px_rgba(15,23,42,0.14)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento',
-                atacante ? 'border-[#5a3a38] bg-[#3b2b2c] text-[#f0e6e4]' : estilo.tarjeta,
-                objetivoRuta && 'ring-2 ring-sev-media/70 ring-offset-2 ring-offset-[#d9dee5]',
+                atacante ? 'border-atacante-borde bg-atacante-fondo text-atacante-texto' : estilo.tarjeta,
+                objetivoRuta && 'ring-2 ring-sev-media/70 ring-offset-2 ring-offset-lienzo',
               )}
               style={{ left: activo.x - TARJETA.ancho / 2, top: activo.y - TARJETA.alto / 2, width: TARJETA.ancho, height: TARJETA.alto }}
             >
               {golpeado && <span className="anillo-activo" style={{ borderColor: 'var(--sev-critica)' }} aria-hidden />}
               {!atacante && estilo.pastilla && (
-                <span className={cn('absolute -top-2.5 right-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#f3f5f8] shadow-sm', estilo.pastilla.clase)}>
+                <span className={cn('absolute -top-2.5 right-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-sobre-intenso shadow-sm', estilo.pastilla.clase)}>
                   <estilo.pastilla.icono className="size-3" aria-hidden />
                   {estilo.pastilla.texto}
                 </span>
               )}
               {activo.joya && (
-                <span className="absolute -top-2.5 left-2 flex items-center gap-1 rounded-full bg-[#e9dcc0] px-1.5 py-0.5 text-[10px] font-semibold text-[#7a5412] shadow-sm">
+                <span className="absolute -top-2.5 left-2 flex items-center gap-1 rounded-full bg-fam-ambar-fondo px-1.5 py-0.5 text-[10px] font-semibold text-fam-ambar-texto shadow-sm">
                   <Crown className="size-3" aria-hidden />
                   Joya
                 </span>
               )}
               <span className="flex min-w-0 items-center gap-2">
-                <Icono className={cn('size-4 shrink-0', atacante ? 'text-[#e8a39a]' : 'text-texto-suave')} aria-hidden />
-                <span className={cn('truncate text-[13px] font-semibold', atacante ? 'text-[#f5ecea]' : 'text-texto')}>{activo.nombre}</span>
+                <Icono className={cn('size-4 shrink-0', atacante ? 'text-atacante-icono' : 'text-texto-suave')} aria-hidden />
+                <span className={cn('truncate text-[13px] font-semibold', atacante ? 'text-atacante-texto' : 'text-texto')}>{activo.nombre}</span>
               </span>
-              <span className={cn('mt-0.5 flex items-center justify-between gap-2 text-[11px]', atacante ? 'text-[#d9c3bf]' : 'text-texto-suave')}>
+              <span className={cn('mt-0.5 flex items-center justify-between gap-2 text-[11px]', atacante ? 'text-atacante-suave' : 'text-texto-suave')}>
                 <span className="truncate">{atacante ? (activo.ip ?? 'Internet') : activo.area}</span>
                 {!atacante && (
                   <span className="flex shrink-0 gap-0.5" aria-hidden title={`Criticidad ${activo.criticidad}/5`}>
                     {Array.from({ length: 5 }, (_, i) => (
-                      <span key={i} className={cn('size-1.5 rounded-full', i < activo.criticidad ? 'bg-texto-suave' : 'bg-[#c3cbd5]')} />
+                      <span key={i} className={cn('size-1.5 rounded-full', i < activo.criticidad ? 'bg-texto-suave' : 'bg-separador')} />
                     ))}
                   </span>
                 )}

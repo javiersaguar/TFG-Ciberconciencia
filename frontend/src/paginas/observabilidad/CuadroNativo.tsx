@@ -7,6 +7,7 @@ import type { CSSProperties } from 'react'
 
 import type { Cuadro, PanelCuadro } from '@/api/observabilidad'
 
+import { compactarFilasDeUnNumero } from './compactar'
 import { altoPanel } from './formatoUnidad'
 import { PanelBarras, PanelGrafo, PanelIndicador, PanelSerie, PanelStat, PanelTabla, PanelTarta } from './Paneles'
 
@@ -29,7 +30,8 @@ function posicion(panel: PanelCuadro): CSSProperties {
 }
 
 export function CuadroNativo({ cuadro }: { cuadro: Cuadro }) {
-  const paneles = [...cuadro.paneles].sort((a, b) => a.y - b.y || a.x - b.x)
+  // las filas de solo números se compactan (sin romper la disposición de Grafana): ver compactar.ts
+  const paneles = compactarFilasDeUnNumero(cuadro.paneles).sort((a, b) => a.y - b.y || a.x - b.x)
   const orden = new Map(paneles.filter((p) => p.tipo !== 'fila').map((p, i) => [p.id, i]))
   return (
     <div className="@container">

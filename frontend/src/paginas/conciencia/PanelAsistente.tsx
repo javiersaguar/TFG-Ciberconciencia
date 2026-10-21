@@ -1,15 +1,18 @@
 /**
- * El asistente de respuesta: mira el ataque en cada instante y dice qué hacer ya. Tres bloques:
+ * Resumen del asistente de respuesta dentro de la simulación: la situación redactada, la gravedad con sus factores y
+ * las acciones que se pueden PROBAR en la simulación. El razonamiento completo (hechos observados, inferencias y plan,
+ * con su procedencia por bloque) está en `/respuesta`, que usa las mismas funciones puras y no ejecuta nada.
  *
- *   Situación         lo que está pasando, redactado (`redactor.ts`), y la gravedad con sus factores (Pilar C)
- *   Respuesta         acciones priorizadas por el motor de reglas, cada una con su porqué y su coste de negocio;
- *                     «Aplicar» la incorpora a la simulación y cambia el curso del ataque desde ese momento
- *   Aplicadas         lo que ya se ha hecho, en orden
+ * «Aplicar» solo cambia la SIMULACIÓN de la demo y nada se aplica sin una acción explícita del usuario. Los niveles de
+ * autonomía son una interfaz de demo de la propuesta en estudio (agente de respuesta acotada, F6.4): el 0 y el 1
+ * funcionan; el 2 y el 3 están deshabilitados (en estudio) y el 4 está descartado por diseño.
  */
-import { Bot, CheckCircle2, ChevronDown, ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, Bot, CheckCircle2, ChevronDown, ShieldAlert, Sparkles } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { Button } from '@/componentes/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/componentes/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/componentes/ui/tooltip'
 import { cn } from '@/lib/utils'
 
@@ -31,6 +34,22 @@ const COLOR_URGENCIA = {
   Alta: 'border-l-sev-alta',
   Media: 'border-l-sev-media',
 } as const
+
+const NIVELES_AUTONOMIA = [
+  { nivel: 0, nombre: 'Recomienda', detalle: 'El analista decide y aplica cada acción con un clic.', disponible: true },
+  { nivel: 1, nombre: 'Ejecuta con aprobación', detalle: 'Cada acción pide confirmación explícita, con su justificación completa.', disponible: true },
+  { nivel: 2, nombre: 'Autónomo en lo reversible', detalle: 'En estudio (F6.4): no disponible.', disponible: false },
+  { nivel: 3, nombre: 'Autónomo con política', detalle: 'En estudio (F6.4): no disponible.', disponible: false },
+  { nivel: 4, nombre: 'Autónomo pleno', detalle: 'Descartado por diseño: incompatible con la supervisión humana.', disponible: false },
+] as const
+
+const EFECTO: Record<Recomendacion['efecto']['tipo'], string> = {
+  aislar: 'El activo deja de poder usarse como origen o destino del ataque.',
+  proteger: 'El activo queda protegido frente a los pasos posteriores.',
+  'bloquear-cuenta': 'La cuenta deja de servir al atacante en los pasos posteriores.',
+  'bloquear-canal': 'El canal (correo, mando y control o salida de datos) queda cortado.',
+  informativa: 'No cambia el curso del ataque: queda registrada como hecha.',
+}
 
 function Gravedad({ puntuacion }: { puntuacion: Puntuacion }) {
   const [abierto, setAbierto] = useState(false)
@@ -75,7 +94,7 @@ function TarjetaRecomendacion({ rec, alAplicar }: { rec: Recomendacion; alAplica
   return (
     <li className={cn('rounded-xl border border-l-4 border-borde bg-superficie p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)]', COLOR_URGENCIA[nivel])}>
       <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10.5px] font-semibold">
-        <span className={cn('rounded-full px-1.5 py-px text-[#f3f5f8]', nivel === 'Inmediata' ? 'bg-sev-critica' : nivel === 'Alta' ? 'bg-sev-alta' : 'bg-sev-media')}>
+        <span className={cn('rounded-full px-1.5 py-px text-sobre-intenso', nivel === 'Inmediata' ? 'bg-sev-critica' : nivel === 'Alta' ? 'bg-sev-alta' : 'bg-sev-media')}>
           {nivel} · {rec.prioridad}
         </span>
         <span className="rounded-full bg-superficie-hundida px-1.5 py-px text-texto-suave">{rec.fase}</span>
@@ -97,7 +116,8 @@ function TarjetaRecomendacion({ rec, alAplicar }: { rec: Recomendacion; alAplica
           Coste: {rec.impactoNegocio}
         </p>
       )}
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex items-center justify-end gap-2">
+        <span className="text-[10.5px] text-texto-suave">solo en la simulación</span>
         <Button size="sm" variant={nivel === 'Inmediata' ? 'default' : 'outline'} onClick={alAplicar}>
           {rec.efecto.tipo === 'informativa' ? 'Marcar como hecha' : 'Aplicar'}
         </Button>
@@ -113,9 +133,16 @@ interface Props {
   aplicadas: AccionAplicada[]
   alAplicar: (rec: Recomendacion) => void
   empezado: boolean
+  /** Enlace al razonamiento completo (hechos, inferencias y recomendaciones) en `/respuesta`. */
+  enlaceRespuesta: string
 }
 
-export function PanelAsistente({ parrafos, puntuacion, recomendaciones, aplicadas, alAplicar, empezado }: Props) {
+export function PanelAsistente({ parrafos, puntuacion, recomendaciones, aplicadas, alAplicar, empezado, enlaceRespuesta }: Props) {
+  const [autonomia, setAutonomia] = useState(0)
+  const [pendiente, setPendiente] = useState<Recomendacion | null>(null)
+
+  const pedirAplicar = (rec: Recomendacion) => (autonomia >= 1 ? setPendiente(rec) : alAplicar(rec))
+
   return (
     <aside aria-label="Asistente de respuesta" className="flex min-h-0 flex-col rounded-2xl border border-borde bg-superficie">
       <header className="flex items-center justify-between gap-2 border-b border-borde px-4 py-3">
@@ -148,16 +175,33 @@ export function PanelAsistente({ parrafos, puntuacion, recomendaciones, aplicada
             {parrafos.map((p) => <p key={p}>{p}</p>)}
           </div>
           {empezado && <Gravedad puntuacion={puntuacion} />}
+          <Link to={enlaceRespuesta} className="inline-flex items-center gap-1 text-xs font-medium text-acento hover:underline">
+            Hechos, inferencias y plan completo en el asistente de respuesta <ArrowRight className="size-3" aria-hidden />
+          </Link>
         </section>
 
         {empezado && (
           <section aria-label="Respuesta inmediata" className="space-y-2">
             <h2 className="text-sm">Respuesta inmediata <span className="font-normal text-texto-suave">· {recomendaciones.length}</span></h2>
+            <fieldset className="rounded-xl border border-dashed border-borde-discontinuo p-2">
+              <legend className="px-1 text-[10.5px] font-semibold text-texto-suave">Nivel de autonomía · demo (propuesta en estudio)</legend>
+              <div className="grid gap-0.5">
+                {NIVELES_AUTONOMIA.map((n) => (
+                  <label key={n.nivel} className={cn('flex items-start gap-1.5 text-[11px]', n.disponible ? 'text-texto' : 'text-texto-suave')}>
+                    <input type="radio" name="autonomia" className="mt-0.5 accent-[var(--acento)]" value={n.nivel} checked={autonomia === n.nivel} disabled={!n.disponible} onChange={() => setAutonomia(n.nivel)} />
+                    <span>
+                      <span className="font-semibold">Nivel {n.nivel} · {n.nombre}.</span> {n.detalle}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <p className="text-[11px] text-texto-suave">«Aplicar» solo cambia la simulación de esta demo: no ejecuta nada fuera del navegador.</p>
             {recomendaciones.length === 0 ? (
               <p className="text-xs text-texto-suave">Nada pendiente con la evidencia actual.</p>
             ) : (
               <ol className="space-y-2">
-                {recomendaciones.map((rec) => <TarjetaRecomendacion key={rec.clave} rec={rec} alAplicar={() => alAplicar(rec)} />)}
+                {recomendaciones.map((rec) => <TarjetaRecomendacion key={rec.clave} rec={rec} alAplicar={() => pedirAplicar(rec)} />)}
               </ol>
             )}
           </section>
@@ -171,7 +215,7 @@ export function PanelAsistente({ parrafos, puntuacion, recomendaciones, aplicada
                 <li key={a.clave} className="flex items-start gap-1.5 text-xs text-texto">
                   <CheckCircle2 className="mt-px size-3.5 shrink-0 text-ok" aria-hidden />
                   <span>
-                    {a.titulo} <span className="text-texto-suave">· segundo {Math.round(a.t)}</span>
+                    {a.titulo} <span className="text-texto-suave">· segundo {Math.round(a.t)} de la simulación</span>
                   </span>
                 </li>
               ))}
@@ -179,6 +223,37 @@ export function PanelAsistente({ parrafos, puntuacion, recomendaciones, aplicada
           </section>
         )}
       </div>
+
+      <Dialog open={pendiente !== null} onOpenChange={(abierto) => !abierto && setPendiente(null)}>
+        {pendiente && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>¿Aplicar en la simulación?</DialogTitle>
+              <DialogDescription>Nivel 1 · ejecuta con aprobación. Solo cambia la simulación de la demo; se deshace con «Reiniciar».</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 text-sm">
+              <p className="font-semibold text-texto">{pendiente.titulo}</p>
+              <p className="text-xs text-texto-suave">Efecto: {EFECTO[pendiente.efecto.tipo]}</p>
+              <ul className="space-y-0.5 text-xs text-texto" aria-label="Justificación">
+                {pendiente.porque.map((l) => <li key={l}>Evidencia: {l}</li>)}
+                <li>Regla: {pendiente.fase} · D3FEND {pendiente.d3fend} · prioridad {pendiente.prioridad}</li>
+              </ul>
+              {pendiente.impactoNegocio && <p className="rounded-lg bg-aviso/10 px-2 py-1 text-xs text-aviso">Coste: {pendiente.impactoNegocio}</p>}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendiente(null)}>Cancelar</Button>
+              <Button
+                onClick={() => {
+                  alAplicar(pendiente)
+                  setPendiente(null)
+                }}
+              >
+                Confirmar y aplicar en la simulación
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
     </aside>
   )
 }

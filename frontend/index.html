@@ -5,9 +5,26 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#1f2a37" />
+    <meta name="theme-color" content="#dde2e8" />
     <meta name="description" content="Plataforma de conciencia cibersituacional: detección multi-etapa, grafo de ataque y priorización explicable (TFG)." />
     <title>Ciberconciencia · Portal</title>
+    <script>
+      // Tema antes del primer pintado, para que no parpadee. Misma clave y valores que src/componentes/tema/tema.ts
+      // (lo comprueba tema.test.ts). Sin elección guardada, o si el navegador bloquea el almacenamiento: modo claro.
+      ;(function () {
+        var oscuro = false
+        try {
+          oscuro = window.localStorage.getItem('tfg-tema') === 'oscuro'
+        } catch (e) {}
+        var raiz = document.documentElement
+        if (oscuro) raiz.classList.add('dark')
+        raiz.style.colorScheme = oscuro ? 'dark' : 'light'
+        var color = document.querySelector('meta[name="theme-color"]')
+        if (color) color.setAttribute('content', oscuro ? '#0e131a' : '#dde2e8')
+        var esquema = document.querySelector('meta[name="color-scheme"]')
+        if (esquema) esquema.setAttribute('content', oscuro ? 'dark' : 'light')
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

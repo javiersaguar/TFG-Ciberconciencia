@@ -1,0 +1,73 @@
+{
+  "nota": "Copias generadas por `npm run sincronizar-datos`. No editar a mano: editar el original y volver a sincronizar.",
+  "ficheros": [
+    {
+      "copia": "cobertura-potencial.json",
+      "origen": "eval/attack-coverage/cobertura-potencial.json",
+      "sha256": "a012697bb0904f51d3cfe7623ab6125cec334953f9756bcf5af0c8efce92ba1a",
+      "bytes": 35721,
+      "modificado": "2026-07-28T14:55:18.326Z"
+    },
+    {
+      "copia": "cobertura-observada.json",
+      "origen": "eval/attack-coverage/cobertura-observada.json",
+      "sha256": "c2e4296cb608dc793a8a3414dfee4262e01f980d4855d0ce8e5591c7ac9e0b82",
+      "bytes": 4708,
+      "modificado": "2026-07-28T14:55:18.417Z"
+    },
+    {
+      "copia": "ml1-resultados.json",
+      "origen": "ml/anomaly/resultados.json",
+      "sha256": "f017f9378f9e6228b71ce0afaf390efb14dab3094f258887720d3165165c9e6a",
+      "bytes": 1524,
+      "modificado": "2026-07-27T21:47:25.758Z"
+    },
+    {
+      "copia": "alertas-apt29-day1.jsonl",
+      "origen": "eval/portal/alertas-apt29-day1.jsonl",
+      "sha256": "26a9f70adb2bdeb309dc01ce29365410d66fca1b9084c5d5ee2406e467b6acc1",
+      "bytes": 301854,
+      "filas": 741,
+      "modificado": "2026-10-21T09:08:16.584Z"
+    },
+    {
+      "copia": "aristas-p2.jsonl",
+      "origen": "eval/portal/aristas-p2.jsonl",
+      "sha256": "66390baa39d6bc2b187d5a6bd07aaa760a943b0b3e1a46020614de2393c9b965",
+      "bytes": 3855,
+      "filas": 17,
+      "modificado": "2026-10-21T09:08:25.300Z"
+    },
+    {
+      "copia": "p1-campanas.jsonl",
+      "origen": "eval/portal/p1-campanas.jsonl",
+      "sha256": "9f89cf78bc6eceffad0c914a7cb791d6222bd567b744e337930e6459cd158ec5",
+      "bytes": 3849,
+      "filas": 11,
+      "modificado": "2026-10-21T09:08:17.048Z"
+    },
+    {
+      "copia": "p2-campanas.jsonl",
+      "origen": "eval/portal/p2-campanas.jsonl",
+      "sha256": "87ba3df50faf1c79dc193f9fd14ce1546a7cc1ccc95be273ec7b53f6761e27a2",
+      "bytes": 905,
+      "filas": 1,
+      "modificado": "2026-10-21T09:08:18.080Z"
+    },
+    {
+      "copia": "tecnicas-observadas.jsonl",
+      "origen": "eval/portal/tecnicas-observadas.jsonl",
+      "sha256": "a0ac1423d3f5e32f18368e76a9c88f79dd726852c561e4ce3411fc9c5713d8bc",
+      "bytes": 5907,
+      "filas": 47,
+      "modificado": "2026-10-21T09:08:18.316Z"
+    },
+    {
+      "copia": "attack-catalogo-v19.json",
+      "origen": "eval/portal/attack-catalogo-v19.json",
+      "sha256": "0e30ff2f68a37d21b9e6f08262ad0b0e58e681fb247fe0e618be2518b143e099",
+      "bytes": 105442,
+      "modificado": "2026-10-21T09:09:07.284Z"
+    }
+  ]
+}

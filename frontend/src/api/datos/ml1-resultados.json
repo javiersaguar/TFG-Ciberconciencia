@@ -1,0 +1,68 @@
+{
+  "minutes": 5,
+  "resultados": [
+    {
+      "estrategia": "A: limpias, todas las feats",
+      "auc_roc": 0.995,
+      "auc_pr": 0.996,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 132,
+      "n_features": 42
+    },
+    {
+      "estrategia": "B: todo (cont=0.3), todas",
+      "auc_roc": 0.913,
+      "auc_pr": 0.919,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 392,
+      "n_features": 42
+    },
+    {
+      "estrategia": "C: limpias, SIN feats circulares",
+      "auc_roc": 0.995,
+      "auc_pr": 0.996,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 132,
+      "n_features": 34
+    },
+    {
+      "estrategia": "D: todo (cont=0.3), SIN circulares",
+      "auc_roc": 0.851,
+      "auc_pr": 0.847,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 392,
+      "n_features": 34
+    },
+    {
+      "estrategia": "E: control, solo n_eventos",
+      "auc_roc": 0.941,
+      "auc_pr": 0.92,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 132,
+      "n_features": 1
+    },
+    {
+      "estrategia": "F: limpias, SOLO ratios (sin volumen)",
+      "auc_roc": 0.867,
+      "auc_pr": 0.806,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 132,
+      "n_features": 16
+    },
+    {
+      "estrategia": "G: todo (cont=0.3), SOLO ratios",
+      "auc_roc": 0.533,
+      "auc_pr": 0.646,
+      "positivos": 15,
+      "muestras": 28,
+      "n_entrenamiento": 392,
+      "n_features": 16
+    }
+  ]
+}

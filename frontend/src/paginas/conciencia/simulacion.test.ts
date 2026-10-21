@@ -52,6 +52,14 @@ describe('la respuesta cambia el curso del ataque', () => {
     expect(ev.pasos.find((p) => p.paso.id === 'd15')!.motivo).toBe('Depende de un paso que no llegó a ocurrir')
   })
 
+  it('una acción aplicada en el mismo instante en que se ve un paso llega tarde para ese paso', () => {
+    const primero = [...HELIOS.pasos].sort((a, b) => a.t - b.t)[0]
+    const efecto: Efecto = primero.canal ? { tipo: 'bloquear-canal', canal: primero.canal } : { tipo: 'aislar', activo: primero.hasta }
+    const ev = evaluar(HELIOS, primero.t, [accion(efecto, primero.t)])
+    expect(ev.pasos.find((p) => p.paso.id === primero.id)!.ocurrido).toBe(true)
+    expect(ev.ocurridos.length).toBeGreaterThan(0)
+  })
+
   it('responder tarde no deshace lo ocurrido: solo afecta a lo posterior', () => {
     const ev = evaluar(DMEVALS, duracionEscenario(DMEVALS), [accion({ tipo: 'aislar', activo: 'scranton' }, 60)])
     expect(ev.pasos.find((p) => p.paso.id === 'd6')!.ocurrido).toBe(true)

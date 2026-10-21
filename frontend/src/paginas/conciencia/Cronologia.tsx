@@ -37,7 +37,7 @@ export function Cronologia({ org, ev, acciones }: { org: Organizacion; ev: Evalu
                 <span className="text-texto"><span className="font-semibold text-ok">Respuesta:</span> {e.accion.titulo}</span>
               </li>
             ) : (
-              <li key={e.clave} className={cn('flex items-start gap-2 px-4 py-1.5 text-xs', !e.ev.ocurrido && 'opacity-75')}>
+              <li key={e.clave} id={`paso-${e.ev.paso.id}`} className={cn('flex items-start gap-2 px-4 py-1.5 text-xs', !e.ev.ocurrido && 'opacity-75')}>
                 {e.ev.ocurrido ? (
                   <Siren className="mt-px size-3.5 shrink-0 text-sev-critica" aria-hidden />
                 ) : (

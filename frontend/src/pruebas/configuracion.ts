@@ -1,5 +1,5 @@
 /**
- * Configuración común de Vitest (`setupFiles`): los matchers de jest-dom y la limpieza del DOM entre tests.
+ * Configuración común de Vitest (`setupFiles`): los matchers de jest-dom y la limpieza del DOM y de la sesión entre tests.
  */
 import '@testing-library/jest-dom/vitest'
 
@@ -8,6 +8,8 @@ import { afterEach } from 'vitest'
 
 afterEach(() => {
   cleanup()
+  // los filtros que las páginas guardan para la sesión no deben pasar de un test a otro
+  sessionStorage.clear()
 })
 
 // jsdom no implementa algunas APIs que usan Radix y Recharts.

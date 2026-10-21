@@ -65,14 +65,14 @@ export function formatear(valor: number | null | undefined, unidad: string, eje 
   }
 }
 
-/** Los colores con nombre de Grafana, en la paleta apagada del portal. */
+/** Los colores con nombre de Grafana, en la paleta apagada del portal: tokens `--graf-*`, que cambian con el tema. */
 const COLORES: Record<string, string> = {
-  green: '#2b6f52',
-  orange: '#a8690f',
-  red: '#a3302a',
-  yellow: '#8f7412',
-  blue: '#345f9e',
-  purple: '#5f4a96',
+  green: 'var(--graf-verde)',
+  orange: 'var(--graf-naranja)',
+  red: 'var(--graf-rojo)',
+  yellow: 'var(--graf-amarillo)',
+  blue: 'var(--graf-azul)',
+  purple: 'var(--graf-morado)',
 }
 
 export function color(nombre: string | null | undefined): string | undefined {

@@ -14,7 +14,7 @@ export default function PaginaProximamente({ seccion }: { seccion: SeccionFutura
   return (
     <>
       <EncabezadoPagina titulo={seccion.titulo} descripcion={seccion.descripcion} />
-      <section className="flex max-w-3xl flex-col gap-4 rounded-2xl border border-dashed border-[#aeb8c5] bg-superficie/70 p-6">
+      <section className="flex max-w-3xl flex-col gap-4 rounded-2xl border border-dashed border-borde-discontinuo bg-superficie/70 p-6">
         <div className="flex items-center gap-3">
           <span className="flex size-11 items-center justify-center rounded-xl bg-superficie-hundida text-texto-suave" aria-hidden>
             <Icono className="size-5" />

@@ -24,10 +24,10 @@ describe('formato de unidades', () => {
 
   it('colorea por el último umbral que el valor alcanza', () => {
     const panel = { color: null, umbrales: [{ color: 'red', desde: null }, { color: 'orange', desde: 90 }, { color: 'green', desde: 97 }] }
-    expect(colorPorUmbral(panel, 50)).toBe('#a3302a')
-    expect(colorPorUmbral(panel, 95)).toBe('#a8690f')
-    expect(colorPorUmbral(panel, 99.36)).toBe('#2b6f52')
-    expect(colorPorUmbral({ color: 'orange', umbrales: [] }, 1)).toBe('#a8690f')
+    expect(colorPorUmbral(panel, 50)).toBe('var(--graf-rojo)')
+    expect(colorPorUmbral(panel, 95)).toBe('var(--graf-naranja)')
+    expect(colorPorUmbral(panel, 99.36)).toBe('var(--graf-verde)')
+    expect(colorPorUmbral({ color: 'orange', umbrales: [] }, 1)).toBe('var(--graf-naranja)')
   })
 
   it('junta varias series en filas por instante', () => {

@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright: resultados, informes y capturas (se regeneran con npm run e2e)
+/test-results
+/playwright-report
+/capturas

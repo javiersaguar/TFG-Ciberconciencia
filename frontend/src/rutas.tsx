@@ -1,17 +1,29 @@
 /**
- * Rutas del portal. Todas cuelgan del shell; las secciones de fases futuras (incidentes, matriz ATT&CK) existen ya
- * como páginas «próximamente» para que la navegación final esté fijada desde la base.
+ * Rutas del portal. Todas cuelgan del shell; las secciones de fases futuras existen ya como páginas «próximamente»
+ * para que la navegación final esté fijada desde la base.
+ *
+ * CARGA DIFERIDA: cada página es un chunk aparte (`paginasDiferidas.tsx`) y el shell la espera con un `Suspense`.
  */
 import { createBrowserRouter, createMemoryRouter, type RouteObject } from 'react-router'
 
 import { AppShell } from '@/componentes/shell/AppShell'
 import { SECCIONES_FUTURAS } from '@/componentes/shell/navegacion'
-import PaginaConciencia from '@/paginas/conciencia/PaginaConciencia'
-import PaginaGrafo from '@/paginas/grafo/PaginaGrafo'
-import PaginaNoEncontrado from '@/paginas/no-encontrado/PaginaNoEncontrado'
-import PaginaObservabilidad from '@/paginas/observabilidad/PaginaObservabilidad'
-import PaginaProximamente from '@/paginas/proximamente/PaginaProximamente'
-import PaginaSituacion from '@/paginas/situacion/PaginaSituacion'
+import {
+  PaginaAtaque,
+  PaginaAttack,
+  PaginaConciencia,
+  PaginaCopiloto,
+  PaginaCronologia,
+  PaginaEvaluacion,
+  PaginaGrafo,
+  PaginaIncidentes,
+  PaginaNoEncontrado,
+  PaginaObservabilidad,
+  PaginaProximamente,
+  PaginaProyecto,
+  PaginaRespuesta,
+  PaginaSituacion,
+} from '@/paginasDiferidas'
 
 export const rutas: RouteObject[] = [
   {
@@ -19,6 +31,14 @@ export const rutas: RouteObject[] = [
     children: [
       { index: true, element: <PaginaSituacion /> },
       { path: 'conciencia', element: <PaginaConciencia /> },
+      { path: 'incidentes', element: <PaginaIncidentes /> },
+      { path: 'ataque', element: <PaginaAtaque /> },
+      { path: 'cronologia', element: <PaginaCronologia /> },
+      { path: 'attack', element: <PaginaAttack /> },
+      { path: 'respuesta', element: <PaginaRespuesta /> },
+      { path: 'copiloto', element: <PaginaCopiloto /> },
+      { path: 'proyecto', element: <PaginaProyecto /> },
+      { path: 'evaluacion', element: <PaginaEvaluacion /> },
       { path: 'grafo', element: <PaginaGrafo /> },
       { path: 'observabilidad', element: <PaginaObservabilidad /> },
       ...SECCIONES_FUTURAS.map((seccion) => ({
