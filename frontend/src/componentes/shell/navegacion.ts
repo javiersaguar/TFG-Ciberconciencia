@@ -23,6 +23,8 @@ export interface Seccion {
   descripcion: string
   icono: LucideIcon
   grupo?: GrupoSeccion
+  /** No sale en la barra lateral (se llega por otro sitio: el Copiloto, desde su botón). */
+  oculta?: boolean
 }
 
 export interface SeccionFutura extends Seccion {
@@ -79,10 +81,11 @@ export const SECCIONES: readonly Seccion[] = [
   },
   {
     ruta: '/copiloto',
-    titulo: 'Copiloto',
+    titulo: 'Copiloto (vista ampliada)',
     descripcion: 'Preguntas sobre la evidencia de una organización, con una cita en cada afirmación. No ejecuta nada.',
     icono: MessagesSquare,
     grupo: 'respuesta',
+    oculta: true,
   },
   {
     ruta: '/evaluacion',

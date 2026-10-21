@@ -3,11 +3,15 @@
  */
 import '@testing-library/jest-dom/vitest'
 
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach } from 'vitest'
+
+// Con toda la batería en paralelo, una página diferida puede tardar más de 1 s en llegar: se espera hasta 3 s.
+configure({ asyncUtilTimeout: 3000 })
 
 afterEach(() => {
   cleanup()
+  localStorage.removeItem('tfg-copiloto-abierto')
   // los filtros que las páginas guardan para la sesión no deben pasar de un test a otro
   sessionStorage.clear()
 })

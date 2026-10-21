@@ -584,3 +584,34 @@
 .rayado {
   background-image: repeating-linear-gradient(45deg, transparent 0 3px, color-mix(in srgb, var(--superficie) 38%, transparent) 3px 5px);
 }
+
+/* Copiloto: el panel entra deslizándose desde la derecha y cada mensaje aparece con un fundido corto. */
+@keyframes entrada-panel {
+  from { transform: translateX(16px); opacity: 0; }
+}
+.entrada-panel {
+  animation: entrada-panel 180ms ease-out both;
+}
+.entrada-mensaje {
+  animation: entrada-pagina 160ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .entrada-panel,
+  .entrada-mensaje {
+    animation: none;
+  }
+}
+
+/* Modo presentación: contorno del elemento del paso (componentes/presentacion). */
+.presentacion-foco {
+  outline: 3px solid var(--acento);
+  outline-offset: 4px;
+  border-radius: 1rem;
+  animation: presentacion-foco 1.6s ease-in-out 2;
+}
+@keyframes presentacion-foco {
+  50% { outline-color: color-mix(in srgb, var(--acento) 35%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .presentacion-foco { animation: none; }
+}

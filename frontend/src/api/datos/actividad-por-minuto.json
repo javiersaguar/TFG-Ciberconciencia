@@ -1,0 +1,310 @@
+[
+  {
+    "minuto": "02:56",
+    "total": 2,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 0,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "02:57",
+    "total": 3,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 1,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "02:58",
+    "total": 14,
+    "porNivel": {
+      "informational": 1,
+      "low": 3,
+      "medium": 7,
+      "high": 3,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "02:59",
+    "total": 5,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 3,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:00",
+    "total": 291,
+    "porNivel": {
+      "informational": 1,
+      "low": 2,
+      "medium": 286,
+      "high": 2,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:01",
+    "total": 6,
+    "porNivel": {
+      "informational": 1,
+      "low": 0,
+      "medium": 5,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:02",
+    "total": 3,
+    "porNivel": {
+      "informational": 0,
+      "low": 1,
+      "medium": 1,
+      "high": 1,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:03",
+    "total": 8,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 4,
+      "high": 2,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:04",
+    "total": 2,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 1,
+      "high": 1,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:05",
+    "total": 136,
+    "porNivel": {
+      "informational": 2,
+      "low": 4,
+      "medium": 1,
+      "high": 129,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:06",
+    "total": 11,
+    "porNivel": {
+      "informational": 1,
+      "low": 4,
+      "medium": 6,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:07",
+    "total": 0,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 0,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:08",
+    "total": 23,
+    "porNivel": {
+      "informational": 0,
+      "low": 11,
+      "medium": 12,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:09",
+    "total": 78,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 3,
+      "high": 75,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:10",
+    "total": 7,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 7,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:11",
+    "total": 7,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 3,
+      "high": 2,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:12",
+    "total": 7,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 3,
+      "high": 2,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:13",
+    "total": 7,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 3,
+      "high": 2,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:14",
+    "total": 11,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 5,
+      "high": 4,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:15",
+    "total": 4,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 2,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:16",
+    "total": 12,
+    "porNivel": {
+      "informational": 0,
+      "low": 3,
+      "medium": 6,
+      "high": 3,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:17",
+    "total": 6,
+    "porNivel": {
+      "informational": 0,
+      "low": 2,
+      "medium": 2,
+      "high": 2,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:18",
+    "total": 0,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 0,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:19",
+    "total": 38,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 23,
+      "high": 15,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:20",
+    "total": 33,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 19,
+      "high": 14,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:21",
+    "total": 22,
+    "porNivel": {
+      "informational": 4,
+      "low": 7,
+      "medium": 5,
+      "high": 6,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:22",
+    "total": 3,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 3,
+      "high": 0,
+      "critical": 0
+    }
+  },
+  {
+    "minuto": "03:23",
+    "total": 2,
+    "porNivel": {
+      "informational": 0,
+      "low": 0,
+      "medium": 2,
+      "high": 0,
+      "critical": 0
+    }
+  }
+]

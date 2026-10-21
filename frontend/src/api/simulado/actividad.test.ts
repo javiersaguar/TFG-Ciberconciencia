@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { cargarAlertasDay1, type AlertaDay1 } from '../exportaciones'
+import actividadPorMinuto from '../datos/actividad-por-minuto.json'
+import severidad from '../datos/severidad.json'
+import tacticasPorHost from '../datos/tacticas-por-host.json'
 import { alertasPorMinuto, mapaTacticaHost, repartoPorNivel } from './actividad'
 
 const alertas = await cargarAlertasDay1()
@@ -38,5 +41,13 @@ describe('agregados de APT29 day1', () => {
     const rara = { ...alertas[0], ms: 0, host: 'OTRO' } as AlertaDay1
     expect(alertasPorMinuto([rara]).reduce((s, m) => s + m.total, 0)).toBe(0)
     expect(mapaTacticaHost([rara]).maximo).toBe(0)
+  })
+})
+
+describe('agregados precalculados al sincronizar (los que carga la portada)', () => {
+  it('son exactamente los que se calculaban en el navegador con las 741 alertas', () => {
+    expect(actividadPorMinuto).toEqual(alertasPorMinuto(alertas))
+    expect(severidad).toEqual(repartoPorNivel(alertas))
+    expect(tacticasPorHost).toEqual(mapaTacticaHost(alertas))
   })
 })

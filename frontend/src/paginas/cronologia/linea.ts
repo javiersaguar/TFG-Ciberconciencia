@@ -146,3 +146,29 @@ export function enlaceGrafo(alerta: AlertaDay1, legado: readonly EventoCronologi
   const destino = evento?.enGrafo ?? campanasDe(alerta, campanas)[0]?.nodoGrafo ?? `host-${alerta.host.toLowerCase()}`
   return `/ataque?sel=${encodeURIComponent(destino)}`
 }
+
+export interface EtiquetaEje {
+  ms: number
+  texto: string
+  x: number
+  ancla: 'start' | 'middle' | 'end'
+}
+
+/**
+ * Etiquetas del eje sin solapes: cada una se ancla dentro del gráfico (a la izquierda en el borde izquierdo, a la
+ * derecha en el derecho) y se descarta la que pisaría a la anterior. `anchoCaracter` aproxima la monoespaciada a 11 px.
+ */
+export function etiquetasEje(lista: readonly { ms: number; texto: string }[], x: (ms: number) => number, ancho: number, anchoCaracter = 6.8, hueco = 6): EtiquetaEje[] {
+  const visibles: EtiquetaEje[] = []
+  let finAnterior = -Infinity
+  for (const m of lista) {
+    const px = x(m.ms)
+    const w = m.texto.length * anchoCaracter
+    const ancla = px - w / 2 < 0 ? 'start' : px + w / 2 > ancho ? 'end' : 'middle'
+    const inicio = ancla === 'start' ? px : ancla === 'end' ? px - w : px - w / 2
+    if (inicio < finAnterior + hueco) continue
+    visibles.push({ ...m, x: px, ancla })
+    finAnterior = inicio + w
+  }
+  return visibles
+}

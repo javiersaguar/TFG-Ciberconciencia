@@ -35,6 +35,9 @@ export default defineConfig({
             // acababa dentro de `graficos` (los grupos arrastran las dependencias de sus módulos) y cualquier botón
             // obligaba a descargar Recharts entero en la portada.
             { name: 'utilidades', test: /node_modules\/(clsx|tailwind-merge|class-variance-authority)\//, priority: 35 },
+            // solo la base de Lucide (sin iconos): si no, el empaquetador junta en un chunk compartido los iconos de
+            // muchas páginas y la portada lo descargaba entero (44,8 kB) por necesitar `createLucideIcon`
+            { name: 'iconos-base', test: /node_modules\/lucide-react\/dist\/esm\/(createLucideIcon|Icon|context|defaultAttributes|shared\/)/, priority: 35 },
             { name: 'd3-comun', test: /node_modules\/(d3-color|d3-ease|d3-interpolate|d3-timer)\//, priority: 30 },
             { name: 'flujo', test: /node_modules\/(@xyflow|d3-zoom|d3-drag|d3-selection|d3-transition|d3-dispatch|classcat|zustand)\//, priority: 20 },
             { name: 'graficos', test: /node_modules\/(recharts|recharts-scale|react-smooth|victory-vendor|d3-[a-z-]+|internmap|@reduxjs|redux|react-redux|immer|reselect)\//, priority: 10 },

@@ -311,7 +311,7 @@ export function PanelTabla({ panel, indice }: { panel: PanelCuadro; indice: numb
             <thead className="sticky top-0 bg-superficie-alterna">
               <tr>
                 {tabla.columnas.map((columna) => (
-                  <th key={columna.clave} scope="col" className={cn('px-2.5 py-1.5 font-semibold whitespace-nowrap text-texto-suave', columna.unidad ? 'text-right' : 'text-left')}>
+                  <th key={columna.clave} scope="col" className={cn('px-2 py-1.5 font-semibold whitespace-nowrap text-texto-suave', columna.unidad ? 'text-right' : 'text-left')}>
                     {columna.titulo}
                   </th>
                 ))}
@@ -323,7 +323,7 @@ export function PanelTabla({ panel, indice }: { panel: PanelCuadro; indice: numb
                   {tabla.columnas.map((columna) => {
                     const valor = fila[columna.clave]
                     return (
-                      <td key={columna.clave} className={cn('px-2.5 py-1.5 whitespace-nowrap', columna.unidad ? 'text-right text-texto' : 'text-texto')}>
+                      <td key={columna.clave} className={cn('px-2 py-1.5', columna.unidad ? 'text-right whitespace-nowrap text-texto' : 'text-texto [overflow-wrap:anywhere]')}>
                         {columna.unidad && typeof valor === 'number' ? formatear(valor, columna.unidad) : valor ?? '—'}
                       </td>
                     )

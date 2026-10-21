@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 import { buscarComandos, comandosBase, comandosCampanas, comandosTecnicas, TITULO_TIPO, type Comando } from './comandos'
 
-export function PaletaComandos({ abierta, alCambiar }: { abierta: boolean; alCambiar: (abierta: boolean) => void }) {
+export function PaletaComandos({ abierta, alCambiar, alAccion }: { abierta: boolean; alCambiar: (abierta: boolean) => void; alAccion?: (accion: string) => void }) {
   const navegar = useNavigate()
   const [consulta, setConsulta] = useState('')
   const [activo, setActivo] = useState(0)
@@ -33,7 +33,8 @@ export function PaletaComandos({ abierta, alCambiar }: { abierta: boolean; alCam
   const ir = (c: Comando | undefined) => {
     if (!c) return
     cerrar(false)
-    navegar(c.a)
+    if (c.a.startsWith('#')) alAccion?.(c.a)
+    else navegar(c.a)
   }
   const mover = (delta: number) => setActivo((a) => (resultados.length ? (a + delta + resultados.length) % resultados.length : 0))
 

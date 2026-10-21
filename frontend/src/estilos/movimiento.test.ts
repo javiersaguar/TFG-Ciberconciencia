@@ -9,7 +9,7 @@ const css = readFileSync(resolve(process.cwd(), 'src/estilos/globales.css'), 'ut
 const reducidos = [...css.matchAll(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/g)].map((m) => m[1])
 
 describe('movimiento con significado', () => {
-  it.each(['.trazo-avance', '.pulso-nodo', '.entrada-pagina', '.entrada-escalonada'])('%s se desactiva con movimiento reducido', (clase) => {
+  it.each(['.trazo-avance', '.pulso-nodo', '.entrada-pagina', '.entrada-escalonada', '.entrada-panel', '.entrada-mensaje'])('%s se desactiva con movimiento reducido', (clase) => {
     expect(reducidos.some((bloque) => bloque.includes(clase) && /animation:\s*none/.test(bloque))).toBe(true)
   })
 

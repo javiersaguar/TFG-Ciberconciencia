@@ -9,7 +9,7 @@ import { construirGrafoAtaque } from '@/api/simulado/grafoAtaque'
 import { milisegundosDelDia } from '@/componentes/datos/hora'
 import { renderizarRutas } from '@/pruebas/utilidades'
 
-import { DIA, enlaceGrafo, filtrarAlertas, HOSTS, leerRango, marcas, msDeTexto, RANGO_MINIMO, rangoDeArrastre, resolverSeleccion, textoDeMs } from './linea'
+import { DIA, enlaceGrafo, etiquetasEje, filtrarAlertas, HOSTS, leerRango, marcas, msDeTexto, RANGO_MINIMO, rangoDeArrastre, resolverSeleccion, textoDeMs } from './linea'
 import { FILTROS_CRONOLOGIA, filtrarCronologia, leerEvento, leerHost, ordenarCronologia } from './logica'
 
 const eventos = ordenarCronologia(construirCronologia())
@@ -125,5 +125,24 @@ describe('página de la línea temporal', () => {
     await usuario.click(within(screen.getByRole('group', { name: 'Nivel' })).getByRole('button', { name: 'Alto' }))
     const altosSalto = alertas.filter((a) => a.nivel !== 'high' && a.ms >= msDeTexto('03:09')! && a.ms <= msDeTexto('03:18')!).length
     expect(screen.getByText(new RegExp(`· ${altosSalto} alertas`))).toBeInTheDocument()
+  })
+})
+
+describe('eje de la línea temporal', () => {
+  it('las etiquetas no se pisan, ni en los extremos, a ningún ancho', () => {
+    for (const ancho of [300, 600, 900, 1400]) {
+      const e = { x: (ms: number) => ((ms - DIA.desde) / (DIA.hasta - DIA.desde)) * ancho }
+      const etiquetas = etiquetasEje(marcas(DIA), e.x, ancho)
+      const cajas = etiquetas.map((m) => {
+        const w = m.texto.length * 6.8
+        const ini = m.ancla === 'start' ? m.x : m.ancla === 'end' ? m.x - w : m.x - w / 2
+        return [ini, ini + w] as const
+      })
+      for (let i = 1; i < cajas.length; i++) expect(cajas[i][0], `${ancho}px`).toBeGreaterThanOrEqual(cajas[i - 1][1])
+      for (const [ini, fin] of cajas) {
+        expect(ini).toBeGreaterThanOrEqual(0)
+        expect(fin).toBeLessThanOrEqual(ancho + 0.5)
+      }
+    }
   })
 })

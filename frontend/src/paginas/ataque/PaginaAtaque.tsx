@@ -12,7 +12,7 @@
  */
 import '@xyflow/react/dist/style.css'
 
-import { Background, ControlButton, Controls, MiniMap, Panel, ReactFlow, ReactFlowProvider, useReactFlow, MarkerType, type EdgeChange, type NodeChange, type NodeDimensionChange } from '@xyflow/react'
+import { Background, ControlButton, Controls, MiniMap, Panel, ReactFlow, ReactFlowProvider, useReactFlow, useStore, MarkerType, type EdgeChange, type NodeChange, type NodeDimensionChange } from '@xyflow/react'
 import { Check, ChevronLeft, ChevronRight, ListOrdered, Map as IconoMapa, Pause, Play, RotateCcw, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
@@ -29,8 +29,8 @@ import { Button } from '@/componentes/ui/button'
 import { Skeleton } from '@/componentes/ui/skeleton'
 import { cn } from '@/lib/utils'
 
-import { absoluta, disponerEnCarriles } from './carriles'
-import { AristaRelacion, NodoHost, NodoTarjeta, type AristaFlujo, type NodoFlujo } from './ElementosFlujo'
+import { absoluta, CARRILES, disponerEnCarriles, idCarril, type Disposicion } from './carriles'
+import { AristaRelacion, NodoHost, NodoTarjeta, type AristaFlujo, type NodoFlujo, ZOOM_DETALLE } from './ElementosFlujo'
 import { ESTILO_FUNDAMENTO } from './estilo'
 import {
   alternar,
@@ -61,10 +61,10 @@ const HOSTS = ['SCRANTON', 'NASHUA', 'NEWYORK', 'UTICA'] as const
  * Encaje inicial con un zoom mínimo de LECTURA: si el grafo entero no cabe sin bajar de 0,6, se centra a 0,6 y el
  * resto se alcanza desplazando (con el minimapa para orientarse) o con «Encajar» de los controles, que sí lo mete todo.
  */
-/** Encaje inicial y de cada paso: nunca por debajo del zoom en que las tarjetas enseñan su detalle (texto ≥ 11 px). */
-const AJUSTE = { padding: 0.12, minZoom: 0.85, maxZoom: 1.15 }
-/** Lo que se encuadra al abrir: el momento clave, del robo en SCRANTON al salto a NASHUA. */
-const FOCO_INICIAL = ['alerta-al-0305-lsass', 'cuenta-pbeesly', 'proc-powershell', 'proc-system', 'proc-psexec', 'proc-wsmprovhost', 'alerta-al-0309-remota']
+/** Al cargar y al redimensionar: TODO dentro, con margen (los controles, en horizontal arriba a la derecha, caben en él). */
+const AJUSTE_TODO = { padding: 0.1, minZoom: 0.2, maxZoom: 1.1 }
+/** En cada paso de la secuencia: el paso, de cerca, con el texto legible (≥ 11 px). */
+const AJUSTE_PASO = { padding: 0.25, minZoom: 0.85, maxZoom: 1.15 }
 
 const TEXTOS_ARIA = {
   'node.a11yDescription.default': 'Pulsa Enter o Espacio para ver el detalle. Escape quita la selección.',
@@ -105,28 +105,56 @@ function MuestraTrazo({ fundamento }: { fundamento: Fundamento }) {
   )
 }
 
-/** Leyenda en franja, fuera del lienzo para no tapar el grafo: trazo, icono, nombre y qué significa. */
+/** Leyenda en una línea, fuera del lienzo: trazo, icono y nombre; lo que significa cada uno, plegado. */
 function Leyenda() {
+  const [abierta, setAbierta] = useState(false)
   return (
-    <section aria-label="Leyenda: fundamento de cada relación" className="rounded-2xl border border-borde bg-superficie px-3 py-2">
-      <ul className="grid gap-x-4 gap-y-1 text-[11px] lg:grid-cols-3">
-        {FUNDAMENTOS.map((f) => {
-          const Icono = ESTILO_FUNDAMENTO[f].icono
-          return (
-            <li key={f} className="flex items-start gap-1.5">
-              <MuestraTrazo fundamento={f} />
-              <span>
-                <span className={cn('mr-1 inline-flex items-center gap-1 font-semibold', ESTILO_FUNDAMENTO[f].claseTexto)}>
-                  <Icono className="size-3" aria-hidden />
-                  {ETIQUETA_FUNDAMENTO[f]}
-                </span>
-                <span className="text-texto-suave">{DESCRIPCION_FUNDAMENTO[f]}</span>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
+    <section aria-label="Leyenda: fundamento de cada relación" className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-borde bg-superficie px-3 py-1.5 text-[11px]">
+      {FUNDAMENTOS.map((f) => {
+        const Icono = ESTILO_FUNDAMENTO[f].icono
+        return (
+          <span key={f} className="flex items-center gap-1.5">
+            <MuestraTrazo fundamento={f} />
+            <span className={cn('inline-flex items-center gap-1 font-semibold', ESTILO_FUNDAMENTO[f].claseTexto)}>
+              <Icono className="size-3" aria-hidden />
+              {ETIQUETA_FUNDAMENTO[f]}
+            </span>
+            {abierta && <span className="text-texto-suave">{DESCRIPCION_FUNDAMENTO[f]}</span>}
+          </span>
+        )
+      })}
+      <button type="button" aria-expanded={abierta} onClick={() => setAbierta((v) => !v)} className="ml-auto font-medium text-acento hover:underline">
+        {abierta ? 'Ocultar qué significa' : 'Qué significa cada trazo'}
+      </button>
     </section>
+  )
+}
+
+/**
+ * Nombres de los carriles, siempre legibles: con el grafo lejos (zoom bajo el de detalle) el nombre dentro del carril
+ * se queda diminuto, y con el grafo cerca su columna puede quedar fuera de la vista. En los dos casos aparece una
+ * etiqueta a tamaño fijo en la esquina del carril, pegada al borde del lienzo si el carril empieza fuera.
+ */
+function NombresCarril({ disposicion }: { disposicion: Disposicion }) {
+  const [tx, ty, zoom] = useStore((s) => s.transform)
+  const alto = useStore((s) => s.height)
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[5] overflow-hidden" aria-hidden>
+      {CARRILES.map((host) => {
+        const caja = disposicion.cajas[idCarril(host)]
+        if (!caja) return null
+        const izquierda = caja.x * zoom + tx
+        const arriba = caja.y * zoom + ty
+        const abajo = arriba + caja.alto * zoom
+        const legibleDentro = zoom >= ZOOM_DETALLE && izquierda >= 0
+        if (legibleDentro || abajo < 0 || arriba > alto) return null
+        return (
+          <span key={host} data-nombre-carril style={{ top: Math.max(4, arriba + 3), left: Math.max(6, izquierda + 4) }} className="absolute rounded-md border border-borde bg-superficie/90 px-1.5 py-px font-mono text-[11.5px] font-semibold text-texto shadow-sm">
+            {host}
+          </span>
+        )
+      })}
+    </div>
   )
 }
 
@@ -161,13 +189,15 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
   const idsVisibles = useMemo(() => new Set(visibles.nodos.map((n) => n.id)), [visibles])
   // Qué se encuadra: el paso de la secuencia que se está viendo o, si no, el momento clave del ataque.
   const foco = useMemo(() => {
-    const candidatos = (hito ? hito.nodos : FOCO_INICIAL).filter((id) => idsVisibles.has(id) && !id.startsWith('host-'))
+    const candidatos = hito ? hito.nodos.filter((id) => idsVisibles.has(id) && !id.startsWith('host-')) : []
     return (candidatos.length ? candidatos : [...idsVisibles]).map((id) => ({ id }))
   }, [hito, idsVisibles])
   const focoActual = useRef(foco)
+  const pasoActual = useRef(!!hito)
   useEffect(() => {
     focoActual.current = foco
-  }, [foco])
+    pasoActual.current = !!hito
+  }, [foco, hito])
 
   const seleccionar = useCallback(
     (id: string | null) =>
@@ -256,14 +286,14 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
 
   // Reencuadra al cambiar los filtros y al redimensionar la ventana (recomendación de la skill de React Flow).
   useEffect(() => {
-    const id = requestAnimationFrame(() => void fitView({ ...AJUSTE, nodes: foco, duration: reducido ? 0 : 400 }))
+    const id = requestAnimationFrame(() => void fitView({ ...(hito ? AJUSTE_PASO : AJUSTE_TODO), nodes: foco, duration: reducido ? 0 : 400 }))
     return () => cancelAnimationFrame(id)
-  }, [foco, fitView, reducido])
+  }, [foco, hito, fitView, reducido])
   useEffect(() => {
     let id = 0
     const alRedimensionar = () => {
       cancelAnimationFrame(id)
-      id = requestAnimationFrame(() => void fitView({ ...AJUSTE, nodes: focoActual.current }))
+      id = requestAnimationFrame(() => void fitView({ ...(pasoActual.current ? AJUSTE_PASO : AJUSTE_TODO), nodes: focoActual.current }))
     }
     window.addEventListener('resize', alRedimensionar)
     return () => {
@@ -355,8 +385,8 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
               nodesConnectable={false}
               elementsSelectable
               fitView
-              fitViewOptions={AJUSTE}
-              minZoom={0.25}
+              fitViewOptions={AJUSTE_TODO}
+              minZoom={0.2}
               maxZoom={2}
               colorMode={tema === 'oscuro' ? 'dark' : 'light'}
               attributionPosition="bottom-left"
@@ -366,13 +396,14 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
               aria-label="Lienzo del grafo de ataque"
             >
               <Background gap={22} size={1.1} />
-              <Controls showInteractive={false} position="top-right" fitViewOptions={{ padding: 0.04 }}>
+              <NombresCarril disposicion={disposicion} />
+              <Controls showInteractive={false} orientation="horizontal" position="top-right" fitViewOptions={AJUSTE_TODO}>
                 <ControlButton onClick={() => setMinimapa((v) => !v)} aria-pressed={minimapa} aria-label={minimapa ? 'Ocultar el minimapa' : 'Mostrar el minimapa'} title={minimapa ? 'Ocultar el minimapa' : 'Mostrar el minimapa'}>
                   <IconoMapa aria-hidden />
                 </ControlButton>
               </Controls>
               {hito && paso != null && (
-                <Panel position="top-left" className="pointer-events-none rounded-lg border border-borde bg-superficie px-2.5 py-1 text-xs shadow-sm">
+                <Panel position="top-center" className="pointer-events-none rounded-lg border border-borde bg-superficie px-2.5 py-1 text-xs shadow-sm">
                   <span className="font-mono font-semibold text-texto tabular-nums">{formatearHora(hito.hora)}</span>
                   <span className="text-texto-suave"> · paso {paso + 1} de {grafo.hitos.length}</span>
                 </Panel>

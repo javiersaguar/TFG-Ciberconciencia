@@ -20,8 +20,9 @@ import { EncabezadoPagina, EstadoError } from '@/componentes/shell'
 import { Button } from '@/componentes/ui/button'
 import { Skeleton } from '@/componentes/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { BotonPreguntar } from '@/copiloto/BotonPreguntar'
 
-import { campanasDe, DIA, enlaceGrafo, escala, filtrarAlertas, HOSTS, idSeleccion, leerRango, marcas, PRESETS, rangoDeArrastre, resolverSeleccion, textoDeMs, type Rango, type Seleccion } from './linea'
+import { campanasDe, DIA, enlaceGrafo, escala, etiquetasEje, filtrarAlertas, HOSTS, idSeleccion, leerRango, marcas, PRESETS, rangoDeArrastre, resolverSeleccion, textoDeMs, type Rango, type Seleccion } from './linea'
 
 const NIVELES: { valor: NivelRegla; texto: string; trazo: string }[] = [
   { valor: 'high', texto: 'Alto', trazo: 'var(--sev-alta)' },
@@ -106,10 +107,11 @@ function Carriles({ rango, alertas, aristas, campanas, seleccion, alElegir, alCa
         <svg width={ancho} height={HOSTS.length * CARRIL + EJE} role="img" aria-label={`Alertas entre ${textoDeMs(rango.desde)} y ${textoDeMs(rango.hasta)} por host; arrastra para ampliar un rango`} className="overflow-visible">
           {HOSTS.map((h, i) => <rect key={h} x={0} y={i * CARRIL + 2} width={ancho} height={CARRIL - 4} rx={6} className="fill-superficie-alterna" />)}
           {marcas(rango).map((m) => (
-            <g key={m.ms}>
-              <line x1={e.x(m.ms)} x2={e.x(m.ms)} y1={0} y2={HOSTS.length * CARRIL} className="stroke-borde" strokeDasharray="2 3" />
-              <text x={e.x(m.ms)} y={HOSTS.length * CARRIL + 15} textAnchor={e.x(m.ms) > ancho - 24 ? 'end' : e.x(m.ms) < 24 ? 'start' : 'middle'} className="fill-texto-suave font-mono text-[11px]">{m.texto}</text>
-            </g>
+            <line key={`l${m.ms}`} x1={e.x(m.ms)} x2={e.x(m.ms)} y1={0} y2={HOSTS.length * CARRIL} className="stroke-borde" strokeDasharray="2 3" />
+          ))}
+          {/* etiquetas del eje sin solapes: ancladas dentro del gráfico y sin pisarse (etiquetasEje en linea.ts) */}
+          {etiquetasEje(marcas(rango), e.x, ancho).map((m) => (
+            <text key={`t${m.ms}`} data-etiqueta-eje x={m.x} y={HOSTS.length * CARRIL + 15} textAnchor={m.ancla} className="fill-texto-suave font-mono text-[11px]">{m.texto}</text>
           ))}
           {campanas.map((c) => {
             if (!c.inicio || !c.fin) return null
@@ -198,7 +200,10 @@ function Detalle({ seleccion, campanas, legado }: { seleccion?: Seleccion; campa
           ))}
         </p>
       )}
-      <Link to={enlaceGrafo(a, legado, campanas)} className="inline-flex items-center gap-1 font-medium text-acento hover:underline">Ver en el grafo <ArrowRight className="size-3" aria-hidden /></Link>
+      <p className="flex flex-wrap gap-x-3 gap-y-1">
+        <Link to={enlaceGrafo(a, legado, campanas)} className="inline-flex items-center gap-1 font-medium text-acento hover:underline">Ver en el grafo <ArrowRight className="size-3" aria-hidden /></Link>
+        <BotonPreguntar pregunta={`¿Qué pasó en ${a.host} entre ${textoDeMs(Math.max(DIA.desde, a.ms - 60_000))} y ${textoDeMs(Math.min(DIA.hasta, a.ms + 60_000))}?`} seleccion={{ tipo: 'evento', id: a.id, etiqueta: a.regla }} />
+      </p>
     </section>
   )
 }

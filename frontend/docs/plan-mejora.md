@@ -136,3 +136,36 @@ Verificación final: 274 tests en 25 ficheros, ESLint y build limpios. Pendiente
 
 Verificación: 368 tests unitarios en 34 ficheros, ESLint y build limpios; Playwright 37 escenarios en verde (2 saltos
 previstos) en 1280, 1440 y 1920 px; capturas en los dos temas revisadas.
+
+## 8. Ronda 3 (21-10-2026): fallos visuales, portada ligera, Copiloto en panel lateral y modo presentación
+
+El agente se quedó sin uso a mitad de la ronda (con la batería de tests fallando por *timeouts*: corría a la vez que
+Playwright; sin carga, los 383 pasaban en 5 s). La terminó otra sesión.
+
+| Bloque | Mejora | Estado |
+|---|---|---|
+| §1 | Tabla de incidentes que no se corta, eje de la línea temporal sin solapes, grafo de ataque encajado con los nombres de carril visibles; con pruebas que lo habrían detectado | Hecho. Además: escala del grafo compactada (34 px/min) |
+| §1 | Con el Copiloto abierto a 1440 px el contenido se quedaba en ~800 px y las tablas volvían a cortarse | Hecho: el panel solo empuja si deja ≥ 1.000 px; si no, se superpone. Barra superior con consultas de contenedor |
+| §2 | Agregados de la portada calculados al sincronizar | Hecho: portada de 816 a 462 kB de JS |
+| §3 | Copiloto en panel lateral (botón, Ctrl/Cmd + I, Ctrl+K), contexto de página, tiempo real de la demo, 4 detectores de señales débiles, avisos «Conviene vigilar» | Hecho; `/copiloto` queda como vista a pantalla completa |
+| §4 | Modo presentación de 8 pasos (Ctrl+K o `?presentacion=1`), cifras del guion comprobadas por test | Hecho |
+
+Verificación: 396 tests unitarios en 37 ficheros, ESLint y build limpios; Playwright 52 escenarios en verde (2 saltos
+previstos) en 1280, 1440 y 1920 px.
+
+### Pendiente anotado: mapa mundial de alertas (idea del 21-10-2026)
+
+Un mapa del mundo que muestre en tiempo real **desde dónde llegan las alertas y hacia dónde van**. Requisitos para que
+sea real y no ilustrativo:
+
+1. **IP públicas que geolocalizar.** El corpus actual solo tiene direcciones privadas de laboratorio (10.0.x.x y el
+   atacante en 192.168.0.4): hoy no hay ni un origen geolocalizable. Harían falta capturas con tráfico a Internet
+   (p. ej. el C2 de un escenario nuevo del laboratorio) o los IOC de red de la CTI (F4).
+2. **Base GeoIP local** (p. ej. GeoLite2) consultada en el servidor, nunca desde el navegador hacia un servicio de
+   terceros: las IP de un incidente son datos sensibles.
+3. **Tiempo real**: el WebSocket de alertas de la API (F6.3).
+4. **Honestidad del dato**: la geolocalización por IP es aproximada y los atacantes usan infraestructura intermedia
+   (VPS, proxies); el mapa dice «ubicación de la IP», no «ubicación del atacante».
+
+Mientras tanto, si se quiere para la demo, puede hacerse sobre el escenario ficticio de Helios **marcado como
+ilustrativo**, con la misma interfaz que usará la versión real. Propuesta de ubicación: F8.3 (completo).

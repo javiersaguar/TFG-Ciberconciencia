@@ -13,13 +13,13 @@ import { useIncidentes, type Incidente } from '@/api/incidentes'
 import { useActividadDay1, useSituacion, type ActividadDay1, type Cifra } from '@/api/situacion'
 import { NIVELES_ORDEN } from '@/api/simulado/actividad'
 import type { NivelRegla } from '@/api/tipos'
+import { Ayuda } from '@/componentes/datos/Ayuda'
 import { ChipProcedencia } from '@/componentes/datos/Chips'
 import { formatearEntero, formatearPorcentaje } from '@/componentes/datos/formato'
 import { formatearHora } from '@/componentes/datos/hora'
 import { useNumeroAnimado } from '@/componentes/datos/useNumeroAnimado'
 import { EncabezadoPagina, EstadoError } from '@/componentes/shell'
 import { Skeleton } from '@/componentes/ui/skeleton'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/componentes/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 const NIVEL: Record<NivelRegla, { texto: string; fondo: string }> = {
@@ -59,14 +59,11 @@ function KpiPrincipal({ cifra }: { cifra: Cifra }) {
     <section aria-label={cifra.titulo} className="flex flex-col gap-0.5 rounded-2xl border border-borde bg-superficie px-4 py-3">
       <h2 className="flex items-center justify-between gap-2 text-[13px] font-semibold text-texto-suave">
         {cifra.titulo}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span tabIndex={0} className="text-ok" aria-label={`Fuente: ${cifra.fuente}`}>
-              <NotebookText className="size-3.5" aria-hidden />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">Documentado en: {cifra.fuente}</TooltipContent>
-        </Tooltip>
+        <Ayuda texto={`Documentado en: ${cifra.fuente}`}>
+          <span tabIndex={0} className="text-ok" aria-label={`Fuente: ${cifra.fuente}`}>
+            <NotebookText className="size-3.5" aria-hidden />
+          </span>
+        </Ayuda>
       </h2>
       <p className="text-[1.8rem] leading-none font-semibold tracking-tight text-primario tabular-nums">{formatearEntero(animado == null ? null : Math.round(animado))}</p>
       <p className="text-xs text-texto-suave">{cifra.detalle}</p>
@@ -81,14 +78,11 @@ function KpiSecundaria({ titulo, valor, detalle, nota }: { titulo: string; valor
       <span className="text-[15px] font-semibold text-texto tabular-nums">{valor}</span>
       <span className="text-[11px] text-texto-suave">{detalle}</span>
       {nota && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" className="self-center text-texto-suave hover:text-acento" aria-label={`Nota: ${nota}`}>
-              <Info className="size-3.5" aria-hidden />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">{nota}</TooltipContent>
-        </Tooltip>
+        <Ayuda texto={nota} className="self-center">
+          <button type="button" className="text-texto-suave hover:text-acento" aria-label={`Nota: ${nota}`}>
+            <Info className="size-3.5" aria-hidden />
+          </button>
+        </Ayuda>
       )}
     </section>
   )

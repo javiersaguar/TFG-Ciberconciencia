@@ -69,5 +69,28 @@
       "bytes": 105442,
       "modificado": "2026-10-21T09:09:07.284Z"
     }
+  ],
+  "derivados": [
+    {
+      "fichero": "actividad-por-minuto.json",
+      "derivadoDe": "eval/portal/alertas-apt29-day1.jsonl",
+      "sha256Origen": "26a9f70adb2bdeb309dc01ce29365410d66fca1b9084c5d5ee2406e467b6acc1",
+      "sha256": "a1ca311171f6438ab1769779eb7f02e0646b1a72c4ef94adfab9da0f740f9e7f",
+      "bytes": 4787
+    },
+    {
+      "fichero": "severidad.json",
+      "derivadoDe": "eval/portal/alertas-apt29-day1.jsonl",
+      "sha256Origen": "26a9f70adb2bdeb309dc01ce29365410d66fca1b9084c5d5ee2406e467b6acc1",
+      "sha256": "fa89b48c484fe3f2f7bd3e88a9e9d043fd70bc758495893370ef12b842a8ef56",
+      "bytes": 207
+    },
+    {
+      "fichero": "tacticas-por-host.json",
+      "derivadoDe": "eval/portal/alertas-apt29-day1.jsonl",
+      "sha256Origen": "26a9f70adb2bdeb309dc01ce29365410d66fca1b9084c5d5ee2406e467b6acc1",
+      "sha256": "d776cb2de32b7898215d94752e425da556415f888437ff62cedfce1d089ecea8",
+      "bytes": 1097
+    }
   ]
 }

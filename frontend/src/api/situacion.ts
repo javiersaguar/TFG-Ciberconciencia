@@ -10,10 +10,10 @@ import { useQuery } from '@tanstack/react-query'
 
 import { formatearEntero, formatearPorcentaje } from '@/componentes/datos/formato'
 
-import { cargarAlertasDay1, cargarTecnicasObservadas } from './exportaciones'
+import { cargarTecnicasObservadas } from './exportaciones'
 import { desdeSimulado } from './fuente'
 import type { Procedencia } from './observabilidad'
-import { alertasPorMinuto, mapaTacticaHost, repartoPorNivel, type MapaTacticaHost, type MinutoActividad } from './simulado/actividad'
+import { NIVELES_ORDEN, type MapaTacticaHost, type MinutoActividad } from './simulado/actividad'
 import { CAMPANAS, CORPUS, CRONOLOGIA_DAY1, DAY1, REF, type Campana, type NivelRegla } from './simulado/corpus'
 
 export type { Campana }
@@ -137,7 +137,11 @@ export function useSituacion() {
   })
 }
 
-/** Actividad de APT29 day1 a partir de sus 741 alertas (exportación del 21-10-2026): se procesa una vez, aquí. */
+/**
+ * Actividad de APT29 day1: los agregados que `npm run sincronizar-datos` deriva de sus 741 alertas (exportación del
+ * 21-10-2026). La portada ya no descarga las alertas: carga unos pocos kB ya sumados (y un test comprueba que son los
+ * mismos números que daba sumarlas en el navegador).
+ */
 export interface ActividadDay1 {
   porMinuto: MinutoActividad[]
   porNivel: { nivel: NivelRegla; alertas: number }[]
@@ -152,14 +156,22 @@ export function useActividadDay1() {
   return useQuery({
     queryKey: ['actividad-day1'],
     queryFn: async (): Promise<ActividadDay1> => {
-      const [alertas, tecnicas, capaF2] = await Promise.all([cargarAlertasDay1(), cargarTecnicasObservadas(), import('./datos/cobertura-observada.json')])
+      const [porMinuto, porNivel, mapa, tecnicas, capaF2] = await Promise.all([
+        import('./datos/actividad-por-minuto.json'),
+        import('./datos/severidad.json'),
+        import('./datos/tacticas-por-host.json'),
+        cargarTecnicasObservadas(),
+        import('./datos/cobertura-observada.json'),
+      ])
+      // lo generado se valida al leerlo: un nivel desconocido no llega a la interfaz
+      const niveles = porNivel.default.filter((p): p is { nivel: NivelRegla; alertas: number } => (NIVELES_ORDEN as readonly string[]).includes(p.nivel))
       return {
-        porMinuto: alertasPorMinuto(alertas),
-        porNivel: repartoPorNivel(alertas),
-        mapa: mapaTacticaHost(alertas),
-        total: alertas.length,
+        porMinuto: porMinuto.default as MinutoActividad[],
+        porNivel: niveles,
+        mapa: mapa.default,
+        total: niveles.reduce((s, p) => s + p.alertas, 0),
         tecnicas: { hoy: tecnicas.length, f2: capaF2.default.techniques.length },
-        fuente: REF.alertasDay1,
+        fuente: `derivado de ${REF.alertasDay1}`,
       }
     },
     staleTime: Infinity,

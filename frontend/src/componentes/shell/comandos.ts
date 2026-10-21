@@ -8,20 +8,27 @@ import type { Incidente } from '@/api/incidentes'
 
 import { TODAS_LAS_SECCIONES } from './navegacion'
 
-export type TipoComando = 'seccion' | 'host' | 'campana' | 'tecnica'
+export type TipoComando = 'accion' | 'seccion' | 'host' | 'campana' | 'tecnica'
 
 export interface Comando {
   id: string
   tipo: TipoComando
   titulo: string
   detalle?: string
+  /** Destino: una ruta o, si empieza por `#`, una acción del shell (abrir el Copiloto…). */
   a: string
   /** Texto extra por el que también se encuentra (dataset, tácticas…). */
   claves?: string
 }
 
-export const TITULO_TIPO: Record<TipoComando, string> = { seccion: 'Secciones', host: 'Hosts', campana: 'Campañas', tecnica: 'Técnicas ATT&CK' }
-const ORDEN_TIPO: TipoComando[] = ['seccion', 'host', 'campana', 'tecnica']
+export const TITULO_TIPO: Record<TipoComando, string> = { accion: 'Acciones', seccion: 'Secciones', host: 'Hosts', campana: 'Campañas', tecnica: 'Técnicas ATT&CK' }
+const ORDEN_TIPO: TipoComando[] = ['accion', 'seccion', 'host', 'campana', 'tecnica']
+
+/** Acciones del shell: abrir el Copiloto e iniciar la presentación. */
+export const ACCIONES: readonly Comando[] = [
+  { id: 'accion:copiloto', tipo: 'accion', titulo: 'Preguntar al Copiloto…', detalle: 'Abre el panel del Copiloto (Ctrl + I)', a: '#copiloto', claves: 'chat asistente pregunta' },
+  { id: 'accion:presentacion', tipo: 'accion', titulo: 'Iniciar presentación', detalle: 'Recorrido guiado de 8 pasos por el TFG (← → y Esc)', a: '#presentacion', claves: 'demo tutora tour guiado modo' },
+]
 
 const HOSTS: readonly { host: string; papel: string }[] = [
   { host: 'SCRANTON', papel: 'Víctima inicial' },
@@ -32,6 +39,7 @@ const HOSTS: readonly { host: string; papel: string }[] = [
 
 export function comandosBase(): Comando[] {
   return [
+    ...ACCIONES,
     ...TODAS_LAS_SECCIONES.map((s) => ({ id: `seccion:${s.ruta}`, tipo: 'seccion' as const, titulo: s.titulo, detalle: s.descripcion, a: s.ruta })),
     ...HOSTS.map((h) => ({ id: `host:${h.host}`, tipo: 'host' as const, titulo: h.host, detalle: `${h.papel} · en el grafo de ataque`, a: `/ataque?sel=host-${h.host.toLowerCase()}` })),
   ]
@@ -67,7 +75,7 @@ const normalizar = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, 
 /** Sin consulta: secciones y hosts. Con consulta: todo lo que contiene todas las palabras, agrupado por tipo. */
 export function buscarComandos(comandos: readonly Comando[], consulta: string, limite = 40): Comando[] {
   const palabras = normalizar(consulta).split(/\s+/).filter(Boolean)
-  if (palabras.length === 0) return comandos.filter((c) => c.tipo === 'seccion' || c.tipo === 'host').slice(0, limite)
+  if (palabras.length === 0) return comandos.filter((c) => c.tipo === 'accion' || c.tipo === 'seccion' || c.tipo === 'host').slice(0, limite)
   const puntuados = comandos.flatMap((c, orden) => {
     const titulo = normalizar(c.titulo)
     const todo = `${titulo} ${normalizar(c.detalle ?? '')} ${normalizar(c.claves ?? '')}`

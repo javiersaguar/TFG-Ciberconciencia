@@ -182,3 +182,24 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   primera mención («detector P1» en vez de «oráculo» en el texto visible).
 - **Densidad de Observabilidad**: `compactar.ts` baja las filas de un número sin romper la disposición de Grafana; no se
   dibujan umbrales que el cuadro de Grafana no tenga.
+
+## 14. Convenciones de la ronda 3 (21-10-2026)
+
+- **Copiloto en panel lateral** (`src/copiloto/`): estado compartido en `ProveedorEstadoCopiloto`, panel en diferido.
+  Empuja el contenido **solo si le deja ≥ 1.000 px** (`empujaContenido`); si no, se superpone. No vuelvas a decidirlo por
+  el ancho de la ventana: con la barra lateral abierta el contenido se queda estrecho y las tablas se cortan.
+- **Señales débiles** (`copiloto/senales.ts`): funciones puras con `UMBRALES` declarados; avisan («Conviene vigilar»),
+  nunca alertan ni cambian severidades; cada una con sus citas y descartable. Un patrón que no salga de los datos no se
+  enseña.
+- **«Preguntar al Copiloto sobre esto»** (`BotonPreguntar`): abre el panel con la pregunta precargada y lo elegido como
+  contexto; no envía la pregunta.
+- **Agregados en la sincronización**: lo que la portada resume de un fichero grande se calcula en
+  `scripts/sincronizar-datos.mjs` (con su huella de origen en `procedencia.json → derivados`), no en el navegador.
+- **Modo presentación** (`componentes/presentacion/`): guion puro en `guion.ts`, sin cifras escritas a mano (lo
+  comprueba el test); `?presentacion=n` en la URL; ← → y Esc con captura y sin interferir con campos de texto ni
+  diálogos; resalta con la clase `presentacion-foco` usando selectores accesibles (aria-label) en vez de añadir ids.
+- **Barra superior**: consultas de contenedor (`@container/barra`) para adaptarse al ancho real, no al de la ventana.
+- **Pruebas de diseño**: además de las funcionales, hay e2e que fallan si una tabla desborda, si el eje se pisa, si un
+  nodo queda fuera del lienzo o si el Copiloto estrecha el contenido. Añade una de este tipo con cada fallo visual.
+- **Idea pendiente: mapa mundial de alertas.** Ver `frontend/docs/plan-mejora.md` §8: con el corpus actual sería
+  ilustrativo (solo IP privadas); necesita IP públicas, GeoIP local en el servidor y el WebSocket de F6.3.

@@ -11,7 +11,12 @@ describe('explorador del grafo de ataque', () => {
     const menu = await screen.findByRole('navigation', { name: 'Secciones del portal' })
     await usuario.click(within(menu).getByRole('link', { name: /Grafo de ataque/ }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Grafo de ataque · APT29 day1' })).toBeInTheDocument()
-    expect(screen.getAllByText('Telemetría directa: aristas de Sysmon EID 3 y alertas Sigma.').length).toBeGreaterThan(0)
+    // la leyenda va en una línea; lo que significa cada trazo, plegado hasta que se pide
+    const leyenda = screen.getByRole('region', { name: 'Leyenda: fundamento de cada relación' })
+    const desplegar = within(leyenda).getByRole('button', { name: 'Qué significa cada trazo' })
+    expect(desplegar).toHaveAttribute('aria-expanded', 'false')
+    await usuario.click(desplegar)
+    expect(within(leyenda).getByText('Telemetría directa: aristas de Sysmon EID 3 y alertas Sigma.')).toBeInTheDocument()
   })
 
   it('al elegir una relación en la lista enseña su detalle, su fundamento y su procedencia', async () => {

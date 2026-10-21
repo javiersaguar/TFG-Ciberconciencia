@@ -19,7 +19,7 @@ mismo redibujado de los cuadros de Grafana. Las convenciones para trabajar en é
 | | Línea temporal | `/cronologia?sel=<id>&desde=HH:MM&hasta=HH:MM` | Las 741 alertas de day1 en carriles por host, coloreadas por nivel, con las campañas como bandas y P2 como conectores; selector de rango arrastrando (y atajos accesibles), lista compacta sincronizada y detalle con «Ver en el grafo» |
 | | Matriz ATT&CK | `/attack?tecnica=<ID>` | Una columna por táctica (orden del catálogo v19), subtécnicas plegables, tres capas fechadas (potencial; observada en F2, 28-07, 34; observada hoy, 21-10, 47), punto de «observada» y tooltip con nombre, reglas, alertas y datasets |
 | Respuesta | Asistente de respuesta | `/respuesta?caso=<id>` | Para cada campaña real o caso de la demo: situación, HECHOS OBSERVADOS, INFERENCIAS DEL SISTEMA y RECOMENDACIONES (técnica ATT&CK → acción NIST SP 800-61 y D3FEND, con porqué y coste), con la procedencia por bloque. No ejecuta nada: copiar el plan como texto o, en la demo, ver su efecto en la simulación |
-| | Copiloto | `/copiloto?org=<id>` | Preguntas sobre la evidencia de una organización; respuesta por partes (streaming), una cita en cada afirmación, sin acciones (las mitigaciones remiten a `/respuesta`). Proveedor local hoy; LLM con RAG declarado, en el servidor (`docs/copiloto-rag.md`) |
+| | Copiloto | panel lateral · `/copiloto?org=<id>` | **Panel lateral derecho** que se abre desde la barra superior, con **Ctrl/Cmd + I** o desde Ctrl+K, y desde «Preguntar al Copiloto sobre esto» en incidentes, grafo y línea temporal (con lo elegido como contexto). Preguntas sobre la evidencia de una organización, respuesta por partes con una cita en cada afirmación, sin acciones (las mitigaciones remiten a `/respuesta`); lee en vivo las simulaciones de la demo y avisa de **señales débiles** («Conviene vigilar», ver abajo). `/copiloto` es su vista a pantalla completa y ya no está en la barra lateral. Proveedor local hoy; LLM con RAG declarado, en el servidor (`docs/copiloto-rag.md`) |
 | Plataforma | Evaluación | `/evaluacion` | Solo lo medido; lo de la fase F7, pendiente y sin números |
 | | Grafo del pipeline | `/grafo` | Las 14 piezas del pipeline; el fondo solo se mueve durante el replay |
 | | Observabilidad | `/observabilidad?cuadro=<uid>` | Los cuatro cuadros de Grafana, más densos: filas de un número compactadas sin romper la disposición, chip de procedencia sin recortes |
@@ -112,6 +112,37 @@ sistema para IDs, hashes, rutas y procesos, y `prefers-reduced-motion` respetado
   y volver siguen ahí.
 - **Menos texto**: cada página abre con una frase; el resto está en «Cómo leer esta página». La jerga interna se explica
   en su primera mención (F2, F6, F7, CEP, RAG) y la procedencia se marca por bloque o por panel.
+- **Copiloto en panel lateral**: empuja el contenido **solo si le deja al menos 1.000 px** (`empujaContenido`, en
+  `copiloto/estado.ts`); si no, se superpone con sombra. Con la regla anterior (empujar a partir de 1.280 px de
+  ventana) el contenido se quedaba en unos 800 px a 1440 px y las tablas se cortaban. La barra superior se adapta a su
+  propio ancho (consultas de contenedor): por debajo de 48 rem esconde el dataset y el atajo.
+
+### Señales débiles del Copiloto («Conviene vigilar»)
+
+Funciones puras en `copiloto/senales.ts`, con sus umbrales en `UMBRALES` (y repetidos en cada aviso). Un aviso **no es
+una alerta** ni cambia la severidad de nada: se puede descartar (por organización, en `sessionStorage`).
+
+| Detector | Umbral | Caso real que encuentra |
+|---|---|---|
+| Impacto previo al salto | ≥ 2 alertas de `impact` en un host, ≥ 5 min antes del primer salto lateral hacia él | NASHUA: alertas de impact desde las 02:59:37, casi 10 min antes de la conexión desde SCRANTON |
+| Alertas sin técnica | ≥ 20 alertas sin técnica ATT&CK en un host en 5 min | SCRANTON: la ráfaga del «Dropper Via PowerShell», invisible para P1 y P2 |
+| P1 a medias | campaña P1 con ≤ 1 etapa de refuerzo además del ancla | SCRANTON 03:10 (confianza 0,65) |
+| Pasos sin patrón (demo) | ≥ 2 pasos en un activo sin ningún patrón que los confirme | Según el instante de la simulación |
+
+## Modo presentación
+
+Recorrido guiado de 8 pasos para contar el TFG con el propio portal (ROADMAP F8.4, «modo demo»): el problema (portada) →
+el ataque en el tiempo → el grafo y «Reproducir ataque» → de alertas a incidentes → el asistente de respuesta → el
+Copiloto con sus avisos → lo medido y lo que falta → la demo de conciencia situacional.
+
+- Se inicia desde **Ctrl/Cmd + K → «Iniciar presentación»** o con **`?presentacion=1`** en la URL (el número es el paso).
+- **← y →** cambian de paso (también los botones y los puntos), **Esc** sale. No interfiere con lo que se escribe ni con
+  un diálogo abierto, y no bloquea la página: se puede pulsar «Reproducir ataque» durante el paso del grafo.
+- Resalta el elemento del paso y lo trae a la vista; si la tarjeta lo taparía, la tarjeta sube arriba. En el paso del
+  Copiloto abre el panel con una pregunta precargada (sin enviarla) y lo cierra al salir de ese paso.
+- **Ninguna cifra del guion está escrita a mano** (`componentes/presentacion/guion.ts`): salen de `corpus.ts` y de los
+  resultados de ML-1, y `presentacion.test.tsx` falla si aparece un número que no se pueda reconstruir desde ahí.
+- Solo se descarga cuando la URL lo pide.
 
 ## Movimiento
 
@@ -141,8 +172,8 @@ reales (`build_alert()`, `p1_05_emision.sql` y la vista de P2), y ninguna págin
 resultados de ML-1 (`ml/anomaly/resultados.json`), sin tocar los originales, y anota en `procedencia.json` la ruta de
 origen, el SHA-256, el tamaño y la fecha. Un test comprueba que cada copia coincide con su huella.
 
-Lo que **no** se enseña porque no está medido: precisión, exhaustividad, F1, falsos positivos y latencia (F3.4/F7), la
-prioridad de incidentes reales (Pilar C) y la confianza de las campañas P1 de apt29. Y la reducción 0,991 de P1 va
+Lo que **no** se enseña porque no está medido: precisión, exhaustividad, F1, falsos positivos y latencia (F3.4/F7) y la
+prioridad de incidentes reales (Pilar C). Y la reducción 0,991 de P1 va
 siempre con su advertencia: **no es comparable** con la línea base 741 → 87 (88,3 %).
 
 ### Datos exportados de ClickHouse (21-10-2026)
@@ -152,6 +183,9 @@ campañas P1 y la P2 de los detectores en lote (con host, ventana y confianza de
 corpus actual y el catálogo de ATT&CK v19. Su `README.md` explica cada fichero y **las consultas para regenerarlos**.
 `npm run sincronizar-datos` los copia a `src/api/datos/` (los `.jsonl`, validados línea a línea; huella SHA-256 y filas
 en `procedencia.json`, comprobadas por un test) y `src/api/exportaciones.ts` los carga bajo demanda, cada uno en su chunk.
+Además **deriva** de las 741 alertas los tres agregados de la portada (`actividad-por-minuto.json`, `severidad.json` y
+`tacticas-por-host.json`, anotados en `procedencia.json → derivados` con la huella de su origen), así que la portada ya
+no descarga las alertas: un test comprueba que dan los mismos números que el cálculo en el navegador.
 
 Consecuencias ya reflejadas: T1685 verificado (*Disable or Modify Tools*); confianza de las campañas P1 de apt29
 (0,85 · 0,80 · 0,65); y técnicas observadas **47 en el corpus actual (21-10) frente a 34 en la capa de F2 (28-07)**, cada
@@ -229,8 +263,15 @@ frontend/
   alertas una a una exportadas de esos datasets).
 - Ninguna serie de los cuadros de Grafana define umbrales: el soporte de bandas existe, pero no se dibuja ninguna (no se
   inventan). Solo hay un panel de un número ilustrativo y su valor es constante, así que no lleva minigráfica.
-- La portada descarga el chunk de las 741 alertas (302 kB, 44,6 kB con gzip); con la API, la agregación por minuto la hará
-  ClickHouse y bajará a unos cientos de bytes.
+- Portada: **462 kB de JS** sin comprimir (era 816 kB en la ronda 2) porque los agregados se calculan al sincronizar; con
+  la API, la agregación la hará ClickHouse.
+- Grafo de ataque: con todo el día a la vista el texto queda pequeño (el eje cubre 28 min); «Reproducir ataque» y el zoom
+  acercan cada paso. Se compactó la escala de tiempo (34 px por minuto, antes 46).
+- **Idea anotada para F8 (21-10-2026): mapa mundial en tiempo real del origen y el destino de las alertas.** Con el
+  corpus actual no hay qué geolocalizar: todas las direcciones son privadas de laboratorio (10.0.x.x, y el atacante
+  en 192.168.0.4), así que un mapa con estos datos sería **ilustrativo**. Para que sea real hace falta telemetría con IP
+  públicas (o los IOC de la CTI de F4) y una base GeoIP local (p. ej. GeoLite2, sin llamadas a terceros desde el
+  navegador), además del WebSocket de alertas de F6.3. Si se adelanta como demo, va marcado como ilustrativo.
 - F8.0: nombre y marca definitivos (el logotipo y «Ciberconciencia» son provisionales).
 - `npm audit`: 11 avisos en dependencias que ya estaban (cadena de `shadcn` y `vite`); esta ronda no añade dependencias.
 

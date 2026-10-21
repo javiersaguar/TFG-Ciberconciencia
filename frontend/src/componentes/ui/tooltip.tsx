@@ -15,10 +15,16 @@ function TooltipProvider({
   )
 }
 
+// Cada tooltip trae su proveedor (como en shadcn/ui actual): no hace falta uno global en App.tsx, así Radix solo se
+// descarga en las páginas que lo usan.
 function Tooltip({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+  return (
+    <TooltipProvider>
+      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+    </TooltipProvider>
+  )
 }
 
 function TooltipTrigger({

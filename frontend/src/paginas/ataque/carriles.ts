@@ -13,7 +13,7 @@ export const CARRILES = ['SCRANTON', 'NASHUA', 'NEWYORK', 'UTICA'] as const
 export const MEDIDAS = {
   /** Columna de la izquierda con el nombre, la IP y el papel del host. */
   etiqueta: 172,
-  pxPorMinuto: 46,
+  pxPorMinuto: 34,
   tarjeta: { ancho: 158, alto: 64 },
   banda: { alto: 30, minimo: 128 },
   /** Separación vertical entre filas y horizontal mínima dentro de una fila. */

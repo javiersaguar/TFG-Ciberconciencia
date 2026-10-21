@@ -106,10 +106,15 @@ function NodoTarjetaBase({ data, type }: NodeProps<NodoFlujo>) {
   if (type === 'campana') {
     // Banda de campaña: ocupa su ventana en el eje de tiempo.
     return (
-      <div style={{ width: data.ancho ?? MEDIDAS.banda.minimo, height: MEDIDAS.banda.alto, borderColor: estilo.color }} className={cn(marco, 'flex items-center gap-1.5 rounded-lg border-2 border-dashed px-2')}>
+      <div
+        style={{ width: data.ancho ?? MEDIDAS.banda.minimo, height: MEDIDAS.banda.alto, borderColor: estilo.color }}
+        title={nodo.subtitulo ? `${nodo.etiqueta} · ${nodo.subtitulo}` : nodo.etiqueta}
+        className={cn(marco, 'flex items-center gap-1.5 rounded-lg border-2 border-dashed px-2')}
+      >
         <Icono className={cn('size-3.5 shrink-0', estilo.claseTexto)} aria-hidden />
-        <span className="truncate text-[12px] font-semibold text-texto" title={nodo.etiqueta}>{nodo.etiqueta}</span>
-        {detallado && nodo.subtitulo && <span className="truncate font-mono text-[11px] text-texto-suave">{nodo.subtitulo}</span>}
+        {/* el nombre de la campaña no cede: solo se recorta si ni él cabe en la banda (y entonces queda el tooltip) */}
+        <span className="max-w-full shrink-0 truncate text-[12px] font-semibold whitespace-nowrap text-texto">{nodo.etiqueta}</span>
+        {detallado && nodo.subtitulo && <span className="min-w-0 truncate font-mono text-[11px] text-texto-suave">{nodo.subtitulo}</span>}
         {data.pulso && <span className="pulso-nodo" aria-hidden />}
         <AsasTarjeta />
       </div>

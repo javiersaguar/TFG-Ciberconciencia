@@ -710,6 +710,9 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
 - [ ] **F8.3 Completo:** Explorador del grafo · Matriz ATT&CK · Inventario de activos ·
   Panel CTI · Informes PDF · Ajustes (¡tocar los pesos y ver cambiar el ranking!) ·
   Alertas en vivo por WebSocket.
+  ➕ *Idea anotada el 21-10-2026:* **mapa mundial en tiempo real** del origen y el destino de las alertas. Requiere IP
+  públicas (el corpus actual solo tiene direcciones privadas de laboratorio), GeoIP local en el servidor y el WebSocket
+  de F6.3; sin eso, solo ilustrativo. Detalle en `frontend/docs/plan-mejora.md` §8.
 - [ ] **F8.4** Estados de carga y vacíos · responsive · accesibilidad básica ·
   **modo demo** (un botón lanza el replay) · Dockerizar · **grabar vídeo de 3–5 min**.
 

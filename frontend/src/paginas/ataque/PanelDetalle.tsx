@@ -11,6 +11,7 @@ import { Link } from 'react-router'
 import type { AristaAtaque, GrafoAtaque, NodoAtaque } from '@/api/ataque'
 import { ChipProcedencia } from '@/componentes/datos/Chips'
 import { cn } from '@/lib/utils'
+import { BotonPreguntar } from '@/copiloto/BotonPreguntar'
 
 import { ESTILO_FUNDAMENTO } from './estilo'
 import { DESCRIPCION_FUNDAMENTO, ETIQUETA_FUNDAMENTO, ETIQUETA_RELACION, esArista } from './logica'
@@ -111,8 +112,8 @@ export function PanelDetalle({ grafo, elemento }: { grafo: GrafoAtaque; elemento
         </p>
       ))}
 
-      {(detalle.incidente || detalle.cronologia) && (
-        <nav aria-label="Ir a" className="flex flex-wrap gap-2 border-t border-borde pt-2 text-xs">
+      <nav aria-label="Ir a" className="flex flex-wrap gap-2 border-t border-borde pt-2 text-xs">
+          <BotonPreguntar {...preguntaSobre(elemento, arista)} />
           {detalle.incidente && (
             <Link to={`/incidentes?id=${encodeURIComponent(detalle.incidente)}`} className="inline-flex items-center gap-1 font-medium text-acento hover:underline">
               Ver incidente <ArrowRight className="size-3" aria-hidden />
@@ -123,8 +124,17 @@ export function PanelDetalle({ grafo, elemento }: { grafo: GrafoAtaque; elemento
               Ver en la línea temporal <ArrowRight className="size-3" aria-hidden />
             </Link>
           )}
-        </nav>
-      )}
+      </nav>
     </section>
   )
+}
+
+/** La pregunta que tiene sentido para cada elemento del grafo (siempre una que el Copiloto sabe responder). */
+function preguntaSobre(elemento: NodoAtaque | AristaAtaque, arista: boolean) {
+  const seleccion = { tipo: 'nodo' as const, id: elemento.id, etiqueta: elemento.etiqueta }
+  if (arista) return { pregunta: '¿Hubo movimiento lateral?', seleccion }
+  const nodo = elemento as NodoAtaque
+  if (nodo.tipo === 'campana' && nodo.detalle.incidente) return { pregunta: 'Explícame esta campaña', seleccion: { tipo: 'incidente' as const, id: nodo.detalle.incidente, etiqueta: nodo.etiqueta } }
+  const host = nodo.hosts[0]
+  return { pregunta: host ? `¿Qué pasó en ${host}?` : '¿Qué está pasando?', seleccion }
 }

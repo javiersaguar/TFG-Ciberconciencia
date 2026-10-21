@@ -99,7 +99,7 @@ export function BarraLateral({ abierta, alAlternar }: { abierta: boolean; alAlte
             <div key={grupo}>
               <p className={ROTULO}>{TITULO_GRUPO[grupo]}</p>
               <ul className="space-y-0.5">
-                {SECCIONES.filter((s) => s.grupo === grupo).map((seccion) => (
+                {SECCIONES.filter((s) => s.grupo === grupo && !s.oculta).map((seccion) => (
                   <li key={seccion.ruta}>
                     <Enlace seccion={seccion} />
                   </li>

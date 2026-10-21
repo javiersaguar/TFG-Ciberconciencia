@@ -1,11 +1,10 @@
 /**
- * Raíz de la aplicación: proveedores (TanStack Query, tooltips) y el enrutador.
+ * Raíz de la aplicación: el proveedor de TanStack Query y el enrutador. (Cada tooltip de Radix trae su proveedor.)
  */
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { RouterProvider } from 'react-router'
 
-import { TooltipProvider } from '@/componentes/ui/tooltip'
 import { crearClienteConsultas } from '@/lib/consultas'
 import { crearEnrutador } from '@/rutas'
 
@@ -14,9 +13,7 @@ export default function App() {
   const [enrutador] = useState(crearEnrutador)
   return (
     <QueryClientProvider client={cliente}>
-      <TooltipProvider>
-        <RouterProvider router={enrutador} />
-      </TooltipProvider>
+      <RouterProvider router={enrutador} />
     </QueryClientProvider>
   )
 }

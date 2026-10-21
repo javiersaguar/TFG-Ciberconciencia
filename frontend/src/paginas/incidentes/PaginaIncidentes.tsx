@@ -17,6 +17,7 @@ import { esListaDeTextos, esObjeto, useEstadoSesion } from '@/componentes/datos/
 import { EncabezadoPagina, EstadoError } from '@/componentes/shell'
 import { Skeleton } from '@/componentes/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { BotonPreguntar } from '@/copiloto/BotonPreguntar'
 
 import { CRITERIOS_INICIALES, filtrarIncidentes, grupoDe, leerIncidente, ORDEN_INICIAL, ordenarIncidentes, type CampoOrden, type CriteriosIncidentes, type GrupoDataset, type Orden } from './logica'
 
@@ -43,7 +44,7 @@ function Cabecera({ campo, titulo, orden, alOrdenar, derecha }: { campo: CampoOr
   const activo = orden.campo === campo
   const Icono = !activo ? ArrowUpDown : orden.sentido === 'asc' ? ArrowUp : ArrowDown
   return (
-    <th scope="col" aria-sort={activo ? (orden.sentido === 'asc' ? 'ascending' : 'descending') : 'none'} className={cn('px-2.5 py-2 font-semibold', derecha ? 'text-right' : 'text-left')}>
+    <th scope="col" aria-sort={activo ? (orden.sentido === 'asc' ? 'ascending' : 'descending') : 'none'} className={cn('px-2 py-2 font-semibold', derecha ? 'text-right' : 'text-left')}>
       <button type="button" onClick={() => alOrdenar(campo)} className="inline-flex items-center gap-1 hover:text-texto">
         {titulo}
         <Icono className="size-3" aria-hidden />
@@ -118,6 +119,7 @@ function Detalle({ incidente }: { incidente: Incidente | undefined }) {
         {i.nodoGrafo && <Link to={`/ataque?sel=${encodeURIComponent(i.nodoGrafo)}`} className="inline-flex items-center gap-1 font-medium text-acento hover:underline">Grafo de ataque <ArrowRight className="size-3" aria-hidden /></Link>}
         {i.eventoCronologia && <Link to={`/cronologia?sel=${encodeURIComponent(i.eventoCronologia)}`} className="inline-flex items-center gap-1 font-medium text-acento hover:underline">Línea temporal <ArrowRight className="size-3" aria-hidden /></Link>}
         <Link to={`/respuesta?caso=${encodeURIComponent(i.id)}`} className="inline-flex items-center gap-1 font-medium text-acento hover:underline">Asistente de respuesta <ArrowRight className="size-3" aria-hidden /></Link>
+        {i.dataset === 'SDWIN-200501225525' && <BotonPreguntar pregunta="Explícame esta campaña" seleccion={{ tipo: 'incidente', id: i.id, etiqueta: `${i.patron} · ${i.hosts.join(' → ')}` }} />}
       </nav>
     </section>
   )
@@ -156,8 +158,8 @@ export default function PaginaIncidentes() {
       ) : !consulta.data ? (
         <div role="status" aria-label="Cargando los incidentes"><Skeleton className="h-96 rounded-2xl" /></div>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_25rem]">
-          <section aria-label="Lista de incidentes" className="min-w-0 rounded-2xl border border-borde bg-superficie p-4">
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_25rem]">
+          <section aria-label="Lista de incidentes" className="min-w-0 rounded-2xl border border-borde bg-superficie p-3">
             <div role="search" className="mb-3 flex flex-wrap items-center gap-3">
               <label className="relative flex min-w-48 flex-1 items-center">
                 <span className="sr-only">Buscar incidentes</span>
@@ -189,12 +191,12 @@ export default function PaginaIncidentes() {
               </label>
               <p role="status" className="text-xs text-texto-suave">{lista.length} de {consulta.data.length}</p>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-borde/70">
+            <div data-contenedor-tabla className="overflow-x-auto rounded-lg border border-borde/70">
               <table className="w-full border-collapse text-xs">
                 <thead className="bg-superficie-alterna text-texto-suave">
                   <tr>
                     <Cabecera campo="patron" titulo="Patrón" orden={orden} alOrdenar={ordenar} />
-                    <th scope="col" className="px-2.5 py-2 text-left font-semibold">Hosts</th>
+                    <th scope="col" className="px-2 py-2 text-left font-semibold">Hosts</th>
                     <Cabecera campo="inicio" titulo="Ventana (UTC)" orden={orden} alOrdenar={ordenar} />
                     <Cabecera campo="alertas" titulo="Alertas" orden={orden} alOrdenar={ordenar} derecha />
                     <Cabecera campo="confianza" titulo="Confianza" orden={orden} alOrdenar={ordenar} derecha />
@@ -223,21 +225,24 @@ export default function PaginaIncidentes() {
                       </tr>
                       {visible && filas.map((i) => (
                         <tr key={i.id} aria-selected={i.id === elegido?.id} className={cn('border-t border-borde/60', i.id === elegido?.id ? 'bg-acento-suave/60' : 'hover:bg-superficie-alterna/60')}>
-                          <td className="px-2.5 py-1.5 whitespace-nowrap">
-                            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', PATRON[i.patron].clase)}>{PATRON[i.patron].texto}</span>
+                          <td className="px-2 py-1.5 whitespace-nowrap">
+                            <span title={PATRON[i.patron].texto} className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', PATRON[i.patron].clase)}>
+                              {i.patron}
+                              <span className="sr-only"> · {PATRON[i.patron].texto.split(' · ')[1]}</span>
+                            </span>
                           </td>
-                          <td className="px-2.5 py-1.5">
+                          <td className="px-2 py-1.5">
                             <button type="button" onClick={() => elegir(i.id)} className="text-left font-medium text-texto hover:text-acento hover:underline" aria-label={`Ver el incidente ${i.patron} de ${i.hosts.join(' → ') || i.dataset}`}>
                               {i.hosts.join(' → ') || '—'}
                             </button>
-                            {g.id !== 'apt29' && <span className="block max-w-[16rem] truncate text-[11px] text-texto-suave" title={i.descripcionDataset}>{i.descripcionDataset}</span>}
+                            {g.id !== 'apt29' && <span className="block max-w-[13rem] truncate text-[11px] text-texto-suave" title={i.descripcionDataset}>{i.descripcionDataset}</span>}
                           </td>
-                          <td className="px-2.5 py-1.5 font-mono whitespace-nowrap text-texto tabular-nums">
-                            {g.id !== 'apt29' && i.fecha && <span className="mr-1 text-texto-suave">{i.fecha}</span>}
-                            {ventana(i)}
+                          <td className="px-2 py-1.5 font-mono text-[11px] text-texto tabular-nums">
+                            {g.id !== 'apt29' && i.fecha && <span className="block text-[10.5px] text-texto-suave">{i.fecha}</span>}
+                            <span className="whitespace-nowrap">{ventana(i)}</span>
                           </td>
-                          <td className="px-2.5 py-1.5 text-right text-texto tabular-nums">{formatearEntero(i.alertas)}</td>
-                          <td className="px-2.5 py-1.5 text-right text-texto tabular-nums">{confianza(i.confianza)}</td>
+                          <td className="px-2 py-1.5 text-right text-texto tabular-nums">{formatearEntero(i.alertas)}</td>
+                          <td className="px-2 py-1.5 text-right text-texto tabular-nums">{confianza(i.confianza)}</td>
                         </tr>
                       ))}
                     </tbody>

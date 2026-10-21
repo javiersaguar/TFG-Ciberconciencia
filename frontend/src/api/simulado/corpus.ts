@@ -109,6 +109,10 @@ export const DAY1 = {
   tiempoUtcTimePct: 73.4,
   tiempoEventTimePct: 26.6,
   conexionesSysmon3: 1_229,
+  /** Campaña completa en SCRANTON y NASHUA: 02:56:14 † → 03:22:41,798 (escenario §4, 15-09; comprobado con la exportación del 21-10). */
+  duracionS: 1_587,
+  /** La regla que más dispara: una sola acción del atacante, un fichero por alerta (BITÁCORA 27-07; 292 en la exportación del 21-10). */
+  reglaDominante: { titulo: 'Potential Binary Or Script Dropper Via PowerShell', alertas: 292 },
 } as const
 
 /** Tipos de evento que caen a `dlq.normalize` (11-09): la lista de trabajo para ampliar el normalizador. */

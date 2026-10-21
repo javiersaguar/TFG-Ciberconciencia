@@ -7,7 +7,7 @@ import { FlaskConical, NotebookText } from 'lucide-react'
 
 import type { Procedencia } from '@/api/observabilidad'
 import type { NivelRegla } from '@/api/tipos'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/componentes/ui/tooltip'
+import { Ayuda } from './Ayuda'
 import { cn } from '@/lib/utils'
 
 export function ChipProcedencia({ procedencia, fuente, className }: { procedencia: Procedencia; fuente?: string; className?: string }) {
@@ -28,10 +28,7 @@ export function ChipProcedencia({ procedencia, fuente, className }: { procedenci
   )
   if (!fuente) return chip
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{chip}</TooltipTrigger>
-      <TooltipContent className="max-w-xs">{documentada ? `Documentado en: ${fuente}` : fuente}</TooltipContent>
-    </Tooltip>
+    <Ayuda texto={documentada ? `Documentado en: ${fuente}` : fuente}>{chip}</Ayuda>
   )
 }
 

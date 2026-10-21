@@ -18,7 +18,7 @@ import {
   verificarFragmento,
   type ContextoCopiloto,
   type Fragmento,
-} from './copiloto'
+} from './nucleo'
 
 const [p1, p2, alertas, aristas] = await Promise.all([cargarCampanasP1(), cargarCampanaP2(), cargarAlertasDay1(), cargarAristasP2()])
 const dmevals = contextoDmevals(alertas, aristas, construirIncidentes(p1, p2))

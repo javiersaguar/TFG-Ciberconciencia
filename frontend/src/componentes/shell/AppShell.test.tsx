@@ -12,7 +12,9 @@ describe('shell y navegación', () => {
   it('la barra lateral enseña las secciones construidas, las futuras con su fase y el aviso de datos simulados', async () => {
     renderizarRutas('/')
     const nav = await screen.findByRole('navigation', { name: 'Secciones del portal' })
-    for (const seccion of SECCIONES) expect(within(nav).getByRole('link', { name: new RegExp(seccion.titulo) })).toBeInTheDocument()
+    for (const seccion of SECCIONES.filter((s) => !s.oculta)) expect(within(nav).getByRole('link', { name: new RegExp(seccion.titulo) })).toBeInTheDocument()
+    // el Copiloto no ocupa un sitio en la barra lateral: se abre desde su botón (y /copiloto es su vista ampliada)
+    expect(within(nav).queryByRole('link', { name: /Copiloto/ })).not.toBeInTheDocument()
     for (const seccion of SECCIONES_FUTURAS) {
       expect(within(nav).getByRole('link', { name: new RegExp(`${seccion.titulo}.*${seccion.fase}`) })).toBeInTheDocument()
     }

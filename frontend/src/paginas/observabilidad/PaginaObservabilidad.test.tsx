@@ -7,10 +7,11 @@ import { renderizarRutas } from '@/pruebas/utilidades'
 describe('Observabilidad', () => {
   it('abre el primer cuadro con sus filas y paneles, cada uno con su procedencia', async () => {
     renderizarRutas('/observabilidad')
-    const cuadro = await screen.findByRole('tabpanel', { name: 'Cuadro Salud del pipeline' })
+    const cuadro = await screen.findByRole('tabpanel', { name: 'Cuadro Salud del pipeline' }, { timeout: 4000 })
     expect(within(cuadro).getByRole('heading', { name: 'Bus de eventos (Redpanda)' })).toBeInTheDocument()
     const particiones = within(cuadro).getByRole('region', { name: 'Particiones' })
-    expect(within(particiones).getByText('17')).toBeInTheDocument()
+    // el número se anima hasta su valor: se espera al final (con la máquina cargada tarda más)
+    expect(await within(particiones).findByText('17', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(within(particiones).getByText('documentado')).toBeInTheDocument()
     expect(within(within(cuadro).getByRole('region', { name: 'Tráfico Kafka (bytes/s)' })).getByText('ilustrativo')).toBeInTheDocument()
   })
@@ -18,7 +19,7 @@ describe('Observabilidad', () => {
   it('cambia de cuadro con las pestañas y dibuja tablas, indicador y grafo', async () => {
     const usuario = userEvent.setup()
     renderizarRutas('/observabilidad')
-    await screen.findByRole('tabpanel', { name: 'Cuadro Salud del pipeline' })
+    await screen.findByRole('tabpanel', { name: 'Cuadro Salud del pipeline' }, { timeout: 4000 })
 
     await usuario.click(screen.getByRole('tab', { name: /Cobertura y calidad/ }))
     const calidad = await screen.findByRole('tabpanel', { name: 'Cuadro Cobertura y calidad' })
@@ -42,7 +43,7 @@ describe('Observabilidad', () => {
     expect(enrutador.state.location.search).toBe('?cuadro=tfg-data-quality')
 
     await enrutador.navigate('/observabilidad?cuadro=no-existe')
-    expect(await screen.findByRole('tabpanel', { name: 'Cuadro Salud del pipeline' })).toBeInTheDocument()
+    expect(await screen.findByRole('tabpanel', { name: 'Cuadro Salud del pipeline' }, { timeout: 4000 })).toBeInTheDocument()
   })
 
   it('ningún panel del cuadro de seguridad es ilustrativo', async () => {

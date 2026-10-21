@@ -35,7 +35,8 @@ const menu = (page: Page) => page.getByRole('navigation', { name: 'Secciones del
 test('navega por todas las secciones desde el menú, sin errores en consola', async ({ page }) => {
   const errores = vigilarErrores(page)
   await page.goto('/')
-  for (const p of PANTALLAS) {
+  // El Copiloto ya no está en la barra lateral (ronda 3): se abre desde la barra superior y /copiloto es su vista ampliada.
+  for (const p of PANTALLAS.filter((x) => x.ruta !== '/copiloto')) {
     await menu(page).getByRole('link', { name: new RegExp(`^${p.menu.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click()
     await expect(page.getByRole('heading', { level: 1, name: p.h1, exact: true })).toBeAttached()
   }
@@ -132,7 +133,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
   })
 }
 
-test('peso de la primera carga: la portada no descarga Recharts ni React Flow', async ({ page }, info) => {
+test('peso de la primera carga: la portada no descarga Recharts, React Flow ni las 741 alertas, y pesa menos de 500 kB', async ({ page }, info) => {
   test.skip(info.project.name !== '1280', 'basta con medirlo una vez')
   const scripts = new Map<string, number>()
   page.on('response', async (r) => {
@@ -144,6 +145,9 @@ test('peso de la primera carga: la portada no descarga Recharts ni React Flow', 
   const total = portada.reduce((s, [, b]) => s + b, 0)
   console.log(`JS de la portada: ${(total / 1000).toFixed(2)} kB en ${portada.length} ficheros (${portada.map(([r, b]) => `${r.split('/').pop()} ${(b / 1000).toFixed(1)}`).join(', ')})`)
   expect(portada.some(([ruta]) => /\/(graficos|flujo)-/.test(ruta))).toBe(false)
+  // ronda 3: los agregados se calculan al sincronizar; la portada ya no baja las 741 alertas y vuelve a < 500 kB
+  expect(portada.some(([ruta]) => /\/alertas-apt29-day1-/.test(ruta))).toBe(false)
+  expect(total).toBeLessThan(500_000)
 
   scripts.clear()
   await menu(page).getByRole('link', { name: /^Grafo de ataque/ }).click()
@@ -219,4 +223,96 @@ test('copiloto: responde con citas y remite las mitigaciones al asistente de res
   await page.getByRole('button', { name: 'Preguntar' }).click()
   await expect(page.getByRole('log', { name: 'Conversación' }).getByRole('link', { name: /Asistente de respuesta/ })).toHaveAttribute('href', /\/respuesta\?caso=/)
   expect(errores).toEqual([])
+})
+
+// --- Ronda 3, §1: pruebas que habrían detectado los fallos visuales del 21-10 ---
+
+test('ninguna tabla desborda su contenedor (incidentes con su panel, línea temporal, portada, asistente, evaluación, observabilidad)', async ({ page }) => {
+  for (const ruta of ['/incidentes?id=p2-scranton-nashua', '/incidentes?id=p1-lsass_campaign_02', '/cronologia?sel=al-0309-remota', '/', '/respuesta?caso=p2-scranton-nashua', '/evaluacion', '/observabilidad?cuadro=tfg-data-quality']) {
+    await page.goto(ruta)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page.locator('[role="status"][aria-label^="Cargando"]')).toHaveCount(0)
+    await page.waitForTimeout(500)
+    const desbordes = await page.evaluate(() =>
+      [...document.querySelectorAll('table')].flatMap((tabla) => {
+        const c = tabla.parentElement!
+        return c.scrollWidth > c.clientWidth + 1 ? [`${tabla.querySelector('th')?.textContent ?? 'tabla'}: ${c.scrollWidth} > ${c.clientWidth}`] : []
+      }),
+    )
+    expect(desbordes, ruta).toEqual([])
+  }
+})
+
+test('línea temporal: las etiquetas del eje no se pisan', async ({ page }) => {
+  for (const ruta of ['/cronologia', '/cronologia?desde=03:09&hasta=03:18', '/cronologia?desde=03:09&hasta=03:10']) {
+    await page.goto(ruta)
+    const etiquetas = page.locator('[data-etiqueta-eje]')
+    await expect(etiquetas.first()).toBeVisible()
+    const cajas = (await etiquetas.evaluateAll((ts) => ts.map((t) => t.getBoundingClientRect()).map((r) => ({ x: r.x, fin: r.right })))).sort((a, b) => a.x - b.x)
+    for (let i = 1; i < cajas.length; i++) expect(cajas[i].x, `${ruta}: etiqueta ${i}`).toBeGreaterThanOrEqual(cajas[i - 1].fin)
+  }
+})
+
+async function nodosDentroDelLienzo(page: Page) {
+  return page.evaluate(() => {
+    const lienzo = document.querySelector('.react-flow')!.getBoundingClientRect()
+    const controles = document.querySelector('.react-flow__controls')!.getBoundingClientRect()
+    const fallos: string[] = []
+    for (const n of document.querySelectorAll<HTMLElement>('.react-flow__node')) {
+      const r = n.getBoundingClientRect()
+      const id = n.dataset.id ?? '?'
+      if (r.left < lienzo.left - 1 || r.right > lienzo.right + 1 || r.top < lienzo.top - 1 || r.bottom > lienzo.bottom + 1) fallos.push(`${id} fuera del lienzo`)
+      const pisa = r.left < controles.right && r.right > controles.left && r.top < controles.bottom && r.bottom > controles.top
+      if (pisa && !n.classList.contains('react-flow__node-host')) fallos.push(`${id} bajo los controles`)
+    }
+    return fallos
+  })
+}
+
+test('grafo de ataque: al cargar y tras redimensionar, todo queda dentro del lienzo y nada bajo los controles', async ({ page }) => {
+  await page.goto('/ataque')
+  await expect(page.locator('.react-flow__node').first()).toBeVisible()
+  await page.waitForTimeout(700)
+  expect(await nodosDentroDelLienzo(page)).toEqual([])
+  // los nombres de los carriles se ven
+  for (const host of ['SCRANTON', 'NASHUA', 'NEWYORK', 'UTICA']) await expect(page.locator('.react-flow').getByText(host, { exact: true }).first()).toBeVisible()
+  const tamano = page.viewportSize()!
+  await page.setViewportSize({ width: tamano.width - 160, height: tamano.height - 80 })
+  await page.waitForTimeout(800)
+  expect(await nodosDentroDelLienzo(page)).toEqual([])
+  await page.setViewportSize(tamano)
+})
+
+// --- Ronda 3, §4: modo presentación, y el panel del Copiloto sin estrechar el contenido ---
+
+test('modo presentación: ocho pasos con ← →, el elemento del paso resaltado y Esc para salir', async ({ page }, info) => {
+  const errores = vigilarErrores(page)
+  await page.goto('/?presentacion=1')
+  const tarjeta = page.getByRole('region', { name: 'Presentación' })
+  const rutas = ['/', '/cronologia', '/ataque', '/incidentes', '/respuesta', '/incidentes', '/evaluacion', '/conciencia']
+  for (let n = 1; n <= 8; n++) {
+    await expect(tarjeta).toContainText(`paso ${n} de 8`)
+    await expect(page).toHaveURL(new RegExp(`${rutas[n - 1].replace('/', '\\/')}(\\?|$).*presentacion=${n}`))
+    await expect(page.locator('.presentacion-foco')).toHaveCount(1)
+    if (info.project.name === '1440') await page.screenshot({ path: `capturas/presentacion/paso-${n}.png` })
+    if (n === 6) await expect(page.getByRole('complementary', { name: 'Copiloto' })).toBeVisible()
+    if (n < 8) await page.keyboard.press('ArrowRight')
+  }
+  await page.keyboard.press('Escape')
+  await expect(tarjeta).toHaveCount(0)
+  await expect(page).toHaveURL(/\/conciencia\?org=helios&t=62$/)
+  expect(errores).toEqual([])
+})
+
+test('el Copiloto empuja el contenido solo si le deja al menos 1000 px; si no, se superpone y la tabla no se corta', async ({ page }, info) => {
+  await page.goto('/incidentes')
+  await expect(page.getByRole('heading', { name: 'Incidentes', level: 1 })).toBeVisible()
+  const anchoAntes = await page.locator('#contenido').evaluate((e) => e.getBoundingClientRect().width)
+  await page.keyboard.press('Control+i')
+  await expect(page.getByRole('complementary', { name: 'Copiloto' })).toBeVisible()
+  const anchoDespues = await page.locator('#contenido').evaluate((e) => e.getBoundingClientRect().width)
+  if (anchoDespues < anchoAntes) expect(anchoDespues).toBeGreaterThanOrEqual(1000 - 48) // empuja: queda sitio (menos el relleno de main)
+  else expect(info.project.name).not.toBe('1920') // a 1920 px siempre hay sitio para empujar
+  const desborda = await page.locator('#contenido [data-contenedor-tabla]').evaluateAll((els) => els.some((e) => e.scrollWidth > e.clientWidth + 1))
+  expect(desborda).toBe(false)
 })

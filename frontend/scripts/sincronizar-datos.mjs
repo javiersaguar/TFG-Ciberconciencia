@@ -13,6 +13,12 @@
  * SHA-256, tamaño, filas (en los `.jsonl`) y fecha de modificación del original. Un test comprueba que cada copia
  * coincide con su huella, así que una copia editada a mano o desfasada se detecta. Volver a ejecutarlo es seguro.
  *
+ * Además DERIVA de `alertas-apt29-day1.jsonl` los tres agregados que enseña la portada, para que no tenga que
+ * descargar y sumar las 741 alertas en el navegador: `actividad-por-minuto.json` (02:56–03:23, por nivel),
+ * `severidad.json` y `tacticas-por-host.json`. Repiten EXACTAMENTE la normalización de `src/api/exportaciones.ts` y
+ * los agregados de `src/api/simulado/actividad.ts` (un test compara los dos resultados). Su procedencia es la del
+ * original: `procedencia.json` los anota en `derivados`, con la huella del fichero del que salen.
+ *
  * Sin dependencias: solo módulos de Node.
  */
 import { createHash } from 'node:crypto'
@@ -79,3 +85,82 @@ const procedencia = {
 }
 writeFileSync(join(DESTINO, 'procedencia.json'), `${JSON.stringify(procedencia, null, 2)}\n`)
 console.log(`Procedencia en ${relative(FRONTEND, join(DESTINO, 'procedencia.json'))}`)
+
+// --- Agregados derivados para la portada -----------------------------------------------------------------------
+
+const NIVELES = ['informational', 'low', 'medium', 'high', 'critical']
+const HOSTS = ['SCRANTON', 'NASHUA', 'NEWYORK', 'UTICA']
+const textoDe = (v) => (typeof v === 'string' ? v : '')
+const textosDe = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [])
+const numeroDe = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null)
+const msDelDia = (fecha) => {
+  const [hms, milis = '0'] = fecha.slice(11).split('.')
+  const [h, m, s] = hms.split(':').map(Number)
+  return ((h * 60 + m) * 60 + s) * 1000 + Number(milis.padEnd(3, '0'))
+}
+/** La misma normalización que `normalizarAlerta` (solo los campos que usan los agregados). */
+function alertaDe(f) {
+  const fecha = textoDe(f.hora)
+  const origen = numeroDe(f.src_event_id)
+  const reconstruida = origen !== null && origen >= 1000
+  const nivel = textoDe(f.rule_level)
+  return {
+    ms: reconstruida ? Math.floor(msDelDia(fecha) / 1000) * 1000 : msDelDia(fecha),
+    nivel: NIVELES.includes(nivel) ? nivel : 'informational',
+    tacticas: textosDe(f.tactic_ids),
+    host: textoDe(f.device_hostname).split('.')[0].toUpperCase(),
+  }
+}
+const vacio = () => Object.fromEntries(NIVELES.map((n) => [n, 0]))
+const dos = (n) => String(n).padStart(2, '0')
+
+function alertasPorMinuto(alertas, desde = 2 * 60 + 56, hasta = 3 * 60 + 23) {
+  const minutos = Array.from({ length: hasta - desde + 1 }, (_, i) => ({ minuto: `${dos(Math.floor((desde + i) / 60))}:${dos((desde + i) % 60)}`, total: 0, porNivel: vacio() }))
+  for (const a of alertas) {
+    const m = minutos[Math.floor(a.ms / 60000) - desde]
+    if (!m) continue
+    m.total += 1
+    m.porNivel[a.nivel] += 1
+  }
+  return minutos
+}
+
+function repartoPorNivel(alertas) {
+  const cuenta = vacio()
+  for (const a of alertas) cuenta[a.nivel] += 1
+  return [...NIVELES].reverse().filter((n) => cuenta[n] > 0).map((nivel) => ({ nivel, alertas: cuenta[nivel] }))
+}
+
+function mapaTacticaHost(alertas) {
+  const porTactica = new Map()
+  const sinTactica = HOSTS.map(() => 0)
+  for (const a of alertas) {
+    const h = HOSTS.indexOf(a.host)
+    if (h < 0) continue
+    if (a.tacticas.length === 0) sinTactica[h] += 1
+    for (const t of a.tacticas) {
+      const fila = porTactica.get(t) ?? HOSTS.map(() => 0)
+      fila[h] += 1
+      porTactica.set(t, fila)
+    }
+  }
+  const suma = (fila) => fila.reduce((s, x) => s + x, 0)
+  const filas = [...porTactica.entries()].sort((a, b) => suma(b[1]) - suma(a[1]) || a[0].localeCompare(b[0]))
+  const celdas = filas.map(([, fila]) => fila)
+  return { tacticas: filas.map(([t]) => t), hosts: HOSTS, celdas, maximo: Math.max(0, ...celdas.flat(), ...sinTactica), sinTactica }
+}
+
+const fuenteAlertas = leidos.find((l) => l.copia === 'alertas-apt29-day1.jsonl')
+const alertas = fuenteAlertas.contenido.toString('utf8').split('\n').filter((l) => l.trim() !== '').map((l) => alertaDe(JSON.parse(l)))
+const derivados = [
+  ['actividad-por-minuto.json', alertasPorMinuto(alertas)],
+  ['severidad.json', repartoPorNivel(alertas)],
+  ['tacticas-por-host.json', mapaTacticaHost(alertas)],
+].map(([fichero, datos]) => {
+  const contenido = `${JSON.stringify(datos, null, 2)}\n`
+  writeFileSync(join(DESTINO, fichero), contenido)
+  console.log(`derivado de ${fuenteAlertas.origen} → ${relative(FRONTEND, join(DESTINO, fichero))}`)
+  return { fichero, derivadoDe: fuenteAlertas.origen, sha256Origen: huella(fuenteAlertas.contenido), sha256: huella(contenido), bytes: Buffer.byteLength(contenido) }
+})
+procedencia.derivados = derivados
+writeFileSync(join(DESTINO, 'procedencia.json'), `${JSON.stringify(procedencia, null, 2)}\n`)

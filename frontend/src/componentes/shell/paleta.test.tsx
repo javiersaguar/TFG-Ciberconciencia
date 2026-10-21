@@ -28,8 +28,10 @@ describe('índice de la paleta de comandos', () => {
     expect(buscarComandos(indice, 'zzzz')).toEqual([])
   })
 
-  it('sin consulta enseña secciones y hosts', () => {
-    expect(buscarComandos(indice, '').every((c) => c.tipo === 'seccion' || c.tipo === 'host')).toBe(true)
+  it('sin consulta enseña las acciones (Copiloto), las secciones y los hosts', () => {
+    const sin = buscarComandos(indice, '')
+    expect(sin[0]).toMatchObject({ tipo: 'accion', a: '#copiloto' })
+    expect(sin.every((c) => c.tipo === 'accion' || c.tipo === 'seccion' || c.tipo === 'host')).toBe(true)
   })
 })
 

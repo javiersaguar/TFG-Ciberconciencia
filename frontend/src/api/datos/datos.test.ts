@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 const DATOS = resolve(process.cwd(), 'src/api/datos')
 const procedencia = JSON.parse(readFileSync(resolve(DATOS, 'procedencia.json'), 'utf8')) as {
   ficheros: { copia: string; origen: string; sha256: string; bytes: number; filas?: number }[]
+  derivados: { fichero: string; derivadoDe: string; sha256Origen: string; sha256: string; bytes: number }[]
 }
 
 describe('datos sincronizados', () => {
@@ -41,5 +42,17 @@ describe('datos sincronizados', () => {
   it('las filas medidas cuadran con las cifras documentadas (741 alertas, 17 aristas, 11 + 1 campañas, 47 técnicas)', () => {
     const filas = Object.fromEntries(procedencia.ficheros.map((f) => [f.copia, f.filas]))
     expect(filas).toMatchObject({ 'alertas-apt29-day1.jsonl': 741, 'aristas-p2.jsonl': 17, 'p1-campanas.jsonl': 11, 'p2-campanas.jsonl': 1, 'tecnicas-observadas.jsonl': 47 })
+  })
+
+  it.each(procedencia.derivados.map((d) => [d.fichero, d] as const))('%s (derivado) coincide con su huella y con la del fichero del que sale', (_f, d) => {
+    expect(createHash('sha256').update(readFileSync(resolve(DATOS, d.fichero))).digest('hex')).toBe(d.sha256)
+    const origen = procedencia.ficheros.find((f) => f.origen === d.derivadoDe)
+    expect(origen, d.derivadoDe).toBeDefined()
+    expect(d.sha256Origen).toBe(origen!.sha256)
+  })
+
+  it('los tres agregados de la portada salen de las alertas de day1', () => {
+    expect(procedencia.derivados.map((d) => d.fichero).sort()).toEqual(['actividad-por-minuto.json', 'severidad.json', 'tacticas-por-host.json'])
+    for (const d of procedencia.derivados) expect(d.derivadoDe).toBe('eval/portal/alertas-apt29-day1.jsonl')
   })
 })

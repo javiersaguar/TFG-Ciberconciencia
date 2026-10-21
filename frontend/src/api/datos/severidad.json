@@ -1,0 +1,18 @@
+[
+  {
+    "nivel": "high",
+    "alertas": 263
+  },
+  {
+    "nivel": "medium",
+    "alertas": 413
+  },
+  {
+    "nivel": "low",
+    "alertas": 55
+  },
+  {
+    "nivel": "informational",
+    "alertas": 10
+  }
+]
