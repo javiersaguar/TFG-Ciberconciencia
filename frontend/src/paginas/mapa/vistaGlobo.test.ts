@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { aEsfera, type Vec3 } from '@/componentes/tierra/esfera'
 
-import { centroDePais, girarVista, LATITUD_MAXIMA, paisesPorCodigo, pintarPaises, quedaDetras } from './vistaGlobo'
+import { centroDePais, girarVista, LATITUD_MAXIMA, paisesPorCodigo, pintarPaises, trazaQueRecoloca } from './vistaGlobo'
 
 const latLon = (v: Vec3) => {
   const r = Math.hypot(...v)
@@ -72,10 +72,19 @@ describe('flechas del globo', () => {
   })
 })
 
-describe('qué queda detrás del globo', () => {
-  const camara = aEsfera(30, 0, 4.4)
-  it('no gira si lo elegido se ve y sí si algún extremo queda a espaldas', () => {
-    expect(quedaDetras(camara, [aEsfera(40, -4), aEsfera(50, 10)])).toBe(false)
-    expect(quedaDetras(camara, [aEsfera(40, -4), aEsfera(-34, 151)])).toBe(true)
+describe('con un país filtrado, qué traza recoloca el globo', () => {
+  const alertas = [
+    { id: 'a5', nivel: 'low' as const },
+    { id: 'a4', nivel: 'high' as const },
+    { id: 'a3', nivel: 'critical' as const },
+    { id: 'a2', nivel: 'medium' as const },
+  ]
+  it('la más reciente de nivel medio, alto o crítico; las bajas no mueven el globo', () => {
+    expect(trazaQueRecoloca(alertas, new Set())?.id).toBe('a4')
+    expect(trazaQueRecoloca([{ id: 'x', nivel: 'informational' as const }, { id: 'y', nivel: 'low' as const }], new Set())).toBeUndefined()
+  })
+  it('las que ya estaban al filtrar no cuentan: el globo se queda en el país hasta que llegue una nueva', () => {
+    expect(trazaQueRecoloca(alertas, new Set(['a5', 'a4', 'a3', 'a2']))).toBeUndefined()
+    expect(trazaQueRecoloca([{ id: 'a6', nivel: 'medium' as const }, ...alertas], new Set(['a5', 'a4', 'a3', 'a2']))?.id).toBe('a6')
   })
 })

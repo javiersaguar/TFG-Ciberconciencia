@@ -5,12 +5,14 @@
  * demo y, al llegar, se abre un anillo. Pinchar un arco (o una alerta de la tabla) la elige: se resalta, se iluminan
  * sus dos países (como en el 2D) y se rotulan sus dos ciudades.
  *
- * El globo no gira solo (decisión de Javier, 24-10): se mueve a mano, arrastrando o con las flechas de la esquina. La
- * única excepción es elegir algo que queda a espaldas (una alerta desde la tabla, un país del filtro): la vista se
- * vuelve una vez hacia ello; si ya se ve, no se mueve.
+ * Cámara (decisión de Javier, 24-10; reglas en `componentes/tierra/camara.ts`):
+ * - Gira sola en todo momento. Si se mueve a mano (arrastre o flechas), espera a que se suelte y retoma al poco.
+ * - Con una traza elegida se para y la encuadra para que se vean bien su origen y su destino (`encuadrarTraza`).
+ * - Con un país filtrado se para centrada en el país, y solo se recoloca cuando llega una traza nueva de nivel medio,
+ *   alto o crítico, que encuadra (`trazaQueRecoloca`). Al quitar el filtro y la elección, vuelve a girar.
  *
  * Mismo convenio que el 2D: el reloj lo controla la reproducción (pausa real, velocidad); con movimiento reducido no
- * hay partículas ni transiciones de cámara y cada ruta lleva su punta de flecha. Ubicaciones ILUSTRATIVAS: lo dice la página.
+ * hay partículas, giro ni transiciones de cámara y cada ruta lleva su punta de flecha. Ubicaciones ILUSTRATIVAS: lo dice la página.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minus, Plus } from 'lucide-react'
@@ -21,13 +23,15 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { NivelRegla } from '@/api/tipos'
 import { useMovimientoReducido } from '@/componentes/datos/useMovimientoReducido'
 import { useTema } from '@/componentes/tema/useTema'
+import { debeGirar, encuadrarTraza } from '@/componentes/tierra/camara'
 import { aEsfera, arcoGeodesico, direccionDeVista, type Vec3 } from '@/componentes/tierra/esfera'
+import { IluminacionGlobo } from '@/componentes/tierra/IluminacionGlobo'
 import { leerPaletaGlobo, type PaletaGlobo } from '@/componentes/tierra/paleta'
 import { Tierra3D } from '@/componentes/tierra/Tierra3D'
 import { cn } from '@/lib/utils'
 
 import { TEXTO_NIVEL, VUELO_MS, type AlertaMapa } from './modelo'
-import { centroDePais, girarVista, paisesPorCodigo, pintarPaises, quedaDetras, type Sentido } from './vistaGlobo'
+import { centroDePais, girarVista, paisesPorCodigo, pintarPaises, trazaQueRecoloca, type Sentido } from './vistaGlobo'
 
 const TOKEN_NIVEL: Record<NivelRegla, keyof PaletaGlobo> = {
   critical: 'sev-critica', high: 'sev-alta', medium: 'sev-media', low: 'sev-baja', informational: 'sev-info',
@@ -209,17 +213,22 @@ interface Orden {
   n: number
 }
 
-/** Hacia dónde volver la vista cuando cambia lo elegido, y los puntos que tienen que verse. */
+/** Adónde llevar la cámara cuando cambia lo que hay que mirar (`clave`): dirección y distancia al centro. */
 interface Enfoque {
   clave: string
   direccion: Vec3
-  puntos: Vec3[]
+  distancia: number
 }
 
-function Camara({ reducido, orden, enfoque }: { reducido: boolean; orden: Orden | null; enfoque: Enfoque | null }) {
+/** Distancia al centrar un país filtrado: algo más cerca que la vista del mundo. */
+const DISTANCIA_PAIS = 3.9
+
+function Camara({ girar, reducido, orden, enfoque }: { girar: boolean; reducido: boolean; orden: Orden | null; enfoque: Enfoque | null }) {
   const { camera, gl, invalidate } = useThree()
   const controles = useRef<OrbitControls | null>(null)
   const meta = useRef<THREE.Vector3 | null>(null)
+  // el giro automático espera mientras se arrastra y un poco después de soltar (o de pulsar una flecha)
+  const toque = useRef({ tocando: false, ultimo: -Infinity })
   const [aux] = useState(() => ({ dir: new THREE.Vector3(), objetivo: new THREE.Vector3(), eje: new THREE.Vector3() }))
   useEffect(() => {
     camera.position.set(...DIRECCION_INICIAL).multiplyScalar(DISTANCIA)
@@ -231,18 +240,25 @@ function Camara({ reducido, orden, enfoque }: { reducido: boolean; orden: Orden 
     c.minDistance = 1.7
     c.maxDistance = 7
     c.rotateSpeed = 0.6
+    c.autoRotateSpeed = 0.6
     const alCambiar = () => invalidate()
-    // arrastrar cancela la transición en curso (de una flecha o de volver la vista): manda la mano
+    // arrastrar cancela la transición en curso (de una flecha o de un encuadre): manda la mano
     const alEmpezar = () => {
       meta.current = null
+      toque.current.tocando = true
+    }
+    const alSoltar = () => {
+      toque.current = { tocando: false, ultimo: performance.now() }
     }
     c.addEventListener('change', alCambiar)
     c.addEventListener('start', alEmpezar)
+    c.addEventListener('end', alSoltar)
     controles.current = c
     invalidate()
     return () => {
       c.removeEventListener('change', alCambiar)
       c.removeEventListener('start', alEmpezar)
+      c.removeEventListener('end', alSoltar)
       c.dispose()
       controles.current = null
     }
@@ -256,6 +272,7 @@ function Camara({ reducido, orden, enfoque }: { reducido: boolean; orden: Orden 
   }
   useEffect(() => {
     if (!orden) return
+    toque.current.ultimo = performance.now()
     // las pulsaciones seguidas se acumulan sobre el destino en curso, no sobre donde va la cámara a mitad de camino
     const desde = meta.current ?? camera.position
     const distancia = desde.length()
@@ -264,14 +281,12 @@ function Camara({ reducido, orden, enfoque }: { reducido: boolean; orden: Orden 
     else irA(new THREE.Vector3(...girarVista([desde.x, desde.y, desde.z], orden.tipo)))
   }, [orden]) // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando llega una orden nueva
   useEffect(() => {
-    if (!enfoque) return
-    const desde = meta.current ?? camera.position
-    if (!quedaDetras([desde.x, desde.y, desde.z], enfoque.puntos)) return
-    irA(new THREE.Vector3(...enfoque.direccion).multiplyScalar(desde.length()))
-  }, [enfoque?.clave]) // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando cambia lo elegido
+    if (enfoque) irA(new THREE.Vector3(...enfoque.direccion).multiplyScalar(enfoque.distancia))
+  }, [enfoque?.clave]) // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando cambia lo que hay que mirar
   useFrame((_, delta) => {
     const c = controles.current
     if (!c) return
+    c.autoRotate = debeGirar({ activo: girar, reducido, enTransicion: !!meta.current, tocando: toque.current.tocando, msDesdeToque: performance.now() - toque.current.ultimo })
     if (meta.current) {
       const k = 1 - Math.exp(-Math.min(delta, 1 / 30) * 4)
       // por fuera de la esfera: se gira la dirección (también hasta el lado opuesto) y se ajusta la distancia aparte
@@ -295,18 +310,6 @@ function Camara({ reducido, orden, enfoque }: { reducido: boolean; orden: Orden 
     if (c.update(delta)) invalidate()
   })
   return null
-}
-
-/**
- * La luz principal va con la cámara (arriba a la izquierda y por detrás de quien mira), para que la cara que se ve
- * esté siempre iluminada igual al moverlo a mano o con las flechas.
- */
-function LuzQueSigue({ intensidad }: { intensidad: number }) {
-  const luz = useRef<THREE.DirectionalLight>(null)
-  useFrame(({ camera }) => {
-    luz.current?.position.set(-3, 4, 5).applyQuaternion(camera.quaternion)
-  })
-  return <directionalLight ref={luz} position={[-3, 4, 5]} intensity={intensidad} />
 }
 
 /** Mueve los rótulos del DOM sobre sus ciudades y oculta los que quedan detrás del globo. */
@@ -352,15 +355,23 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
   const ordenar = (tipo: Orden['tipo']) => setOrden((o) => ({ tipo, n: (o?.n ?? 0) + 1 }))
   // los países demasiado pequeños para el mapamundi 1:110m (Singapur) no tienen polígono: se mira a su ciudad
   const ciudadDelPais = pais ? alertas.flatMap((a) => [a.desde, a.hasta]).find((u) => u.codigoPais === pais) : undefined
-  const enfoque = useMemo<Enfoque | null>(() => {
-    if (seleccion) {
-      const extremos = [lugar(seleccion.desde), lugar(seleccion.hasta)]
-      return { clave: 'alerta:' + seleccion.id, direccion: direccionDeVista(extremos), puntos: extremos.map((l) => aEsfera(l.lat, l.lon)) }
-    }
-    if (!pais) return null
-    const centro = centroDePais(pais) ?? (ciudadDelPais ? lugar(ciudadDelPais) : null)
-    return centro ? { clave: 'pais:' + pais, direccion: direccionDeVista([centro]), puntos: [aEsfera(centro.lat, centro.lon)] } : null
-  }, [seleccion, pais, ciudadDelPais])
+  // al filtrar por país, las trazas que ya estaban no recolocan el globo: solo las que lleguen después
+  const [paisAntes, setPaisAntes] = useState(pais)
+  const [yaEstaban, setYaEstaban] = useState<ReadonlySet<string>>(() => new Set(alertas.map((a) => a.id)))
+  if (pais !== paisAntes) {
+    setPaisAntes(pais)
+    setYaEstaban(new Set(alertas.map((a) => a.id)))
+  }
+  const recoloca = pais && !seleccion ? trazaQueRecoloca(alertas, yaEstaban) : undefined
+  const modo = seleccion ? 'traza' : pais ? 'pais' : 'girando'
+  const centro = pais ? (centroDePais(pais) ?? (ciudadDelPais ? lugar(ciudadDelPais) : null)) : null
+  const enfoque: Enfoque | null = seleccion
+    ? { clave: 'alerta:' + seleccion.id, ...encuadrarTraza(lugar(seleccion.desde), lugar(seleccion.hasta)) }
+    : recoloca
+      ? { clave: 'llegada:' + recoloca.id, ...encuadrarTraza(lugar(recoloca.desde), lugar(recoloca.hasta)) }
+      : centro
+        ? { clave: 'pais:' + pais, direccion: direccionDeVista([centro]), distancia: DISTANCIA_PAIS }
+        : null
 
   // si la elegida ya salió de la ventana de rastro, se sigue dibujando (como en el 2D)
   const rutas = seleccion && !alertas.some((a) => a.id === seleccion.id) ? [...alertas, seleccion] : alertas
@@ -377,13 +388,12 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
   )
 
   return (
-    <div className="mapa-lienzo relative aspect-[1000/540] min-h-[340px] w-full overflow-hidden" role="region" aria-label="Globo de rutas geográficas">
+    <div className="mapa-lienzo relative aspect-[1000/540] min-h-[340px] w-full overflow-hidden" role="region" aria-label="Globo de rutas geográficas" data-modo={reducido ? 'quieto' : modo}>
       <SinWebGL alternativa={alternativa}>
         <div role="img" aria-label={resumen} className="absolute inset-0 cursor-grab">
-          <Canvas frameloop={enMarcha && !reducido ? 'always' : 'demand'} dpr={[1, 1.75]} camera={{ fov: 30, near: 0.1, far: 50, position: [0, 0, DISTANCIA] }} gl={{ antialias: true }} fallback={alternativa}>
+          <Canvas frameloop={!reducido && (enMarcha || modo === 'girando') ? 'always' : 'demand'} dpr={[1, 1.75]} camera={{ fov: 30, near: 0.1, far: 50, position: [0, 0, DISTANCIA] }} gl={{ antialias: true }} fallback={alternativa}>
             <color attach="background" args={[pal['maqueta-base']]} />
-            <hemisphereLight args={[pal.superficie, pal['maqueta-base'], tema === 'oscuro' ? 1.1 : 1.3]} />
-            <LuzQueSigue intensidad={tema === 'oscuro' ? 1.6 : 1.9} />
+            <IluminacionGlobo oscuro={tema === 'oscuro'} />
             <Tierra3D pal={pal} />
             {seleccion && <PaisesResaltados codigos={[seleccion.desde.codigoPais, seleccion.hasta.codigoPais]} pal={pal} />}
             {ciudades.map((u) => {
@@ -399,7 +409,7 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
               <Ruta key={a.id} alerta={a} pal={pal} elegida={seleccion?.id === a.id} apagada={!!seleccion && seleccion.id !== a.id} reducido={reducido} registrar={registrar} alSeleccionar={alSeleccionar} />
             ))}
             {!reducido && <Movimiento piezas={piezas} reloj={reloj} enMarcha={enMarcha} />}
-            <Camara reducido={reducido} orden={orden} enfoque={enfoque} />
+            <Camara girar={modo === 'girando'} reducido={reducido} orden={orden} enfoque={enfoque} />
             <Proyector anclas={anclas} elementos={rotulos} />
           </Canvas>
         </div>

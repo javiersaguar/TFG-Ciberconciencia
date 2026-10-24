@@ -7,16 +7,22 @@
  * ocurrieron corre un punto de luz (por la última, un cometa) y sus extremos laten. En pausa, quieto; con movimiento
  * reducido, sin animación ni giro (se ve igual el estado).
  *
+ * El globo gira solo en todo momento (decisión de Javier, 24-10; reglas en `componentes/tierra/camara.ts`): si se mueve
+ * a mano o con los botones, espera a que se suelte y retoma al poco. La luz va con la cámara (`IluminacionGlobo`), así que
+ * la cara que se ve está siempre iluminada igual, como en el globo del mapa mundial.
+ *
  * Ubicaciones ILUSTRATIVAS (ver `modelo.ts` → `Geografia`): lo dice la leyenda y la lista de conexiones. La lógica
  * (qué cruza la frontera, los arcos) está en `globo.ts`; aquí solo se dibuja.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Crosshair, Minus, Plus, RotateCw } from 'lucide-react'
+import { Crosshair, Minus, Plus } from 'lucide-react'
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import { useMovimientoReducido } from '@/componentes/datos/useMovimientoReducido'
+import { debeGirar } from '@/componentes/tierra/camara'
+import { IluminacionGlobo } from '@/componentes/tierra/IluminacionGlobo'
 import { leerPaletaGlobo, type PaletaGlobo } from '@/componentes/tierra/paleta'
 import { Tierra3D } from '@/componentes/tierra/Tierra3D'
 import { useTema } from '@/componentes/tema/useTema'
@@ -137,14 +143,12 @@ function Sitio({ lat, lon, color, latir, reducido }: { lat: number; lon: number;
 
 const DISTANCIA = 4.6
 
-function Camara({ direccion, girar, reducido, orden, alTocar }: { direccion: Vec3; girar: boolean; reducido: boolean; orden: { tipo: 'acercar' | 'alejar' | 'centrar'; n: number } | null; alTocar: () => void }) {
+function Camara({ direccion, reducido, orden }: { direccion: Vec3; reducido: boolean; orden: { tipo: 'acercar' | 'alejar' | 'centrar'; n: number } | null }) {
   const { camera, gl, invalidate } = useThree()
   const controles = useRef<OrbitControls | null>(null)
   const meta = useRef<THREE.Vector3 | null>(null)
-  const alTocarRef = useRef(alTocar)
-  useEffect(() => {
-    alTocarRef.current = alTocar
-  }, [alTocar])
+  // el giro automático espera mientras se arrastra y un poco después de soltar (o de pulsar un botón)
+  const toque = useRef({ tocando: false, ultimo: -Infinity })
   useEffect(() => {
     const c = new OrbitControls(camera, gl.domElement)
     c.enablePan = false
@@ -157,14 +161,19 @@ function Camara({ direccion, girar, reducido, orden, alTocar }: { direccion: Vec
     const alCambiar = () => invalidate()
     const alEmpezar = () => {
       meta.current = null
-      alTocarRef.current()
+      toque.current.tocando = true
+    }
+    const alSoltar = () => {
+      toque.current = { tocando: false, ultimo: performance.now() }
     }
     c.addEventListener('change', alCambiar)
     c.addEventListener('start', alEmpezar)
+    c.addEventListener('end', alSoltar)
     controles.current = c
     return () => {
       c.removeEventListener('change', alCambiar)
       c.removeEventListener('start', alEmpezar)
+      c.removeEventListener('end', alSoltar)
       c.dispose()
       controles.current = null
     }
@@ -178,11 +187,8 @@ function Camara({ direccion, girar, reducido, orden, alTocar }: { direccion: Vec
     invalidate()
   }, [clave, camera, invalidate]) // eslint-disable-line react-hooks/exhaustive-deps -- `direccion` cambia con `clave`
   useEffect(() => {
-    if (controles.current) controles.current.autoRotate = girar && !reducido
-    invalidate()
-  }, [girar, reducido, invalidate])
-  useEffect(() => {
     if (!orden) return
+    toque.current.ultimo = performance.now()
     const distancia = camera.position.length()
     if (orden.tipo === 'centrar') meta.current = new THREE.Vector3(...direccion).multiplyScalar(DISTANCIA)
     else meta.current = camera.position.clone().setLength(THREE.MathUtils.clamp(distancia * (orden.tipo === 'acercar' ? 0.8 : 1.25), 1.8, 7.5))
@@ -195,6 +201,7 @@ function Camara({ direccion, girar, reducido, orden, alTocar }: { direccion: Vec
   useFrame((_, delta) => {
     const c = controles.current
     if (!c) return
+    c.autoRotate = debeGirar({ activo: true, reducido, enTransicion: !!meta.current, tocando: toque.current.tocando, msDesdeToque: performance.now() - toque.current.ultimo })
     if (meta.current) {
       const k = 1 - Math.exp(-Math.min(delta, 1 / 30) * 4)
       // por la superficie de la esfera, no en línea recta (que pasaría por dentro)
@@ -260,13 +267,9 @@ export default function Globo3D({ org, ev, enMarcha, alVolverA2D }: Props) {
     () => (geo ? direccionDeVista([geo.sede, ...Object.values(geo.infraestructura).filter((l) => !!l)]) : ([0, 0.3, 1] as Vec3)),
     [geo],
   )
-  // quieto y mirando a las conexiones; el botón lo pone a girar
-  const [girar, setGirar] = useState(false)
-  const [tocado, setTocado] = useState(false)
   const [orden, setOrden] = useState<{ tipo: 'acercar' | 'alejar' | 'centrar'; n: number } | null>(null)
   const [etiquetas] = useState(() => new Map<string, HTMLElement>())
   const animar = enMarcha && !reducido
-  const autoGiro = girar && !tocado && !reducido
   const ordenar = (tipo: 'acercar' | 'alejar' | 'centrar') => setOrden((o) => ({ tipo, n: (o?.n ?? 0) + 1 }))
 
   const anclas = new Map<string, Vec3>()
@@ -293,10 +296,9 @@ export default function Globo3D({ org, ev, enMarcha, alVolverA2D }: Props) {
     <div role="region" aria-label={`Globo de ${org.nombre}`} className="relative h-full w-full overflow-hidden rounded-lg border border-borde bg-lienzo">
       <SinWebGL alternativa={alternativa}>
         <div role="img" aria-label={resumenMundo(org, cs)} className="absolute inset-0 cursor-grab">
-          <Canvas frameloop={animar || autoGiro ? 'always' : 'demand'} dpr={[1, 1.75]} camera={{ fov: 30, near: 0.1, far: 50, position: [0, 0, DISTANCIA] }} gl={{ antialias: true }} fallback={alternativa}>
+          <Canvas frameloop={reducido ? 'demand' : 'always'} dpr={[1, 1.75]} camera={{ fov: 30, near: 0.1, far: 50, position: [0, 0, DISTANCIA] }} gl={{ antialias: true }} fallback={alternativa}>
             <color attach="background" args={[pal['maqueta-base']]} />
-            <hemisphereLight args={[pal.superficie, pal['maqueta-base'], tema === 'oscuro' ? 1.1 : 1.3]} />
-            <directionalLight position={[-3, 4, 5]} intensity={tema === 'oscuro' ? 1.6 : 1.9} />
+            <IluminacionGlobo oscuro={tema === 'oscuro'} />
             <Tierra3D pal={pal} />
             {geo && <Sitio lat={geo.sede.lat} lon={geo.sede.lon} color={pal.acento} latir={!!ultimo && ultimo.sentido === 'entrada'} reducido={reducido} />}
             {sitios.map((s) => (
@@ -305,7 +307,7 @@ export default function Globo3D({ org, ev, enMarcha, alVolverA2D }: Props) {
             {cs.map((c, i) => (
               <ArcoGlobo key={c.id} c={c} pal={pal} animar={animar} reducido={reducido} desfase={(i * 0.37) % 1} />
             ))}
-            <Camara direccion={direccion} girar={autoGiro} reducido={reducido} orden={orden} alTocar={() => setTocado(true)} />
+            <Camara direccion={direccion} reducido={reducido} orden={orden} />
             <Proyector anclas={anclas} elementos={etiquetas} />
           </Canvas>
         </div>
@@ -324,12 +326,6 @@ export default function Globo3D({ org, ev, enMarcha, alVolverA2D }: Props) {
         </div>
 
         <div role="group" aria-label="Cámara del globo" className="absolute top-3 right-3 z-10 flex gap-1">
-          {!reducido && (
-            <button type="button" onClick={() => { setGirar((g) => !g); setTocado(false) }} aria-pressed={autoGiro} title={autoGiro ? 'Parar el giro' : 'Girar el globo'} className={BOTON}>
-              <RotateCw className="size-4" aria-hidden />
-              <span className="sr-only">Girar el globo</span>
-            </button>
-          )}
           {[
             { texto: 'Acercar', icono: Plus, accion: () => ordenar('acercar') },
             { texto: 'Alejar', icono: Minus, accion: () => ordenar('alejar') },

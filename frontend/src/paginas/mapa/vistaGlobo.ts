@@ -1,11 +1,12 @@
 /**
  * Lógica del globo del mapa mundial que no necesita three.js: qué países resaltar y dónde está cada uno, cómo se
- * pintan en la textura de resalte, cuánto gira la vista con las flechas y cuándo una selección queda a espaldas de la
- * cámara. Mismos polígonos que el mapa 2D (`tierra.json`, Natural Earth), así que se resaltan exactamente los mismos
+ * pintan en la textura de resalte, cuánto gira la vista con las flechas y qué traza recoloca el globo con un país
+ * filtrado. Mismos polígonos que el mapa 2D (`tierra.json`, Natural Earth), así que se resaltan exactamente los mismos
  * países en las dos vistas.
  */
 import { geoArea, geoCentroid, geoEquirectangular, geoPath, type GeoPermissibleObjects } from 'd3-geo'
 
+import type { NivelRegla } from '@/api/tipos'
 import { aEsfera, type Coordenadas, type Vec3 } from '@/componentes/tierra/esfera'
 
 import tierra from './tierra.json'
@@ -79,15 +80,14 @@ export function girarVista(posicion: Vec3, sentido: Sentido, paso = PASO_FLECHA)
   return aEsfera(nuevaLat, ((((nuevaLon + 180) % 360) + 360) % 360) - 180, r)
 }
 
+/** Con un país filtrado, solo estas severidades recolocan el globo al llegar (las bajas e informativas, no). */
+export const NIVELES_QUE_RECOLOCAN: readonly NivelRegla[] = ['medium', 'high', 'critical']
+
 /**
- * ¿Queda algún punto a espaldas de quien mira desde `camara`? Se usa para no mover la vista cuando lo elegido ya se
- * ve (se ha pinchado en el propio globo) y girarla solo si está detrás (elegido desde la tabla o el filtro de país).
+ * Con un país filtrado, la traza que recoloca el globo: la más reciente de nivel medio, alto o crítico que haya
+ * llegado DESPUÉS de filtrar (`yaEstaban`: las que había en pantalla al elegir el país, que no cuentan). `alertas` va
+ * de la más nueva a la más vieja, como la devuelve `alertasEnVentana`.
  */
-export function quedaDetras(camara: Vec3, puntos: readonly Vec3[], umbral = 0.2): boolean {
-  const n = Math.hypot(...camara)
-  if (n < 1e-9) return false
-  return puntos.some((p) => {
-    const m = Math.hypot(...p) || 1
-    return (camara[0] * p[0] + camara[1] * p[1] + camara[2] * p[2]) / (n * m) < umbral
-  })
+export function trazaQueRecoloca<T extends { id: string; nivel: NivelRegla }>(alertas: readonly T[], yaEstaban: ReadonlySet<string>): T | undefined {
+  return alertas.find((a) => NIVELES_QUE_RECOLOCAN.includes(a.nivel) && !yaEstaban.has(a.id))
 }

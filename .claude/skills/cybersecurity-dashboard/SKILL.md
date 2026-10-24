@@ -291,12 +291,20 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   **En 2D o 3D** (24-10): `GloboMundial.tsx` recibe exactamente las mismas props que `LienzoMundial` (alertas, selección,
   `reloj`, `enMarcha`) y mueve partículas y anillos en un solo `useFrame` leyendo `reloj.current`: no tiene reloj
   propio. La Tierra de los dos globos está en `componentes/tierra/` (`Tierra3D`, `esfera.ts` pura, `paleta.ts`).
-  **Comportamiento del globo** (24-10, decidido por Javier; no cambiarlo sin preguntar): **no gira solo en ningún
-  momento** ni tiene botón de giro (se probó un giro automático y lo descartó). Se mueve a mano: arrastre o flechas de
-  la esquina inferior derecha. La vista solo se vuelve sola hacia lo elegido si queda a espaldas (`quedaDetras`). Los
-  países de la alerta elegida se iluminan como en el 2D, con los mismos polígonos de `tierra.json`. Lógica en
-  `paginas/mapa/vistaGlobo.ts`. Playwright reduce el movimiento por defecto: para probar algo animado, usa
-  `emulateMedia({ reducedMotion: 'no-preference' })`.
+  **Cámara de los dos globos** (24-10, decidido por Javier tras probar variantes; no cambiarlo sin preguntar; reglas
+  en `componentes/tierra/camara.ts`):
+  - **Giran solos en todo momento**, sin botón de giro. Si se mueven a mano (arrastre o flechas), el giro espera
+    4 s tras soltar (`REANUDAR_GIRO_MS`). Con movimiento reducido no giran.
+  - **Traza elegida** (`/mapa`): se para y la encuadra (`encuadrarTraza`): sobre el punto medio, ladeado al norte
+    para ver la curva y a la distancia justa para que quepan origen y destino.
+  - **País filtrado** (`/mapa`): se para centrado en el país y solo se recoloca, encuadrándola, cuando llega una traza
+    NUEVA de nivel medio, alto o crítico (`trazaQueRecoloca`; las que ya estaban al filtrar no cuentan).
+  - **Iluminación uniforme** (`IluminacionGlobo`): luz ambiental blanca y luz principal que acompaña a la cámara.
+    Nada de luces de cielo y suelo: dejaban el hemisferio sur casi negro en el tema oscuro.
+  - Los países de la alerta elegida se iluminan como en el 2D, con los mismos polígonos de `tierra.json`
+    (`paginas/mapa/vistaGlobo.ts`). `data-modo` en el globo de `/mapa` (`girando` | `traza` | `pais` | `quieto`) es
+    para las pruebas. Playwright reduce el movimiento por defecto: para probar el giro, usa
+    `emulateMedia({ reducedMotion: 'no-preference' })`.
 
 ## 16. Unificación del 24-10-2026: nada de lo anterior se pierde
 
