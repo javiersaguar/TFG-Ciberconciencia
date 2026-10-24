@@ -4,17 +4,23 @@ import { cargarAristasP2, cargarCampanaP2, cargarCampanasP1 } from '@/api/export
 import { construirGrafoAtaque } from '@/api/simulado/grafoAtaque'
 import { formatearHora, milisegundosDelDia } from '@/componentes/datos/hora'
 
-import { alternar, FILTROS_INICIALES, filtrarGrafo, leerCampana, leerSeleccion, recorridoHasta } from './logica'
+import { alternar, FILTROS_INICIALES, filtrarGrafo, leerCampana, leerSeleccion, numerarPasos, RELACIONES, recorridoHasta } from './logica'
 
 const [campanasP1, campanaP2, aristas] = await Promise.all([cargarCampanasP1(), cargarCampanaP2(), cargarAristasP2()])
 const grafo = construirGrafoAtaque({ campanasP1, campanaP2, aristas })
 const ids = (lista: { id: string }[]) => lista.map((e) => e.id)
 
 describe('filtros del explorador', () => {
-  it('sin filtros se ve todo', () => {
-    const v = filtrarGrafo(grafo, FILTROS_INICIALES)
+  it('con todas las relaciones activas se ve todo', () => {
+    const v = filtrarGrafo(grafo, { ...FILTROS_INICIALES, relaciones: [...RELACIONES] })
     expect(v.nodos).toHaveLength(grafo.nodos.length)
     expect(v.aristas).toHaveLength(grafo.aristas.length)
+  })
+
+  it('por defecto se oculta solo el tráfico de dominio de fondo', () => {
+    const v = filtrarGrafo(grafo, FILTROS_INICIALES)
+    expect(v.nodos).toHaveLength(grafo.nodos.length)
+    expect(grafo.aristas.filter((a) => !v.aristas.includes(a)).map((a) => a.relacion)).toEqual(['dominio', 'dominio', 'dominio'])
   })
 
   it('por campaña P1: su campaña, su host y su evidencia; nada de los procesos de P2', () => {
@@ -50,6 +56,15 @@ describe('filtros del explorador', () => {
 })
 
 describe('secuencia temporal', () => {
+  it('cada paso tiene su número en un solo elemento del lienzo, y el salto lo lleva el proceso que conecta', () => {
+    const pasos = numerarPasos(grafo)
+    expect(Object.values(pasos).flat().sort((a, b) => a - b)).toEqual(grafo.hitos.map((_, i) => i + 1))
+    expect(pasos['host-scranton']).toEqual([1])
+    expect(pasos['proc-powershell']).toEqual([4])
+    expect(pasos['proc-psexec']).toEqual([8, 9])
+    expect(pasos['alerta-al-0319-lsass']).toEqual([10])
+  })
+
   it('acumula lo alcanzado hito a hito', () => {
     expect(recorridoHasta(grafo, 0).nodos.has('host-scranton')).toBe(true)
     expect(recorridoHasta(grafo, 0).nodos.has('camp-p2-scranton-nashua')).toBe(false)

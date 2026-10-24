@@ -24,6 +24,7 @@ export type AccionReproduccion =
   | { tipo: 'verTodo' }
   | { tipo: 'tic' }
   | { tipo: 'velocidad'; velocidad: Velocidad }
+  | { tipo: 'ir'; paso: number }
 
 /** El trazo que avanza y el pulso solo se animan en el paso actual y si el usuario no pidió menos movimiento. */
 export function debeAnimar(enPasoActual: boolean, movimientoReducido: boolean): boolean {
@@ -56,6 +57,9 @@ export function reproducir(estado: EstadoReproduccion, accion: AccionReproduccio
     }
     case 'velocidad':
       return { ...estado, velocidad: accion.velocidad }
+    case 'ir':
+      // saltar a un paso concreto desde la lista de pasos: se para ahí, como «anterior» y «siguiente»
+      return { ...estado, enMarcha: false, paso: Math.min(ultimo, Math.max(0, Math.trunc(accion.paso))) }
   }
 }
 

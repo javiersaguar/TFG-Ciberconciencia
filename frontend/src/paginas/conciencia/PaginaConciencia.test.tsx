@@ -19,6 +19,15 @@ describe('Conciencia situacional', () => {
     return { usuario, ...resultado }
   }
 
+  it('sin WebGL la vista 3D no se ofrece: el 3D está desactivado y un ?vista=3d se queda en 2D', async () => {
+    preparar('/conciencia?org=helios&vista=3d')
+    expect(await screen.findByRole('region', { name: 'Grafo de Helios Farmacéutica' })).toBeInTheDocument()
+    const vista = screen.getByRole('radiogroup', { name: 'Vista de la organización' })
+    expect(within(vista).getByRole('radio', { name: '2D' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(vista).getByRole('radio', { name: '3D' })).toBeDisabled()
+    expect(screen.queryByRole('region', { name: /Maqueta 3D/ })).not.toBeInTheDocument()
+  })
+
   it('en calma: el grafo con sus joyas y un asistente que espera la primera evidencia', async () => {
     const { container } = preparar()
     expect(await screen.findByRole('region', { name: 'Grafo de Helios Farmacéutica' })).toBeInTheDocument()

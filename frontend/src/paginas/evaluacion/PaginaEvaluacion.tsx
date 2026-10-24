@@ -68,7 +68,7 @@ export default function PaginaEvaluacion() {
               </table>
             </div>
             {muestra && (
-              <div className="mt-3 space-y-1 rounded-xl border border-l-4 border-borde border-l-aviso p-3 text-xs text-texto">
+              <div className="mt-3 space-y-1 rounded-xl border border-borde bg-superficie-alterna p-3 text-xs text-texto">
                 <p className="flex items-center gap-1.5 font-semibold"><TriangleAlert className="size-3.5 text-aviso" aria-hidden />Cómo leerlo</p>
                 <p>
                   Se evalúa sobre <strong>{muestra.muestras} ventanas</strong> ({muestra.positivos} con ataque): {pares} pares positiva–negativa, así que cada par mal ordenado

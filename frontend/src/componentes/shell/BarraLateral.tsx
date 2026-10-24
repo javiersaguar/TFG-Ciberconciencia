@@ -79,7 +79,7 @@ export function BarraLateral({ abierta, alAlternar }: { abierta: boolean; alAlte
           <Logo className="shrink-0" />
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-[15px] font-semibold tracking-tight text-primario">Ciberconciencia</p>
-            <p className="text-[11.5px] leading-tight text-texto-suave">Conciencia cibersituacional</p>
+            <p className="text-[11.5px] leading-tight text-texto-suave">TFG · ETSIT-UPM</p>
           </div>
           <button
             type="button"

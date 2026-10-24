@@ -97,6 +97,20 @@
   --atacante-icono: #e8a39a;
   --atacante-suave: #d9c3bf;
 
+  /* Maqueta 3D de /conciencia: plataformas de las zonas y piezas sin incidencias (las demás, por su estado). */
+  --maqueta-plataforma: #c9d0d9;
+  --maqueta-pieza: #f1f3f6;
+
+  /* Logotipo (componentes/shell/Logo.tsx; el favicon lleva los mismos valores del tema claro). */
+  --logo-marco-luz: #0d4f8c;
+  --logo-marco-medio: #0b3e72;
+  --logo-marco-sombra: #0a2b52;
+  --logo-fondo: #f7f9fc;
+  --logo-nucleo: #0b2747;
+  --logo-gris: #4d6681;
+  --logo-cian: #22c1df;
+  --logo-pulso: #19c3e6;
+
   /* Colores con nombre de los cuadros de Grafana (umbrales), en la paleta apagada del portal. */
   --graf-verde: #2b6f52;
   --graf-naranja: #a8690f;
@@ -132,7 +146,7 @@
   --chart-6: #5c6f86;
   --chart-7: #8a5a44;
   --chart-8: #4f7d3a;
-  --radius: 0.75rem;
+  --radius: 0.45rem;
   --sombra-tarjeta: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 22px rgb(15 23 42 / 0.05);
 }
 
@@ -193,6 +207,13 @@
   --estado-protegido: #183126;
   --atacante-fondo: #3b2224;
   --atacante-borde: #6b3f3b;
+  --maqueta-plataforma: #3a4554;
+  --maqueta-pieza: #8d9aab;
+  /* El marco navy se perdería sobre la pizarra de la barra lateral: se aclara sin cambiar el tono. */
+  --logo-marco-luz: #3d7cc4;
+  --logo-marco-medio: #2f68aa;
+  --logo-marco-sombra: #23548f;
+  --logo-fondo: #e6ecf3;
 
   --graf-verde: #5dbb8f;
   --graf-naranja: #e0a04a;

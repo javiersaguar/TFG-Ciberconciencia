@@ -7,7 +7,7 @@
  * autonomía son una interfaz de demo de la propuesta en estudio (agente de respuesta acotada, F6.4): el 0 y el 1
  * funcionan; el 2 y el 3 están deshabilitados (en estudio) y el 4 está descartado por diseño.
  */
-import { ArrowRight, Bot, CheckCircle2, ChevronDown, ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronDown, ListChecks, ShieldAlert } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
@@ -28,12 +28,6 @@ const COLOR_NIVEL: Record<Puntuacion['nivel'], string> = {
   Alta: 'text-sev-alta',
   Crítica: 'text-sev-critica',
 }
-
-const COLOR_URGENCIA = {
-  Inmediata: 'border-l-sev-critica',
-  Alta: 'border-l-sev-alta',
-  Media: 'border-l-sev-media',
-} as const
 
 const NIVELES_AUTONOMIA = [
   { nivel: 0, nombre: 'Recomienda', detalle: 'El analista decide y aplica cada acción con un clic.', disponible: true },
@@ -92,7 +86,7 @@ function Gravedad({ puntuacion }: { puntuacion: Puntuacion }) {
 function TarjetaRecomendacion({ rec, alAplicar }: { rec: Recomendacion; alAplicar: () => void }) {
   const nivel = urgencia(rec.prioridad)
   return (
-    <li className={cn('rounded-xl border border-l-4 border-borde bg-superficie p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)]', COLOR_URGENCIA[nivel])}>
+    <li className="rounded-xl border border-borde bg-superficie p-3">
       <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10.5px] font-semibold">
         <span className={cn('rounded-full px-1.5 py-px text-sobre-intenso', nivel === 'Inmediata' ? 'bg-sev-critica' : nivel === 'Alta' ? 'bg-sev-alta' : 'bg-sev-media')}>
           {nivel} · {rec.prioridad}
@@ -148,7 +142,7 @@ export function PanelAsistente({ parrafos, puntuacion, recomendaciones, aplicada
       <header className="flex items-center justify-between gap-2 border-b border-borde px-4 py-3">
         <span className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-acento-suave text-acento" aria-hidden>
-            <Bot className="size-4" />
+            <ListChecks className="size-4" />
           </span>
           <span>
             <span className="block text-sm font-semibold text-primario">Asistente de respuesta</span>
@@ -158,7 +152,6 @@ export function PanelAsistente({ parrafos, puntuacion, recomendaciones, aplicada
         <Tooltip>
           <TooltipTrigger asChild>
             <span tabIndex={0} className="flex items-center gap-1 rounded-full bg-superficie-hundida px-2 py-0.5 text-[10.5px] font-semibold text-texto-suave">
-              <Sparkles className="size-3" aria-hidden />
               {redactorLLM.nombre}
             </span>
           </TooltipTrigger>

@@ -224,7 +224,7 @@ export default function PaginaSituacion() {
     <>
       <EncabezadoPagina
         titulo="Situación"
-        descripcion="APT29 day1 de un vistazo: actividad, severidad, tácticas y campañas."
+        descripcion="APT29 day1: actividad, severidad, tácticas y campañas."
         comoLeer={
           <>
             <p>Los tres indicadores grandes son del corpus completo (nueve datasets); el resto, de APT29 day1 (MITRE ATT&CK Evaluations, 2-5-2020).</p>

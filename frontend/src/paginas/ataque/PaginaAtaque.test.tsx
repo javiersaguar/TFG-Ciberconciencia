@@ -39,11 +39,27 @@ describe('explorador del grafo de ataque', () => {
   it('los filtros reducen lo visible y la secuencia avanza paso a paso', async () => {
     const usuario = userEvent.setup()
     renderizarRutas('/ataque?sel=<script>')
-    expect(await screen.findByText('Nada seleccionado')).toBeInTheDocument()
+    // una selección inválida se ignora: el panel de detalle solo aparece con algo elegido
+    await screen.findByRole('group', { name: 'Secuencia del ataque' })
+    expect(screen.queryByRole('complementary', { name: 'Detalle del elemento elegido' })).not.toBeInTheDocument()
     const filtros = screen.getByRole('group', { name: 'Fundamento' })
     await usuario.click(within(filtros).getByRole('button', { name: /Inferido/ }))
     expect(within(screen.getByRole('list', { name: 'Nodos' })).queryByRole('button', { name: /campaña/ })).not.toBeInTheDocument()
     await usuario.click(screen.getByRole('button', { name: /Siguiente/ }))
     expect(screen.getByText(/Paso 1 de 10/)).toBeInTheDocument()
+  })
+
+  it('la lista de pasos lleva a cualquier paso con su número y su hora, y el panel de detalle se cierra', async () => {
+    const usuario = userEvent.setup()
+    renderizarRutas('/ataque?sel=proc-powershell')
+    const pasos = await screen.findByRole('list', { name: 'Pasos del ataque' })
+    expect(within(pasos).getAllByRole('button')).toHaveLength(10)
+    await usuario.click(within(pasos).getByRole('button', { name: /^Paso 6, 03:09:29,430/ }))
+    const secuencia = screen.getByRole('group', { name: 'Secuencia del ataque' })
+    expect(within(secuencia).getByRole('status')).toHaveTextContent('Paso 6 de 10')
+    expect(within(pasos).getByRole('button', { name: /^Paso 6/ })).toHaveAttribute('aria-current', 'step')
+    const detalle = screen.getByRole('complementary', { name: 'Detalle del elemento elegido' })
+    await usuario.click(within(detalle).getByRole('button', { name: 'Cerrar el detalle' }))
+    expect(screen.queryByRole('complementary', { name: 'Detalle del elemento elegido' })).not.toBeInTheDocument()
   })
 })

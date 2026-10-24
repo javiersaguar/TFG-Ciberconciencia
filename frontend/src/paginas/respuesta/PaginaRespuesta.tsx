@@ -3,7 +3,7 @@
  * con la procedencia marcada por bloque: HECHOS OBSERVADOS / INFERENCIAS DEL SISTEMA / RECOMENDACIONES. No hay botón
  * «Aplicar»: como mucho se copia el plan como texto plano y, en la demo, se enlaza a la simulación para ver su efecto.
  */
-import { ArrowRight, ClipboardCopy, Eye, GitMerge, Info, ListChecks, ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, ClipboardCopy, Eye, GitMerge, Info, ListChecks, ShieldAlert } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
@@ -19,12 +19,11 @@ import { ORGANIZACIONES } from '@/paginas/conciencia/organizaciones'
 
 import { casoDeDemo, casoDeIncidente, planComoTexto, type CasoRespuesta } from './plan'
 
-const COLOR_URGENCIA = { Inmediata: 'border-l-sev-critica', Alta: 'border-l-sev-alta', Media: 'border-l-sev-media' } as const
 const CHIP_URGENCIA = { Inmediata: 'bg-sev-critica', Alta: 'bg-sev-alta', Media: 'bg-sev-media' } as const
 
-function Bloque({ titulo, icono: Icono, color, procedencia, fuente, children }: { titulo: string; icono: typeof Eye; color: string; procedencia?: Procedencia; fuente?: string; children: React.ReactNode }) {
+function Bloque({ titulo, icono: Icono, procedencia, fuente, children }: { titulo: string; icono: typeof Eye; procedencia?: Procedencia; fuente?: string; children: React.ReactNode }) {
   return (
-    <section aria-label={titulo} className={cn('rounded-2xl border border-l-4 border-borde bg-superficie p-4', color)}>
+    <section aria-label={titulo} className="rounded-2xl border border-borde bg-superficie p-4">
       <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-[12px] font-semibold tracking-wide text-texto-suave uppercase">
           <Icono className="size-3.5" aria-hidden />
@@ -78,7 +77,7 @@ function Caso({ caso }: { caso: CasoRespuesta }) {
       </section>
 
       <div className="grid gap-3 xl:grid-cols-2">
-        <Bloque titulo="Hechos observados" icono={Eye} color="border-l-fund-observado" procedencia={caso.procedenciaHechos.procedencia} fuente={caso.procedenciaHechos.fuente}>
+        <Bloque titulo="Hechos observados" icono={Eye} procedencia={caso.procedenciaHechos.procedencia} fuente={caso.procedenciaHechos.fuente}>
           <ul className="space-y-1">
             {caso.hechos.map((h) => (
               <li key={`${h.hora ?? ''}${h.texto}`} className="text-xs">
@@ -90,7 +89,7 @@ function Caso({ caso }: { caso: CasoRespuesta }) {
           </ul>
         </Bloque>
 
-        <Bloque titulo="Inferencias del sistema" icono={GitMerge} color="border-l-fund-inferido" procedencia={caso.tipo === 'demo' ? 'ilustrativa' : 'documentada'} fuente={caso.tipo === 'demo' ? 'Razonamiento de la demo sobre el escenario' : 'Detectores P1 y P2 en lote (exportación del 21-10-2026)'}>
+        <Bloque titulo="Inferencias del sistema" icono={GitMerge} procedencia={caso.tipo === 'demo' ? 'ilustrativa' : 'documentada'} fuente={caso.tipo === 'demo' ? 'Razonamiento de la demo sobre el escenario' : 'Detectores P1 y P2 en lote (exportación del 21-10-2026)'}>
           <ul className="space-y-1 text-xs text-texto">
             {caso.inferencias.map((l) => <li key={l}>{l}</li>)}
           </ul>
@@ -116,12 +115,12 @@ function Caso({ caso }: { caso: CasoRespuesta }) {
         </Bloque>
       </div>
 
-      <Bloque titulo="Recomendaciones" icono={ListChecks} color="border-l-acento" fuente="Motor de reglas · NIST SP 800-61 y MITRE D3FEND">
+      <Bloque titulo="Recomendaciones" icono={ListChecks} fuente="Motor de reglas · NIST SP 800-61 y MITRE D3FEND">
         <ol className="space-y-2" aria-label="Acciones propuestas">
           {caso.propuestas.map((p) => {
             const nivel = urgencia(p.prioridad)
             return (
-              <li key={p.clave} className={cn('rounded-xl border border-l-4 border-borde bg-superficie p-3', COLOR_URGENCIA[nivel])}>
+              <li key={p.clave} className="rounded-xl border border-borde bg-superficie p-3">
                 <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10.5px] font-semibold">
                   <span className={cn('rounded-full px-1.5 py-px text-sobre-intenso', CHIP_URGENCIA[nivel])}>{nivel}</span>
                   <span className="rounded-full bg-superficie-hundida px-1.5 py-px text-texto-suave">{p.fase}</span>
@@ -144,10 +143,6 @@ function Caso({ caso }: { caso: CasoRespuesta }) {
         </ol>
       </Bloque>
 
-      <p className="flex items-center gap-1.5 rounded-xl border border-dashed border-borde-discontinuo px-3 py-2 text-[11px] text-texto-suave">
-        <Sparkles className="size-3.5 shrink-0" aria-hidden />
-        Redacción con LLM: pendiente (F6). Las reglas deciden; el LLM solo redactará la explicación, sin inventar acciones ni cifras.
-      </p>
     </div>
   )
 }

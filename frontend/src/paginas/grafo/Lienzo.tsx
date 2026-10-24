@@ -198,7 +198,7 @@ function Leyenda() {
   return (
     <ul
       aria-label="Leyenda del grafo"
-      className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-x-3 gap-y-1 rounded-xl border border-borde/70 bg-superficie/85 px-3 py-1.5 text-[11px] text-texto-suave backdrop-blur"
+      className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-x-3 gap-y-1 rounded-xl border border-borde bg-superficie px-3 py-1.5 text-[11px] text-texto-suave"
     >
       {tramos.map((tramo) => (
         <li key={tramo.texto} className="flex items-center gap-1.5">

@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest'
 import { renderizarRutas } from '@/pruebas/utilidades'
 
 describe('menos texto en pantalla', () => {
-  it.each(['/incidentes', '/attack', '/cronologia', '/respuesta', '/copiloto', '/evaluacion', '/'])('%s abre con una frase y deja el resto plegado en «Cómo leer esta página»', async (ruta) => {
+  it.each(['/incidentes', '/attack', '/cronologia', '/respuesta', '/copiloto', '/evaluacion', '/'])('%s abre con una frase y deja el resto plegado en «Notas»', async (ruta) => {
     const usuario = userEvent.setup()
     renderizarRutas(ruta)
-    const resumen = await screen.findByText('Cómo leer esta página')
+    const resumen = await screen.findByText('Notas')
     const desplegable = resumen.closest('details')!
     expect(desplegable).not.toHaveAttribute('open')
     await usuario.click(resumen)

@@ -3,9 +3,8 @@
  * a pantalla completa, no una copia: lo que se pregunta aquí sigue en el panel y al revés. Los enlaces antiguos
  * (`/copiloto?org=helios`) siguen funcionando: el parámetro se valida contra las organizaciones conocidas.
  */
-import { Info } from 'lucide-react'
 import { lazy, Suspense } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 
 import { esOrgCopiloto, ORGS_COPILOTO } from '@/copiloto/estado'
 import { EncabezadoPagina } from '@/componentes/shell'
@@ -30,12 +29,6 @@ export default function PaginaCopiloto() {
           </>
         }
       />
-      <p role="note" className="mb-3 flex flex-wrap items-center gap-1.5 text-xs font-medium text-texto-suave">
-        <Info className="size-3.5" aria-hidden />
-        <span>
-          No ejecuta acciones. Para mitigar, usa el <Link to="/respuesta" className="text-acento hover:underline">asistente de respuesta</Link>.
-        </span>
-      </p>
       <Suspense fallback={<div role="status" aria-label="Cargando el Copiloto"><Skeleton className="h-96 rounded-2xl" /></div>}>
         <PanelCopiloto modo="completo" org={org} alCambiarOrg={(o) => setParametros({ org: o }, { replace: true })} />
       </Suspense>

@@ -695,6 +695,8 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
 > se congela**.
 
 - [ ] **F8.0** Nombre y marca · 2–3 *personas* · `docs/product-brief.md`.
+  ↪️ *24-10-2026:* logotipo definitivo de Javier, redibujado en SVG (`frontend/src/componentes/shell/Logo.tsx` y
+  `frontend/public/favicon.svg`). El nombre «Ciberconciencia» sigue provisional; faltan las *personas* y el brief.
 - [ ] **F8.1** React 18 + TypeScript + Vite · Tailwind + shadcn/ui · TanStack Query ·
   Recharts · Cytoscape.js (grafo) · Zustand. Sistema de diseño (tema oscuro, códigos de severidad).
   ↪️ **Base hecha (23-09-2026), con el stack del portal de PIDS:** React 19 + Vite 8 + Tailwind 4 +
@@ -710,6 +712,9 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
 - [ ] **F8.3 Completo:** Explorador del grafo · Matriz ATT&CK · Inventario de activos ·
   Panel CTI · Informes PDF · Ajustes (¡tocar los pesos y ver cambiar el ranking!) ·
   Alertas en vivo por WebSocket.
+  ➕ *Hecho el 24-10-2026:* **maqueta 3D de la organización** en la demo de conciencia situacional (three.js + React Three
+  Fiber, carga diferida): zonas como plataformas escalonadas, ataque en arcos, ruta probable; la vista 2D sigue por
+  defecto. Y el **explorador del grafo** pasa a columnas por momento con pasos numerados y un recorrido paso a paso.
   ➕ *Idea anotada el 21-10-2026:* **mapa mundial en tiempo real** del origen y el destino de las alertas. Requiere IP
   públicas (el corpus actual solo tiene direcciones privadas de laboratorio), GeoIP local en el servidor y el WebSocket
   de F6.3; sin eso, solo ilustrativo. Detalle en `frontend/docs/plan-mejora.md` §8.

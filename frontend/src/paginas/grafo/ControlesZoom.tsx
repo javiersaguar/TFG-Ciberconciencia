@@ -16,7 +16,7 @@ interface Props {
 }
 
 const BOTON =
-  'flex size-8 items-center justify-center rounded-lg border border-borde/70 bg-superficie/70 text-texto-suave shadow-sm backdrop-blur ' +
+  'flex size-8 items-center justify-center rounded-lg border border-borde bg-superficie text-texto-suave ' +
   'transition hover:bg-superficie hover:text-texto focus-visible:outline-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-40'
 
 export function ControlesZoom({ zoom, alAcercar, alAlejar, className }: Props) {

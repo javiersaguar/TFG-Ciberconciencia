@@ -126,7 +126,8 @@ interface Props {
   riesgo: Set<string>
 }
 
-function FichaActivo({ org, ev, activo, alCerrar }: { org: Organizacion; ev: Evaluacion; activo: Activo; alCerrar: () => void }) {
+/** Ficha de un activo (la misma desde la vista 2D y desde la maqueta 3D). */
+export function FichaActivo({ org, ev, activo, alCerrar }: { org: Organizacion; ev: Evaluacion; activo: Activo; alCerrar: () => void }) {
   const activos = porId(org.activos)
   const pasos = ev.pasos.filter((p) => p.paso.desde === activo.id || p.paso.hasta === activo.id)
   const vecinos = org.enlaces.filter((e) => e.desde === activo.id || e.hasta === activo.id)
@@ -344,7 +345,7 @@ export function GrafoOrganizacion({ org, ev, ruta, riesgo }: Props) {
       <ControlesZoom zoom={vista.zoom} alAcercar={acercar} alAlejar={alejar} />
       <ul
         aria-label="Leyenda del grafo"
-        className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-x-3 gap-y-1 rounded-xl border border-borde/70 bg-superficie/85 px-3 py-1.5 text-[11px] text-texto-suave backdrop-blur"
+        className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-5rem)] flex-wrap gap-x-3 gap-y-1 rounded-xl border border-borde bg-superficie px-3 py-1.5 text-[11px] text-texto-suave"
       >
         {[
           { texto: 'Red', color: COLOR.red, trazo: undefined },

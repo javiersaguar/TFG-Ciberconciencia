@@ -21,7 +21,7 @@ function mensajeDeError(error: unknown): string {
 
 export function EstadoError({ error, titulo = 'No se ha podido cargar', alReintentar, reintentando, className }: PropsError) {
   return (
-    <div role="alert" className={cn('flex items-start gap-3 rounded-2xl border border-l-4 border-l-peligro bg-superficie p-4', className)}>
+    <div role="alert" className={cn('flex items-start gap-3 rounded-2xl border border-peligro/50 bg-superficie p-4', className)}>
       <TriangleAlert className="mt-0.5 size-5 shrink-0 text-peligro" aria-hidden />
       <div className="min-w-0 flex-1 space-y-1">
         <p className="font-medium text-foreground">{titulo}</p>

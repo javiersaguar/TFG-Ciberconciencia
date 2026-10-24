@@ -39,6 +39,9 @@ export default defineConfig({
             // muchas páginas y la portada lo descargaba entero (44,8 kB) por necesitar `createLucideIcon`
             { name: 'iconos-base', test: /node_modules\/lucide-react\/dist\/esm\/(createLucideIcon|Icon|context|defaultAttributes|shared\/)/, priority: 35 },
             { name: 'd3-comun', test: /node_modules\/(d3-color|d3-ease|d3-interpolate|d3-timer)\//, priority: 30 },
+            // three.js y React Three Fiber: solo la maqueta 3D de /conciencia, que se carga al elegir esa vista.
+            // Va antes que `flujo` porque R3F trae su propia copia de zustand dentro de @react-three/fiber.
+            { name: 'tresd', test: /node_modules\/(three|@react-three|its-fine|suspend-react|react-use-measure)\//, priority: 25 },
             { name: 'flujo', test: /node_modules\/(@xyflow|d3-zoom|d3-drag|d3-selection|d3-transition|d3-dispatch|classcat|zustand)\//, priority: 20 },
             { name: 'graficos', test: /node_modules\/(recharts|recharts-scale|react-smooth|victory-vendor|d3-[a-z-]+|internmap|@reduxjs|redux|react-redux|immer|reselect)\//, priority: 10 },
           ],

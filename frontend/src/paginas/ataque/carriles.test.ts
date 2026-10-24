@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { cargarAristasP2, cargarCampanaP2, cargarCampanasP1 } from '@/api/exportaciones'
 import { construirGrafoAtaque } from '@/api/simulado/grafoAtaque'
 
-import { absoluta, CARRILES, carrilDe, disponerEnCarriles, idCarril, MEDIDAS, repartirEnFilas } from './carriles'
+import { absoluta, asignarColumnas, CARRILES, carrilDe, disponerEnCarriles, idCarril, interpolar, MEDIDAS, repartirEnFilas } from './carriles'
 
 const [campanasP1, campanaP2, aristas] = await Promise.all([cargarCampanasP1(), cargarCampanaP2(), cargarAristasP2()])
 const grafo = construirGrafoAtaque({ campanasP1, campanaP2, aristas })
@@ -36,14 +36,38 @@ describe('disposición en carriles', () => {
     }
   })
 
-  it('el tiempo va de izquierda a derecha: más tarde, más a la derecha', () => {
-    const conHora = grafo.nodos.filter((n) => n.ms != null).sort((a, b) => a.ms! - b.ms!)
-    for (let i = 1; i < conHora.length; i++) expect(d.cajas[conHora[i].id].x).toBeGreaterThanOrEqual(d.cajas[conHora[i - 1].id].x)
+  it('el tiempo va de izquierda a derecha: una tarjeta más tardía nunca queda a la izquierda', () => {
+    const tarjetas = grafo.nodos.filter((n) => n.ms != null && n.tipo !== 'campana').sort((a, b) => a.ms! - b.ms!)
+    for (let i = 1; i < tarjetas.length; i++) expect(d.cajas[tarjetas[i].id].x, tarjetas[i].id).toBeGreaterThanOrEqual(d.cajas[tarjetas[i - 1].id].x)
+    // y las bandas, por su hora de inicio
+    const bandas = grafo.nodos.filter((n) => n.tipo === 'campana').sort((a, b) => a.ms! - b.ms!)
+    for (let i = 1; i < bandas.length; i++) expect(d.cajas[bandas[i].id].x).toBeGreaterThanOrEqual(d.cajas[bandas[i - 1].id].x)
   })
 
-  it('las campañas son bandas del largo de su ventana', () => {
-    const p1 = grafo.nodos.find((n) => n.id === 'camp-p1-scranton-1')!
-    expect(d.cajas[p1.id].ancho).toBeCloseTo(((p1.msFin! - p1.ms!) / 60_000) * MEDIDAS.pxPorMinuto, 0)
+  it('cada momento con evidencia es una columna: sin solapes, con aire entre tarjetas y su hora escrita', () => {
+    const tarjetas = grafo.nodos.filter((n) => n.tipo !== 'host' && n.tipo !== 'campana')
+    const xs = [...new Set(tarjetas.map((n) => d.cajas[n.id].x))].sort((a, b) => a - b)
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(MEDIDAS.tarjeta.ancho + 24)
+    expect(d.columnas).toHaveLength(xs.length)
+    expect(d.columnas[0].texto).toBe('03:00:29')
+    // la cuenta y su powershell.exe son del mismo instante y del mismo host: misma columna, una encima de otra
+    expect(d.cajas['cuenta-pbeesly'].x).toBe(d.cajas['proc-powershell'].x)
+    expect(d.cajas['cuenta-pbeesly'].y).toBeLessThan(d.cajas['proc-powershell'].y)
+    // wsmprovhost.exe (84 ms después, en NASHUA) comparte columna con el powershell.exe que lo lanza
+    expect(d.cajas['proc-wsmprovhost'].x).toBe(d.cajas['proc-powershell'].x)
+  })
+
+  it('entre columnas lejanas se indica el tiempo que pasa', () => {
+    expect(d.saltos.map((s) => s.texto)).toContain('+5 min')
+    for (const s of d.saltos) expect(s.texto).toMatch(/^\+\d+ min$/)
+  })
+
+  it('las campañas son bandas que cubren su evidencia', () => {
+    const banda = d.cajas['camp-p1-scranton-1']
+    const centro = (id: string) => d.cajas[id].x + d.cajas[id].ancho / 2
+    expect(banda.x).toBeLessThanOrEqual(centro('alerta-al-0300-drop'))
+    expect(banda.x + banda.ancho).toBeGreaterThanOrEqual(centro('alerta-al-0305-lsass'))
+    expect(banda.ancho).toBeGreaterThanOrEqual(MEDIDAS.banda.minimo)
   })
 
   it('las 17 conexiones de P2 llegan al carril de NASHUA a su hora real: WinRM, luego SMB, luego RPC', () => {
@@ -65,6 +89,22 @@ describe('disposición en carriles', () => {
     expect(disponerEnCarriles(grafo.nodos, grafo.aristas)).toEqual(d)
     const abs = absoluta('proc-wsmprovhost', d)
     expect(abs.y).toBe(d.cajas['proc-wsmprovhost'].y + d.cajas['host-nashua'].y)
+  })
+
+  it('asignar columnas: apila lo simultáneo del mismo host y comparte columna entre hosts', () => {
+    const u = asignarColumnas([
+      { id: 'a', ms: 0, carril: 'S' },
+      { id: 'b', ms: 400, carril: 'S' },
+      { id: 'c', ms: 500, carril: 'N' },
+      { id: 'd', ms: 9000, carril: 'N' },
+      { id: 'e', ms: 9500, carril: 'S' },
+    ])
+    expect(Object.fromEntries([...u].map(([k, v]) => [k, `${v.columna}.${v.fila}`]))).toEqual({ a: '0.0', b: '0.1', c: '0.0', d: '1.0', e: '1.0' })
+  })
+
+  it('interpolar respeta los extremos y es lineal entre puntos', () => {
+    const p = [{ ms: 0, x: 0 }, { ms: 10, x: 100 }, { ms: 20, x: 120 }]
+    expect([interpolar(p, -5), interpolar(p, 5), interpolar(p, 15), interpolar(p, 99)]).toEqual([0, 50, 110, 120])
   })
 
   it('repartir en filas pone en otra fila lo que no cabe', () => {

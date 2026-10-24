@@ -28,6 +28,13 @@ describe('reproducción del ataque (reductor)', () => {
     expect(reproducir({ ...enMarcha, paso: 0 }, { tipo: 'anterior' }, 8).paso).toBe(0)
   })
 
+  it('ir a un paso lo elige y para la reproducción; fuera de rango se acota', () => {
+    const enMarcha = { ...INICIAL, enMarcha: true, paso: 2 }
+    expect(reproducir(enMarcha, { tipo: 'ir', paso: 5 }, 10)).toMatchObject({ paso: 5, enMarcha: false })
+    expect(reproducir(INICIAL, { tipo: 'ir', paso: 99 }, 10).paso).toBe(9)
+    expect(reproducir(INICIAL, { tipo: 'ir', paso: -3 }, 10).paso).toBe(0)
+  })
+
   it('un tic en pausa no cambia nada', () => {
     const e = { paso: 2, enMarcha: false, velocidad: 1 as const }
     expect(reproducir(e, { tipo: 'tic' }, 8)).toBe(e)

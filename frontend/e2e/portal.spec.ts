@@ -116,6 +116,51 @@ test('demo de conciencia situacional: simular, acelerar y aplicar una respuesta 
   await expect(asistente.getByRole('link', { name: /asistente de respuesta/ })).toHaveAttribute('href', /^\/respuesta\?caso=helios/)
 })
 
+test('maqueta 3D: se elige, dibuja la organización, abre la ficha de un activo y se recuerda', async ({ page }, info) => {
+  const errores = vigilarErrores(page)
+  await page.goto('/conciencia?org=helios&t=62')
+  const vista = page.getByRole('radiogroup', { name: 'Vista de la organización' })
+  // el 3D se habilita en cuanto la página comprueba que hay WebGL
+  await expect(vista.getByRole('radio', { name: '3D' })).toBeEnabled()
+  await vista.getByRole('radio', { name: '3D' }).click()
+  const maqueta = page.getByRole('region', { name: 'Maqueta 3D de Helios Farmacéutica' })
+  await expect(maqueta.locator('canvas')).toBeVisible()
+  await expect(page).toHaveURL(/vista=3d/)
+  // el resumen para lectores de pantalla y las etiquetas, que son botones
+  await expect(maqueta.getByRole('img', { name: /Comprometidos: .*DC01/ })).toBeAttached()
+  const dc = maqueta.getByRole('button', { name: /^DC01 · Infraestructura TI · comprometido/ })
+  await expect(dc).toBeVisible()
+  await dc.click()
+  await expect(page.getByRole('dialog', { name: /DC01/ })).toBeVisible()
+  await page.keyboard.press('Escape')
+  if (info.project.name === '1440') {
+    for (const tema of ['claro', 'oscuro'] as const) {
+      await page.evaluate((t) => localStorage.setItem('tfg-tema', t), tema)
+      await page.goto('/conciencia?org=helios&t=62')
+      await expect(page.getByRole('region', { name: 'Maqueta 3D de Helios Farmacéutica' }).locator('canvas')).toBeVisible()
+      await page.waitForTimeout(800)
+      await page.screenshot({ path: `capturas/1440/${tema}/conciencia-3d.png` })
+    }
+  } else {
+    // sin ?vista=, se recuerda la última elegida
+    await page.goto('/conciencia?org=dmevals')
+    await expect(page.getByRole('region', { name: 'Maqueta 3D de DMEVALS' }).locator('canvas')).toBeVisible()
+  }
+  expect(errores).toEqual([])
+})
+
+test('maqueta 3D: sin WebGL no se ofrece y la página se queda en 2D', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext
+    HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, tipo: string, ...resto: unknown[]) {
+      return /webgl/.test(tipo) ? null : (original as (...a: unknown[]) => RenderingContext | null).call(this, tipo, ...resto)
+    } as typeof original
+  })
+  await page.goto('/conciencia?org=helios&vista=3d')
+  await expect(page.getByRole('region', { name: 'Grafo de Helios Farmacéutica' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: '3D' })).toBeDisabled()
+})
+
 for (const tema of ['claro', 'oscuro'] as const) {
   test(`capturas de cada pantalla en tema ${tema}, sin desbordamiento horizontal`, async ({ page }, info) => {
     await page.addInitScript((t) => localStorage.setItem('tfg-tema', t), tema)
@@ -156,6 +201,8 @@ test('peso de la primera carga: la portada no descarga Recharts, React Flow ni l
   console.log(`JS añadido al abrir el grafo de ataque: ${(ataque.reduce((s, [, b]) => s + b, 0) / 1000).toFixed(2)} kB (${ataque.map(([r]) => r.split('/').pop()).join(', ')})`)
   expect(ataque.some(([ruta]) => /\/flujo-/.test(ruta))).toBe(true)
   expect(ataque.some(([ruta]) => /\/graficos-/.test(ruta))).toBe(false)
+  // three.js solo llega con la maqueta 3D: ni en la portada ni en el grafo de ataque
+  expect([...portada, ...ataque].some(([ruta]) => /\/tresd-/.test(ruta))).toBe(false)
 })
 
 test('grafo de ataque: «Reproducir ataque» recorre la secuencia y se puede pausar', async ({ page }) => {

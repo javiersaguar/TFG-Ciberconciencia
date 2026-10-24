@@ -33,7 +33,13 @@ export interface Filtros {
   fundamentos: Fundamento[]
 }
 
-export const FILTROS_INICIALES: Filtros = { campana: null, hosts: [], relaciones: [...RELACIONES], fundamentos: [...FUNDAMENTOS] }
+/**
+ * Por defecto se oculta el tráfico de dominio (LDAP y Kerberos hacia el controlador): es ruido de fondo, el mismo que
+ * P2 descarta, y sus tres líneas solo estorbaban al leer el ataque. Se activa desde «Relaciones».
+ */
+export const RELACIONES_POR_DEFECTO: readonly TipoRelacion[] = RELACIONES.filter((r) => r !== 'dominio')
+
+export const FILTROS_INICIALES: Filtros = { campana: null, hosts: [], relaciones: [...RELACIONES_POR_DEFECTO], fundamentos: [...FUNDAMENTOS] }
 
 /**
  * Lo que queda visible con unos filtros. Un nodo contenido (proceso, alerta) solo se ve si se ve su host; una arista,
@@ -71,6 +77,26 @@ export function recorridoHasta(grafo: GrafoAtaque, indice: number): { nodos: Set
     hito.aristas.forEach((id) => aristas.add(id))
   }
   return { nodos, aristas }
+}
+
+/**
+ * Elemento que lleva el número de cada paso en el lienzo: el ORIGEN de su conexión de red si la hay (el salto lo hace
+ * ese proceso), si no la primera alerta, proceso o cuenta del paso, y si no su host. Devuelve, por nodo, los números
+ * de paso (empezando en 1) que señala.
+ */
+export function numerarPasos(grafo: GrafoAtaque): Record<string, number[]> {
+  const porNodo: Record<string, number[]> = {}
+  grafo.hitos.forEach((hito, i) => {
+    const conexion = grafo.aristas.find((a) => hito.aristas.includes(a.id) && a.relacion === 'conexion')
+    const tipoDe = (id: string) => grafo.nodos.find((n) => n.id === id)?.tipo
+    const principal =
+      conexion?.origen ??
+      hito.nodos.find((id) => tipoDe(id) === 'alerta') ??
+      hito.nodos.find((id) => tipoDe(id) === 'proceso' || tipoDe(id) === 'cuenta') ??
+      hito.nodos[0]
+    if (principal) (porNodo[principal] ??= []).push(i + 1)
+  })
+  return porNodo
 }
 
 /** Alterna un valor en una lista (los conmutadores de filtro). */

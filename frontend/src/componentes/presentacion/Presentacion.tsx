@@ -120,7 +120,7 @@ export default function Presentacion() {
       className={cn(
         'fixed left-1/2 z-50',
         arriba ? 'top-14' : 'bottom-4',
-        'w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-acento/50 bg-superficie/95 p-4 shadow-2xl backdrop-blur',
+        'w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-acento/50 bg-superficie p-4 shadow-lg',
         !reducido && 'entrada-mensaje',
       )}
     >

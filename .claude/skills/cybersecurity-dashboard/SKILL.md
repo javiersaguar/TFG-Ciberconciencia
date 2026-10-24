@@ -27,7 +27,8 @@ WebSocket. Autenticación, JWT y multi-tenancy (F8.2) están fuera de alcance.
 ## 2. Arquitectura del frontend
 
 - React 19 + TypeScript estricto + Vite 8 (rolldown) + Tailwind 4 + shadcn/ui (Radix) + TanStack Query + Recharts 3 +
-  react-router 7 + lucide-react + `@xyflow/react` (solo el explorador del grafo de ataque). Sin Zustand.
+  react-router 7 + lucide-react + `@xyflow/react` (solo el explorador del grafo de ataque) + `three` y
+  `@react-three/fiber` (solo la maqueta 3D de `/conciencia`, chunk `tresd`). Sin Zustand propio y sin drei.
 - **Una sola puerta de datos**: `src/api/fuente.ts` (`desdeSimulado`). Las páginas consumen hooks de `src/api/*.ts`
   (`useSituacion`, `useGrafoAtaque`, `useIncidentes`, `useCronologia`, `useCoberturaAttack`, `useEvaluacion`,
   `useCuadro`…) y **nunca** importan `src/api/simulado/` directamente.
@@ -104,12 +105,18 @@ WebSocket. Autenticación, JWT y multi-tenancy (F8.2) están fuera de alcance.
   alertas Sigma), **inferido** (discontinuo; campañas P1/P2 y su confianza), **hipótesis** (punteado; lecturas del
   escenario y extrapolaciones). No inventes aristas: cada una con su `fuente`.
 - Nodos y aristas se construyen desde los datos (`api/simulado/grafoAtaque.ts`), cada uno con la hora (`ms`) de su
-  primer evento medido. La disposición es en **carriles por host** con el tiempo de izquierda a derecha, calculada por
-  una función pura y testeada (`paginas/ataque/carriles.ts`): campañas como bandas de su ventana, tarjetas en filas sin
-  solape y asas de los carriles a la hora de cada arista. Nada de posiciones a mano. `nodeTypes`/`edgeTypes` fuera del
-  componente, componentes con `memo`.
-- Texto ≥ 11–12 px a zoom 1 y **zoom semántico** (por debajo de `ZOOM_DETALLE` las tarjetas ocultan el detalle);
-  etiquetas de arista solo al pasar el ratón, al seleccionar o al reproducir; minimapa plegable; atribución visible.
+  primer evento medido. La disposición es en **carriles por host** calculada por una función pura y testeada
+  (`paginas/ataque/carriles.ts`). Desde el 24-10 el eje **no es lineal en minutos**: cada momento con evidencia es una
+  columna (lo simultáneo del mismo host, < 1 s, se apila; hosts distintos comparten columna), con su hora encima y
+  «+N min» entre columnas lejanas. Bandas y asas se colocan interpolando entre columnas; las conexiones que salen de
+  una tarjeta bajan en vertical desde ella y la evidencia llega a su banda justo encima de su tarjeta (`asasArista`).
+  Nada de posiciones a mano. `nodeTypes`/`edgeTypes` fuera del componente, componentes con `memo`.
+- **Pasos numerados** (`numerarPasos` en `logica.ts`): cada hito de la secuencia lleva su número sobre un elemento (el
+  proceso que conecta, si no la alerta, si no el host). El recorrido de debajo usa los mismos números. En la
+  reproducción la cámara **no se mueve** si el grafo entero se lee (zoom ≥ 0,7); si no, encuadra el paso y el anterior.
+- Texto ≥ 11–12 px a zoom 1 y **zoom semántico** (por debajo de `ZOOM_DETALLE` las tarjetas ocultan su segunda línea);
+  etiquetas de arista solo al pasar el ratón o al seleccionar; minimapa plegable; atribución visible. El detalle es un
+  panel sobre el lienzo que solo aparece con algo elegido, y el lienzo se desplaza para que lo elegido no quede debajo.
 - Controlado: atiende los cambios `select` (ratón y teclado) y `dimensions` (devuelve `measured`, o el minimapa sale
   vacío). `colorMode` sincronizado con `useTema`; variables `--xy-*` ligadas a los tokens.
 - Accesible: `ariaLabel` en nodos y aristas, `ariaLabelConfig` en español, foco visible y una lista de elementos
@@ -178,8 +185,8 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   organización (`preguntar`); nunca un LLM desde el navegador (el proveedor LLM+RAG vivirá en el servidor).
 - **Navegación**: barra superior (ruta, dataset, aviso), paleta Ctrl/Cmd + K propia (sin `cmdk`), filtros en
   `sessionStorage` con `useEstadoSesion` (validados al leerlos) y selección en la URL.
-- **Menos texto**: una frase bajo el título y el resto en `ComoLeer` («Cómo leer esta página»); jerga explicada en su
-  primera mención («detector P1» en vez de «oráculo» en el texto visible).
+- **Menos texto**: una frase bajo el título y el resto en `ComoLeer` (rotulado «Notas» desde el 24-10); jerga explicada en
+  su primera mención («detector P1» en vez de «oráculo» en el texto visible).
 - **Densidad de Observabilidad**: `compactar.ts` baja las filas de un número sin romper la disposición de Grafana; no se
   dibujan umbrales que el cuadro de Grafana no tenga.
 
@@ -203,3 +210,28 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   nodo queda fuera del lienzo o si el Copiloto estrecha el contenido. Añade una de este tipo con cada fallo visual.
 - **Idea pendiente: mapa mundial de alertas.** Ver `frontend/docs/plan-mejora.md` §8: con el corpus actual sería
   ilustrativo (solo IP privadas); necesita IP públicas, GeoIP local en el servidor y el WebSocket de F6.3.
+
+## 15. Convenciones de la ronda 4 (24-10-2026)
+
+- **Maqueta 3D** (`paginas/conciencia/Maqueta3D.tsx`, lógica en `maqueta.ts`): vista alternativa a la 2D, que sigue
+  siendo la de por defecto y la accesible. Selector «2D | 3D» sobre el grafo, `?vista=3d` y `localStorage`
+  (`tfg-vista-conciencia`, con try/catch). Carga diferida (`React.lazy`) y chunk `tresd`: ni la portada ni `/ataque` lo
+  bajan (lo comprueba Playwright). La escena sale de `construirEscena(org, ev, ruta, riesgo)`, pura y testeada: nada de
+  lógica nueva en el componente, solo dibujo.
+  - Colores: tokens leídos con `getComputedStyle` al cambiar de tema (`--maqueta-plataforma`, `--maqueta-pieza`,
+    `--sev-*`, `--acento`, `--ok`…). Ningún hex en el componente.
+  - Movimiento: `frameloop="demand"`; solo se anima el punto del último paso mientras la simulación avanza y sin
+    `prefers-reduced-motion`. La cámara no persigue el ataque.
+  - Etiquetas: botones del DOM proyectados sobre el lienzo (`Proyector`, sin pasar por React en cada fotograma), que abren
+    la misma `FichaActivo` que en 2D; el lienzo es `role="img"` con `resumenEscena`.
+  - WebGL: `hayWebGL()` crea un contexto de prueba (lento sin GPU): se comprueba tras pintar, salvo que se haya pedido
+    el 3D. Sin WebGL, el 3D no se ofrece; si el contexto falla al crear el lienzo, aviso y «Volver a la vista 2D».
+  - Playwright: el Chromium de las pruebas ya tiene WebGL; **no** añadas `--use-angle=swiftshader` (crear el contexto
+    pasaba de 18 a 664 ms y las pruebas de navegación vencían).
+  - Sin drei: controles de `three/addons/controls/OrbitControls.js` y etiquetas propias.
+- **Logotipo**: `componentes/shell/Logo.tsx` (tokens `--logo-*`, `useId` para el recorte) y `public/favicon.svg`. Imagen
+  original de referencia en `frontend/docs/marca/logo-original.png`. No lo sustituyas por un PNG.
+- **Sobriedad** (fuera los tics de interfaz hecha en serie): radio `--radius` 0,45 rem; nada de bandas de color a la
+  izquierda de las tarjetas (`border-l-4`); nada de iconos `Sparkles`/`Bot` para lo que decide un motor de reglas; nada
+  de `backdrop-blur` ni fondos translúcidos sobre lienzos; un solo aviso por pantalla de «no ejecuta acciones»; botones
+  que solo aparecen cuando hacen algo («Restablecer»). Si un adorno no comunica nada, no va.

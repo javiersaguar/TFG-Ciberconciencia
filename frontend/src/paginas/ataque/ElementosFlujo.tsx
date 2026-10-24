@@ -13,7 +13,7 @@ import type { AristaAtaque, NodoAtaque, TipoNodoAtaque } from '@/api/ataque'
 import { ChipNivel } from '@/componentes/datos/Chips'
 import { cn } from '@/lib/utils'
 
-import { MEDIDAS, type Asa as AsaCarril, type MarcaTiempo } from './carriles'
+import { MEDIDAS, type Asa as AsaCarril, type Columna, type Salto } from './carriles'
 import { ESTILO_FUNDAMENTO } from './estilo'
 
 export type DatosNodo = {
@@ -24,10 +24,19 @@ export type DatosNodo = {
   pulso?: boolean
   /** Ancho de la caja (las bandas de campaña miden su ventana). */
   ancho?: number
-  /** Solo carriles: asas a la hora de cada arista, rejilla de tiempo y si llevan las horas encima. */
+  /** Solo carriles: asas a la hora de cada arista, columnas del eje y si llevan las horas encima. */
   asas?: AsaCarril[]
-  marcas?: MarcaTiempo[]
+  columnas?: Columna[]
+  saltos?: Salto[]
   conHoras?: boolean
+  /** Pasos de la secuencia del ataque que señala este nodo, con su estado en la reproducción. */
+  pasos?: PasoMarcado[]
+}
+
+export type EstadoPaso = 'neutro' | 'hecho' | 'actual' | 'futuro'
+export interface PasoMarcado {
+  numero: number
+  estado: EstadoPaso
 }
 export type NodoFlujo = Node<DatosNodo, TipoNodoAtaque>
 export type DatosArista = { arista: AristaAtaque; atenuado: boolean; actual: boolean; dibujar?: boolean; mostrarEtiqueta?: boolean }
@@ -56,34 +65,65 @@ function AsasTarjeta() {
 const ICONO: Record<TipoNodoAtaque, LucideIcon> = { host: Monitor, cuenta: UserRound, proceso: Cpu, alerta: Siren, campana: Layers }
 const TEXTO_TIPO: Record<TipoNodoAtaque, string> = { host: 'Host', cuenta: 'Cuenta', proceso: 'Proceso', alerta: 'Alerta', campana: 'Campaña' }
 
+const dosCifras = (n: number) => String(n).padStart(2, '0')
+/** Hora de la tarjeta al segundo: sin milisegundos, que no todas las fuentes tienen (el detalle da la exacta). */
+const horaCorta = (ms: number) => `${dosCifras(Math.floor(ms / 3_600_000))}:${dosCifras(Math.floor(ms / 60_000) % 60)}:${dosCifras(Math.floor(ms / 1000) % 60)}`
+
 /** Zoom a partir del cual las tarjetas enseñan su detalle (zoom semántico). */
-export const ZOOM_DETALLE = 0.85
+export const ZOOM_DETALLE = 0.7
+
+const CLASE_PASO: Record<EstadoPaso, string> = {
+  neutro: 'bg-primario text-fondo',
+  hecho: 'bg-primario text-fondo',
+  actual: 'bg-acento text-sobre-intenso ring-2 ring-acento/40 ring-offset-1 ring-offset-superficie',
+  futuro: 'border border-borde-discontinuo bg-superficie text-texto-suave',
+}
+
+/** Número del paso en la secuencia del ataque: el orden de lectura del grafo, también sin reproducir. */
+export function InsigniasPaso({ pasos, className }: { pasos?: PasoMarcado[]; className?: string }) {
+  if (!pasos?.length) return null
+  return (
+    <span className={cn('flex gap-0.5', className)} aria-hidden>
+      {pasos.map((p) => (
+        <span key={p.numero} className={cn('flex size-5 items-center justify-center rounded-full text-[11px] font-bold tabular-nums', CLASE_PASO[p.estado])}>
+          {p.numero}
+        </span>
+      ))}
+    </span>
+  )
+}
 
 function NodoHostBase({ data }: NodeProps<NodoFlujo>) {
-  const { nodo, atenuado, seleccionado, actual, asas = [], marcas = [], conHoras } = data
+  const { nodo, atenuado, seleccionado, actual, asas = [], columnas = [], saltos = [], conHoras, pasos } = data
   const Icono = nodo.hosts[0] === 'NEWYORK' ? Server : Monitor
   const papel = nodo.detalle.hechos.find((h) => h.etiqueta === 'Papel')?.valor
   return (
     <div
       className={cn(
-        'relative h-full w-full rounded-xl border bg-zona/60 transition-opacity duration-300 motion-reduce:transition-none',
+        'relative h-full w-full rounded-lg border bg-zona/60 transition-opacity duration-300 motion-reduce:transition-none',
         seleccionado ? 'border-2 border-acento' : actual ? 'border-2 border-fund-observado' : 'border-borde',
         atenuado && 'opacity-45',
       )}
     >
-      {/* Rejilla de tiempo: una línea cada dos minutos; el primer carril lleva las horas encima. */}
-      {marcas.map((m) => (
-        <div key={m.ms} className="pointer-events-none absolute inset-y-0 border-l border-dashed border-borde/70" style={{ left: m.x }} aria-hidden>
-          {conHoras && <span className="absolute -top-5 -translate-x-1/2 font-mono text-[11px] text-texto-suave tabular-nums">{m.texto}</span>}
+      {/* Una franja por columna del eje (alternas), y encima del primer carril la hora de cada columna y los huecos. */}
+      {columnas.map((c, i) => (
+        <div key={c.ms} className={cn('pointer-events-none absolute inset-y-0', i % 2 === 0 && 'bg-superficie-hundida/45')} style={{ left: c.x, width: c.ancho }} aria-hidden>
+          {conHoras && <span className="absolute -top-6 left-1/2 -translate-x-1/2 font-mono text-[11.5px] font-semibold text-texto tabular-nums">{c.texto}</span>}
         </div>
       ))}
-      <div className="absolute inset-y-0 left-0 flex flex-col justify-center gap-0.5 border-r border-borde px-3" style={{ width: MEDIDAS.etiqueta }}>
+      {conHoras &&
+        saltos.map((s) => (
+          <span key={s.x} className="pointer-events-none absolute -top-6 -translate-x-1/2 text-[11px] text-texto-suave" style={{ left: s.x }} aria-hidden>
+            {s.texto}
+          </span>
+        ))}
+      <div className="absolute inset-y-0 left-0 flex flex-col justify-center gap-0.5 border-r border-borde bg-zona px-3" style={{ width: MEDIDAS.etiqueta }} title={papel}>
         <span className="flex items-center gap-1.5">
           <Icono className="size-4 shrink-0 text-texto-suave" aria-hidden />
           <span className="font-mono text-[13px] font-semibold text-texto">{nodo.etiqueta}</span>
         </span>
-        {nodo.subtitulo && <span className="font-mono text-[11.5px] text-texto-suave">{nodo.subtitulo}</span>}
-        {papel && <span className="line-clamp-2 text-[11px] leading-tight text-texto-suave">{papel}</span>}
+        {nodo.subtitulo && <span className="pl-5.5 font-mono text-[11.5px] text-texto-suave">{nodo.subtitulo}</span>}
+        <InsigniasPaso pasos={pasos} className="absolute top-1.5 right-1.5" />
       </div>
       {asas.map((a) => (
         <Asa key={`${a.tipo}-${a.id}`} tipo={a.tipo} posicion={a.lado === 'arriba' ? Position.Top : Position.Bottom} id={a.id} estilo={{ left: a.x }} />
@@ -109,29 +149,36 @@ function NodoTarjetaBase({ data, type }: NodeProps<NodoFlujo>) {
       <div
         style={{ width: data.ancho ?? MEDIDAS.banda.minimo, height: MEDIDAS.banda.alto, borderColor: estilo.color }}
         title={nodo.subtitulo ? `${nodo.etiqueta} · ${nodo.subtitulo}` : nodo.etiqueta}
-        className={cn(marco, 'flex items-center gap-1.5 rounded-lg border-2 border-dashed px-2')}
+        className={cn(marco, 'flex items-center gap-1.5 rounded-md border-2 border-dashed px-2 shadow-none')}
       >
         <Icono className={cn('size-3.5 shrink-0', estilo.claseTexto)} aria-hidden />
         {/* el nombre de la campaña no cede: solo se recorta si ni él cabe en la banda (y entonces queda el tooltip) */}
         <span className="max-w-full shrink-0 truncate text-[12px] font-semibold whitespace-nowrap text-texto">{nodo.etiqueta}</span>
         {detallado && nodo.subtitulo && <span className="min-w-0 truncate font-mono text-[11px] text-texto-suave">{nodo.subtitulo}</span>}
+        <InsigniasPaso pasos={data.pulso ? undefined : data.pasos} className="absolute -top-2.5 -left-2.5" />
         {data.pulso && <span className="pulso-nodo" aria-hidden />}
         <AsasTarjeta />
+        {data.asas?.map((a) => (
+          <Asa key={`${a.tipo}-${a.id}`} tipo={a.tipo} posicion={a.lado === 'arriba' ? Position.Top : Position.Bottom} id={a.id} estilo={{ left: a.x }} />
+        ))}
       </div>
     )
   }
   const mono = type === 'proceso' || type === 'cuenta'
+  const repeticiones = nodo.subtitulo?.match(/×\d+/)?.[0]
   return (
-    <div style={{ width: data.ancho ?? MEDIDAS.tarjeta.ancho, height: MEDIDAS.tarjeta.alto }} className={cn(marco, 'rounded-xl border-borde-tarjeta px-2.5 py-1.5')}>
-      <div className="flex items-center gap-1.5">
-        <Icono className="size-3.5 shrink-0 text-texto-suave" aria-hidden />
-        <span className="text-[11px] font-semibold text-texto-suave">{TEXTO_TIPO[type]}</span>
-        {nodo.nivel && <ChipNivel nivel={nodo.nivel} className="ml-auto" />}
+    <div style={{ width: data.ancho ?? MEDIDAS.tarjeta.ancho, height: MEDIDAS.tarjeta.alto }} title={`${TEXTO_TIPO[type]} · ${nodo.etiqueta}`} className={cn(marco, 'flex flex-col justify-center rounded-lg border-borde-tarjeta px-2.5')}>
+      <div className="flex min-w-0 items-start gap-1.5">
+        <Icono className="mt-px size-3.5 shrink-0 text-texto-suave" aria-hidden />
+        <span className={cn('min-w-0 text-[12px] leading-[1.25] font-semibold text-texto', mono ? 'truncate font-mono' : 'line-clamp-2')}>{nodo.etiqueta}</span>
       </div>
-      <p className={cn('truncate text-[12px] font-semibold text-texto', mono && 'font-mono')} title={nodo.etiqueta}>
-        {nodo.etiqueta}
-      </p>
-      {detallado && nodo.subtitulo && <p className="truncate font-mono text-[11px] text-texto-suave">{nodo.subtitulo}</p>}
+      {detallado && (
+        <div className="mt-0.5 flex items-center gap-1.5 pl-5">
+          {nodo.ms != null && <span className="font-mono text-[11px] whitespace-nowrap text-texto-suave tabular-nums">{horaCorta(nodo.ms)}{repeticiones ? ` · ${repeticiones}` : ''}</span>}
+          {nodo.nivel && <ChipNivel nivel={nodo.nivel} className="ml-auto" />}
+        </div>
+      )}
+      <InsigniasPaso pasos={data.pasos} className="absolute -top-2.5 -left-2.5" />
       {data.pulso && <span className="pulso-nodo" aria-hidden />}
       <AsasTarjeta />
     </div>
@@ -166,7 +213,8 @@ function AristaRelacionBase({ id, sourceX, sourceY, targetX, targetY, sourcePosi
       />
       {/* En la reproducción, el tramo del paso actual se DIBUJA en el sentido del ataque (normalizado a longitud 1). */}
       {data.dibujar && <path d={camino} pathLength={1} className="trazo-avance" style={{ stroke: estilo.color }} aria-hidden />}
-      {(selected || actual || data.mostrarEtiqueta) && (
+      {/* La etiqueta, solo al pasar el ratón o al elegir la relación: en la reproducción ya la explica el texto del paso. */}
+      {(selected || data.mostrarEtiqueta) && (
       <EdgeLabelRenderer>
         <div
           className={cn(
