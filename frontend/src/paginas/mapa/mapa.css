@@ -27,3 +27,5 @@
   .mapa-extremos { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .mapa-extremos > div + div { margin-top: 0; border-top: 0; border-left: 1px solid var(--borde); padding-top: 0; padding-left: 1rem; }
 }
+/* Las flechas del globo: más pequeñas que los botones de la barra, en una cruz de 3 × 3. */
+.mapa-flecha { width: 24px; height: 24px; border-radius: 5px; }

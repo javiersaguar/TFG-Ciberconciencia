@@ -4,7 +4,7 @@
 # quedan los ficheros estáticos y Caddy, sin Node ni node_modules.
 #
 #   docker build -t tfg/portal:local frontend/
-#   docker run --rm -p 127.0.0.1:4173:8080 tfg/portal:local      → http://localhost:4173
+#   docker run --rm -p 127.0.0.1:8090:8080 tfg/portal:local      → http://localhost:8090
 #
 # O con el resto de la plataforma: `docker compose --profile portal up -d --build` desde infra/.
 # Para desarrollar sigue siendo más cómodo `npm run dev` (recarga al guardar).

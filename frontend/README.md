@@ -55,14 +55,14 @@ Node ni `node_modules`:
 
 ```bash
 cd infra
-docker compose --profile portal up -d --build   # http://localhost:4173
+docker compose --profile portal up -d --build   # http://localhost:8090
 docker compose --profile portal down            # parar y quitar el contenedor
 ```
 
 - `frontend/Dockerfile`, en dos etapas: `npm ci` + `npm run build` con `node:22.23.2-alpine`, y servido con
   `caddy:2.10.2-alpine`.
 - El contenedor corre como usuario sin privilegios (UID 10001), con el sistema de ficheros de solo lectura,
-  `cap_drop: [ALL]` y `no-new-privileges`. Solo escucha en `127.0.0.1:4173`.
+  `cap_drop: [ALL]` y `no-new-privileges`. Solo escucha en `127.0.0.1:8090` (no el 4173, que es el de `vite preview` y Playwright).
 - `frontend/Caddyfile`: las rutas de la SPA (`/ataque`, `/mapa?…`) se resuelven a `index.html`, y un `/assets/…` que no
   existe da 404. Los ficheros de `/assets` (llevan huella en el nombre) se cachean un año; `index.html` se revalida
   siempre. Las respuestas van comprimidas con zstd o gzip.
@@ -205,9 +205,22 @@ ninguna coordenada se deduce de las IP privadas de APT29 ni se presenta como ubi
   (`GloboMundial.tsx`, en carga diferida con three.js) enseña **el mismo flujo**, con los mismos filtros, el mismo reloj
   (lee el mismo `reloj`, así que pausa y velocidad valen igual) y la misma selección: arcos por el círculo máximo del
   color de su severidad, el punto con estela que vuela del origen al destino, el anillo al llegar y, al elegir una
-  alerta (pinchando el arco o desde la tabla), el arco resaltado y sus dos ciudades rotuladas. Se gira arrastrando o
-  con su botón, y se acerca o aleja. Sin WebGL, el 3D no se ofrece; con movimiento reducido, rutas estáticas con su
-  flecha. La Tierra es la de los globos del portal (`componentes/tierra/`: mares y tierras del tema, costas,
+  alerta (pinchando el arco o desde la tabla), el arco resaltado y sus dos ciudades rotuladas. Sin WebGL, el 3D no se
+  ofrece; con movimiento reducido, rutas estáticas con su flecha.
+- **Globo: países, giro y flechas** (24-10, ajustes de Javier):
+  - **Países iluminados**: al elegir una alerta se iluminan sus países de origen y destino, como en el 2D, con los
+    mismos polígonos (`tierra.json`) pintados en una capa transparente sobre la Tierra.
+  - **Gira solo mientras se mira el mundo entero.** Se para al elegir una alerta o filtrar por país, y desde ahí solo se
+    mueve a mano. Al quitar la alerta y el filtro vuelve a girar. Arrastrar o usar las flechas también lo para; el
+    botón de giro lo reanuda.
+  - **Vuelve la vista solo si hace falta**: si lo elegido (los dos extremos, o el país filtrado) queda a espaldas, la
+    vista gira una vez hacia ello; si ya se ve, no se mueve. Singapur no tiene polígono en el 1:110m, así que se mira a
+    su ciudad.
+  - **Flechas** abajo a la derecha (arriba = norte, izquierda = oeste…): 20° por pulsación, con transición suave y
+    tope de 75° de latitud para no pasar por encima del polo. Se acumulan si se pulsan seguidas.
+  - La luz principal acompaña a la cámara, para que la cara que se ve esté siempre iluminada igual mientras gira.
+  - Lógica pura en `vistaGlobo.ts` (países por código, centro de la parte principal de cada país, pintado, flechas y
+    «queda detrás»), con su test. La Tierra es la de los globos del portal (`componentes/tierra/`: mares y tierras del tema, costas,
   fronteras, retícula y atmósfera), la misma que el globo de «Mundo» en `/conciencia`.
 
 La cartografía local (`src/paginas/mapa/tierra.json`) contiene 177 geometrías de **Natural Earth**, de dominio público,
@@ -220,7 +233,7 @@ públicas, enriquecimiento GeoIP en el servidor y el flujo de alertas de F6.3. N
 
 Pruebas: `e2e/mapa.spec.ts` comprueba movimiento real de las partículas, pausa, reanudación, detalle estable, filtros,
 zoom, teclado, movimiento reducido, ausencia de peticiones externas y de desbordes, y el globo (mismo flujo, selección
-desde la tabla, vista recordada); guarda capturas de los dos temas en 1280, 1440 y 1920 px. Las pruebas unitarias cubren la ventana acotada, el reloj y el cruce del Pacífico.
+desde la tabla, países iluminados, giro que se para al elegir o filtrar y vuelve al quitarlo, flechas, vista recordada); guarda capturas de los dos temas en 1280, 1440 y 1920 px. Las pruebas unitarias cubren la ventana acotada, el reloj y el cruce del Pacífico.
 
 ## Modo presentación
 

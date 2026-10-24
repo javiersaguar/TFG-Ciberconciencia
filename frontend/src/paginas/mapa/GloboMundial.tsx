@@ -2,14 +2,18 @@
  * El mapa mundial de alertas en 3D: el mismo flujo que `LienzoMundial` (las mismas alertas, filtros, reloj y
  * selección) sobre un globo con el estilo de los del portal (`componentes/tierra`). Cada ruta es un arco por el
  * círculo máximo, del color de su severidad; un punto con estela vuela del origen al destino al ritmo del reloj de la
- * demo y, al llegar, se abre un anillo. Pinchar un arco (o una alerta de la tabla) la elige: se resalta y se rotulan
- * sus dos ciudades.
+ * demo y, al llegar, se abre un anillo. Pinchar un arco (o una alerta de la tabla) la elige: se resalta, se iluminan
+ * sus dos países (como en el 2D) y se rotulan sus dos ciudades.
+ *
+ * El globo gira solo mientras se mira el mundo entero. Se para al elegir una alerta o filtrar por país, y desde ahí
+ * solo se mueve a mano: arrastrando o con las flechas de la esquina. Si lo elegido queda a espaldas, la vista se
+ * vuelve una vez hacia ello; si ya se ve, no se mueve.
  *
  * Mismo convenio que el 2D: el reloj lo controla la reproducción (pausa real, velocidad); con movimiento reducido no
  * hay partículas ni giro y cada ruta lleva su punta de flecha. Ubicaciones ILUSTRATIVAS: lo dice la página.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Maximize2, Minus, Plus, RotateCw } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minus, Plus, RotateCw } from 'lucide-react'
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -23,6 +27,7 @@ import { Tierra3D } from '@/componentes/tierra/Tierra3D'
 import { cn } from '@/lib/utils'
 
 import { TEXTO_NIVEL, VUELO_MS, type AlertaMapa } from './modelo'
+import { centroDePais, girarVista, paisesPorCodigo, pintarPaises, quedaDetras, type Sentido } from './vistaGlobo'
 
 const TOKEN_NIVEL: Record<NivelRegla, keyof PaletaGlobo> = {
   critical: 'sev-critica', high: 'sev-alta', medium: 'sev-media', low: 'sev-baja', informational: 'sev-info',
@@ -40,6 +45,40 @@ interface Props {
   reloj: RefObject<number>
   enMarcha: boolean
   alSeleccionar: (alerta: AlertaMapa) => void
+  /** Código del país filtrado (vacío: todo el mundo). Con un país filtrado el globo no gira solo. */
+  pais?: string
+}
+
+// --- Países de la alerta elegida -----------------------------------------------------------------------------------
+
+/**
+ * Los países de origen y destino de la alerta elegida, iluminados: una capa transparente apenas por encima de la
+ * Tierra (por debajo de fronteras y costas), con su propia textura. Solo se pinta al cambiar la selección o el tema.
+ */
+function PaisesResaltados({ codigos, pal }: { codigos: readonly string[]; pal: PaletaGlobo }) {
+  const clave = [...new Set(codigos)].sort().join(',')
+  const textura = useMemo(() => {
+    if (!clave) return null
+    const lienzo = document.createElement('canvas')
+    lienzo.width = 2048
+    lienzo.height = 1024
+    const ctx = lienzo.getContext('2d')
+    if (!ctx) return null
+    pintarPaises(ctx, lienzo.width, paisesPorCodigo(clave.split(',')), pal.acento)
+    const t = new THREE.CanvasTexture(lienzo)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.anisotropy = 4
+    return t
+  }, [clave, pal])
+  useEffect(() => () => textura?.dispose(), [textura])
+  if (!textura) return null
+  return (
+    // misma orientación que la esfera de `Tierra3D` (el meridiano 0 en +z)
+    <mesh rotation={[0, -Math.PI / 2, 0]} renderOrder={1}>
+      <sphereGeometry args={[1.0006, 128, 96]} />
+      <meshStandardMaterial map={textura} emissiveMap={textura} emissive="#ffffff" emissiveIntensity={0.35} transparent depthWrite={false} roughness={0.85} />
+    </mesh>
+  )
 }
 
 // --- Rutas -------------------------------------------------------------------------------------------------------
@@ -166,14 +205,22 @@ function Movimiento({ piezas, reloj, enMarcha }: { piezas: Map<string, Piezas>; 
 // --- Cámara y rótulos --------------------------------------------------------------------------------------------
 
 interface Orden {
-  tipo: 'acercar' | 'alejar' | 'mundo'
+  tipo: 'acercar' | 'alejar' | 'mundo' | Sentido
   n: number
 }
 
-function Camara({ girar, reducido, orden, alTocar }: { girar: boolean; reducido: boolean; orden: Orden | null; alTocar: () => void }) {
+/** Hacia dónde volver la vista cuando cambia lo elegido, y los puntos que tienen que verse. */
+interface Enfoque {
+  clave: string
+  direccion: Vec3
+  puntos: Vec3[]
+}
+
+function Camara({ girar, reducido, orden, enfoque, alTocar }: { girar: boolean; reducido: boolean; orden: Orden | null; enfoque: Enfoque | null; alTocar: () => void }) {
   const { camera, gl, invalidate } = useThree()
   const controles = useRef<OrbitControls | null>(null)
   const meta = useRef<THREE.Vector3 | null>(null)
+  const [aux] = useState(() => ({ dir: new THREE.Vector3(), objetivo: new THREE.Vector3(), eje: new THREE.Vector3() }))
   const alTocarRef = useRef(alTocar)
   useEffect(() => {
     alTocarRef.current = alTocar
@@ -209,33 +256,66 @@ function Camara({ girar, reducido, orden, alTocar }: { girar: boolean; reducido:
     if (controles.current) controles.current.autoRotate = girar && !reducido
     invalidate()
   }, [girar, reducido, invalidate])
+  const irA = (destino: THREE.Vector3) => {
+    if (reducido) {
+      camera.position.copy(destino)
+      meta.current = null
+    } else meta.current = destino
+    invalidate()
+  }
   useEffect(() => {
     if (!orden) return
-    const distancia = camera.position.length()
-    meta.current =
-      orden.tipo === 'mundo'
-        ? new THREE.Vector3(...DIRECCION_INICIAL).multiplyScalar(DISTANCIA)
-        : camera.position.clone().setLength(THREE.MathUtils.clamp(distancia * (orden.tipo === 'acercar' ? 0.8 : 1.25), 1.7, 7))
-    if (reducido) {
-      camera.position.copy(meta.current)
-      meta.current = null
-    }
-    invalidate()
+    // las pulsaciones seguidas se acumulan sobre el destino en curso, no sobre donde va la cámara a mitad de camino
+    const desde = meta.current ?? camera.position
+    const distancia = desde.length()
+    if (orden.tipo === 'mundo') irA(new THREE.Vector3(...DIRECCION_INICIAL).multiplyScalar(DISTANCIA))
+    else if (orden.tipo === 'acercar' || orden.tipo === 'alejar') irA(desde.clone().setLength(THREE.MathUtils.clamp(distancia * (orden.tipo === 'acercar' ? 0.8 : 1.25), 1.7, 7)))
+    else irA(new THREE.Vector3(...girarVista([desde.x, desde.y, desde.z], orden.tipo)))
   }, [orden]) // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando llega una orden nueva
+  useEffect(() => {
+    if (!enfoque) return
+    const desde = meta.current ?? camera.position
+    if (!quedaDetras([desde.x, desde.y, desde.z], enfoque.puntos)) return
+    irA(new THREE.Vector3(...enfoque.direccion).multiplyScalar(desde.length()))
+  }, [enfoque?.clave]) // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando cambia lo elegido
   useFrame((_, delta) => {
     const c = controles.current
     if (!c) return
     if (meta.current) {
       const k = 1 - Math.exp(-Math.min(delta, 1 / 30) * 4)
-      // por fuera de la esfera, no en línea recta (que pasaría por dentro)
+      // por fuera de la esfera: se gira la dirección (también hasta el lado opuesto) y se ajusta la distancia aparte
+      const { dir, objetivo, eje } = aux
+      dir.copy(camera.position).normalize()
+      objetivo.copy(meta.current).normalize()
+      const angulo = dir.angleTo(objetivo)
+      if (angulo > 1e-4) {
+        eje.crossVectors(dir, objetivo)
+        if (eje.lengthSq() < 1e-10) eje.set(0, 1, 0)
+        dir.applyAxisAngle(eje.normalize(), angulo * k)
+      }
       const largo = THREE.MathUtils.lerp(camera.position.length(), meta.current.length(), k)
-      camera.position.lerp(meta.current, k).setLength(largo)
-      if (camera.position.distanceTo(meta.current) < 0.005) meta.current = null
+      camera.position.copy(dir).multiplyScalar(largo)
+      if (angulo < 0.002 && Math.abs(largo - meta.current.length()) < 0.005) {
+        camera.position.copy(meta.current)
+        meta.current = null
+      }
       invalidate()
     }
     if (c.update(delta)) invalidate()
   })
   return null
+}
+
+/**
+ * La luz principal va con la cámara (arriba a la izquierda y por detrás de quien mira), para que la cara que se ve
+ * esté siempre iluminada igual mientras el globo gira o se mueve con las flechas.
+ */
+function LuzQueSigue({ intensidad }: { intensidad: number }) {
+  const luz = useRef<THREE.DirectionalLight>(null)
+  useFrame(({ camera }) => {
+    luz.current?.position.set(-3, 4, 5).applyQuaternion(camera.quaternion)
+  })
+  return <directionalLight ref={luz} position={[-3, 4, 5]} intensity={intensidad} />
 }
 
 /** Mueve los rótulos del DOM sobre sus ciudades y oculta los que quedan detrás del globo. */
@@ -269,19 +349,42 @@ class SinWebGL extends Component<{ alternativa: ReactNode; children: ReactNode }
 
 // --- El globo ----------------------------------------------------------------------------------------------------
 
-export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSeleccionar }: Props) {
+export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSeleccionar, pais = '' }: Props) {
   const { tema } = useTema()
   const reducido = useMovimientoReducido()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `tema` marca cuándo releer los tokens
   const pal = useMemo(() => leerPaletaGlobo(), [tema])
-  const [girar, setGirar] = useState(false)
+  // gira solo mientras se mira el mundo entero; elegir una alerta, filtrar por país o moverlo a mano lo para
+  const [girar, setGirar] = useState(true)
   const [tocado, setTocado] = useState(false)
+  const detenido = !!seleccion || !!pais
+  // al volver al mundo entero (sin alerta ni país), vuelve a girar aunque se hubiera movido a mano entretanto
+  const [detenidoAntes, setDetenidoAntes] = useState(detenido)
+  if (detenido !== detenidoAntes) {
+    setDetenidoAntes(detenido)
+    if (!detenido) setTocado(false)
+  }
   const [orden, setOrden] = useState<Orden | null>(null)
   const [piezas] = useState(() => new Map<string, Piezas>())
   const [rotulos] = useState(() => new Map<string, HTMLElement>())
   const registrar = useMemo(() => (id: string, p: Piezas | null) => (p ? piezas.set(id, p) : piezas.delete(id)), [piezas])
-  const autoGiro = girar && !tocado && !reducido
+  const autoGiro = girar && !tocado && !detenido && !reducido
   const ordenar = (tipo: Orden['tipo']) => setOrden((o) => ({ tipo, n: (o?.n ?? 0) + 1 }))
+  const mover = (sentido: Sentido) => {
+    setTocado(true)
+    ordenar(sentido)
+  }
+  // los países demasiado pequeños para el mapamundi 1:110m (Singapur) no tienen polígono: se mira a su ciudad
+  const ciudadDelPais = pais ? alertas.flatMap((a) => [a.desde, a.hasta]).find((u) => u.codigoPais === pais) : undefined
+  const enfoque = useMemo<Enfoque | null>(() => {
+    if (seleccion) {
+      const extremos = [lugar(seleccion.desde), lugar(seleccion.hasta)]
+      return { clave: 'alerta:' + seleccion.id, direccion: direccionDeVista(extremos), puntos: extremos.map((l) => aEsfera(l.lat, l.lon)) }
+    }
+    if (!pais) return null
+    const centro = centroDePais(pais) ?? (ciudadDelPais ? lugar(ciudadDelPais) : null)
+    return centro ? { clave: 'pais:' + pais, direccion: direccionDeVista([centro]), puntos: [aEsfera(centro.lat, centro.lon)] } : null
+  }, [seleccion, pais, ciudadDelPais])
 
   // si la elegida ya salió de la ventana de rastro, se sigue dibujando (como en el 2D)
   const rutas = seleccion && !alertas.some((a) => a.id === seleccion.id) ? [...alertas, seleccion] : alertas
@@ -289,7 +392,7 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
   const rotuladas = seleccion ? [seleccion.desde, seleccion.hasta] : [...new Map(rutas.flatMap((a) => [a.desde, a.hasta]).map((u) => [u.id, u])).values()].filter((u) => u.id === 'madrid' || u.id === 'singapur')
   const anclas = new Map<string, Vec3>(rotuladas.map((u) => [u.id, aEsfera(u.coordenadas[1], u.coordenadas[0], 1.03)]))
   const ciudades = [...new Map(rutas.flatMap((a) => [a.desde, a.hasta]).map((u) => [u.id, u])).values()]
-  const resumen = `Globo con ${alertas.length} ${alertas.length === 1 ? 'ruta' : 'rutas'} de origen a destino en los últimos segundos de la demo (ubicaciones ilustrativas).${seleccion ? ` Elegida: de ${seleccion.desde.ciudad} a ${seleccion.hasta.ciudad}, nivel ${TEXTO_NIVEL[seleccion.nivel].toLowerCase()}.` : ''}`
+  const resumen = `Globo con ${alertas.length} ${alertas.length === 1 ? 'ruta' : 'rutas'} de origen a destino en los últimos segundos de la demo (ubicaciones ilustrativas).${seleccion ? ` Elegida: de ${seleccion.desde.ciudad} a ${seleccion.hasta.ciudad}, nivel ${TEXTO_NIVEL[seleccion.nivel].toLowerCase()}; ${seleccion.desde.pais === seleccion.hasta.pais ? `se ilumina ${seleccion.desde.pais}` : `se iluminan ${seleccion.desde.pais} y ${seleccion.hasta.pais}`}.` : ''}`
 
   const alternativa = (
     <div role="alert" className="flex h-full min-h-[340px] items-center justify-center p-6 text-center text-sm text-texto">
@@ -304,8 +407,9 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
           <Canvas frameloop={(enMarcha && !reducido) || autoGiro ? 'always' : 'demand'} dpr={[1, 1.75]} camera={{ fov: 30, near: 0.1, far: 50, position: [0, 0, DISTANCIA] }} gl={{ antialias: true }} fallback={alternativa}>
             <color attach="background" args={[pal['maqueta-base']]} />
             <hemisphereLight args={[pal.superficie, pal['maqueta-base'], tema === 'oscuro' ? 1.1 : 1.3]} />
-            <directionalLight position={[-3, 4, 5]} intensity={tema === 'oscuro' ? 1.6 : 1.9} />
+            <LuzQueSigue intensidad={tema === 'oscuro' ? 1.6 : 1.9} />
             <Tierra3D pal={pal} />
+            {seleccion && <PaisesResaltados codigos={[seleccion.desde.codigoPais, seleccion.hasta.codigoPais]} pal={pal} />}
             {ciudades.map((u) => {
               const elegida = u.id === seleccion?.desde.id || u.id === seleccion?.hasta.id
               return (
@@ -319,7 +423,7 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
               <Ruta key={a.id} alerta={a} pal={pal} elegida={seleccion?.id === a.id} apagada={!!seleccion && seleccion.id !== a.id} reducido={reducido} registrar={registrar} alSeleccionar={alSeleccionar} />
             ))}
             {!reducido && <Movimiento piezas={piezas} reloj={reloj} enMarcha={enMarcha} />}
-            <Camara girar={autoGiro} reducido={reducido} orden={orden} alTocar={() => setTocado(true)} />
+            <Camara girar={autoGiro} reducido={reducido} orden={orden} enfoque={enfoque} alTocar={() => setTocado(true)} />
             <Proyector anclas={anclas} elementos={rotulos} />
           </Canvas>
         </div>
@@ -342,7 +446,21 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
 
         <div className="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-lg border border-borde bg-superficie/95 p-1">
           {!reducido && (
-            <button type="button" className={cn('mapa-icono', autoGiro && 'text-acento')} aria-label="Girar el globo" aria-pressed={autoGiro} onClick={() => { setGirar((g) => !g); setTocado(false) }}>
+            <button
+              type="button"
+              className={cn('mapa-icono', autoGiro && 'text-acento')}
+              aria-label="Girar el globo"
+              aria-pressed={autoGiro}
+              disabled={detenido}
+              title={detenido ? 'Parado mientras hay una alerta elegida o un país filtrado: muévelo a mano' : autoGiro ? 'Parar el giro' : 'Girar el globo'}
+              onClick={() => {
+                if (autoGiro) setGirar(false)
+                else {
+                  setGirar(true)
+                  setTocado(false)
+                }
+              }}
+            >
               <RotateCw className="size-4" aria-hidden />
             </button>
           )}
@@ -352,9 +470,22 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
         </div>
         <div className="absolute bottom-3 left-4 flex gap-4 text-[10px] text-texto-suave">
           <a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener noreferrer" className="hover:underline">Natural Earth · dominio público</a>
-          <span className="hidden sm:inline">Arrastra para girar el globo</span>
+          <span className="hidden sm:inline">Arrastra o usa las flechas para girar el globo</span>
         </div>
-        {reducido && <p className="absolute right-3 bottom-3 rounded bg-superficie/95 px-2 py-1 text-[10px] text-texto-suave">Movimiento reducido: rutas estáticas</p>}
+        {/* flechas: giran la vista 20° por pulsación, como arrastrar, y paran el giro automático */}
+        <div role="group" aria-label="Mover la vista del globo" className="mapa-flechas absolute right-3 bottom-3 z-10 grid grid-cols-3 gap-0.5 rounded-lg border border-borde bg-superficie/95 p-0.5">
+          {([
+            ['arriba', 'Mover la vista hacia arriba (norte)', ChevronUp, 'col-start-2'],
+            ['izquierda', 'Mover la vista a la izquierda (oeste)', ChevronLeft, 'col-start-1 row-start-2'],
+            ['derecha', 'Mover la vista a la derecha (este)', ChevronRight, 'col-start-3 row-start-2'],
+            ['abajo', 'Mover la vista hacia abajo (sur)', ChevronDown, 'col-start-2 row-start-3'],
+          ] as const).map(([sentido, nombre, Icono, sitio]) => (
+            <button key={sentido} type="button" className={cn('mapa-icono mapa-flecha', sitio)} aria-label={nombre} title={nombre} onClick={() => mover(sentido)}>
+              <Icono className="size-3.5" aria-hidden />
+            </button>
+          ))}
+        </div>
+        {reducido && <p className="absolute top-3 left-3 rounded bg-superficie/95 px-2 py-1 text-[10px] text-texto-suave">Movimiento reducido: rutas estáticas</p>}
       </SinWebGL>
     </div>
   )

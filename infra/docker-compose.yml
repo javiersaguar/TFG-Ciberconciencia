@@ -160,7 +160,7 @@ services:
     container_name: portal
     profiles: ["portal"]
     ports:
-      - "127.0.0.1:4173:8080"   # http://localhost:4173 (también desde el navegador de Windows)
+      - "127.0.0.1:8090:8080"   # http://localhost:8090 (también desde Windows). No el 4173: es el de vite preview y Playwright
     read_only: true
     tmpfs:
       - /data:uid=10001,gid=10001,mode=0700

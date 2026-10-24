@@ -88,6 +88,8 @@ test('la portada no descarga la cartografía ni el código del mapa', async ({ p
 test('mapa: el globo 3D enseña el mismo flujo, se elige una alerta y se recuerda la vista', async ({ page }, info) => {
   // sin GPU (Chromium de las pruebas), el globo tarda unos segundos en pintar la primera vez
   test.setTimeout(90_000)
+  // el giro automático solo existe sin movimiento reducido (la configuración lo reduce por defecto)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   const errores: string[] = []
   page.on('pageerror', (e) => errores.push(e.message))
   await page.goto('/mapa')
@@ -98,6 +100,9 @@ test('mapa: el globo 3D enseña el mismo flujo, se elige una alerta y se recuerd
   const globo = page.getByRole('region', { name: 'Globo de rutas geográficas' })
   await expect(globo.locator('canvas')).toBeVisible({ timeout: 20_000 })
   await expect(globo.getByRole('img', { name: /Globo con \d+ rutas? de origen a destino/ })).toBeAttached()
+  // mirando el mundo entero, el globo gira solo
+  const girar = globo.getByRole('button', { name: 'Girar el globo' })
+  await expect(girar).toHaveAttribute('aria-pressed', 'true')
   // la misma selección que en 2D: desde la tabla, con su detalle y el globo resaltándola
   await page.getByRole('button', { name: 'Pausar demo' }).click()
   const tabla = page.getByRole('table', { name: 'Alertas geográficas recientes' })
@@ -106,8 +111,20 @@ test('mapa: el globo 3D enseña el mismo flujo, se elige una alerta y se recuerd
   const [origen, destino] = ruta.split(' a ')
   await primera.click()
   await expect(page.getByTestId('detalle-geografico')).toBeVisible()
-  await expect(globo.getByRole('img', { name: new RegExp(`Elegida: de ${origen} a ${destino}`) })).toBeAttached()
+  await expect(globo.getByRole('img', { name: new RegExp(`Elegida: de ${origen} a ${destino}, .*se ilumina`) })).toBeAttached()
   await expect(globo.getByRole('button', { name: 'Ver todo el mundo' })).toBeVisible()
+  // con una alerta elegida se para y solo se mueve a mano: arrastrando o con las flechas de la esquina
+  await expect(girar).toHaveAttribute('aria-pressed', 'false')
+  await expect(girar).toBeDisabled()
+  const flechas = globo.getByRole('group', { name: 'Mover la vista del globo' })
+  for (const sentido of ['arriba', 'izquierda', 'derecha', 'abajo']) await flechas.getByRole('button', { name: new RegExp(sentido) }).click()
+  // al cerrar la alerta, vuelve a girar; filtrar por país lo vuelve a parar
+  await page.getByRole('button', { name: 'Cerrar detalle de la alerta' }).click()
+  await expect(girar).toHaveAttribute('aria-pressed', 'true')
+  await page.getByLabel('Filtrar por país').selectOption({ label: 'Japón' })
+  await expect(girar).toBeDisabled()
+  await page.getByLabel('Filtrar por país').selectOption({ label: 'Todo el mundo' })
+  await expect(girar).toHaveAttribute('aria-pressed', 'true')
   if (info.project.name === '1440') {
     for (const tema of ['claro', 'oscuro'] as const) {
       await page.evaluate((t) => localStorage.setItem('tfg-tema', t), tema)

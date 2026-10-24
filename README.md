@@ -198,7 +198,7 @@ Los servicios se organizan en perfiles de Docker Compose para no levantar todo s
 | `obs` | Prometheus + Grafana | Monitorización |
 | `graph` | Neo4j | Trabajo sobre el Pilar B *(F5)* |
 | `cti` | OpenCTI y dependencias | Ingesta de inteligencia *(F4)* |
-| `portal` | Portal web (Caddy, imagen `tfg/portal:local`) en `localhost:4173` | Demo del frontend *(F8)* |
+| `portal` | Portal web (Caddy, imagen `tfg/portal:local`) en `localhost:8090` | Demo del frontend *(F8)* |
 
 ---
 
