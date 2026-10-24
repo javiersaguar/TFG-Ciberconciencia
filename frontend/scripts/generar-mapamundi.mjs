@@ -1,7 +1,7 @@
 /**
  * npm run generar-mapamundi
  *
- * Genera `src/paginas/conciencia/globo/mapamundi.json`, el mapa del globo de la demo: las tierras emergidas (para
+ * Genera `src/componentes/tierra/mapamundi.json`, el mapa de los globos 3D y del mapa del mundo de la demo: las tierras emergidas (para
  * colorear los continentes) y las fronteras entre países (para dibujarlas como líneas), a partir de Natural Earth
  * 1:110m (dominio público) en la redistribución TopoJSON del paquete `world-atlas` (licencia ISC).
  *
@@ -20,7 +20,7 @@ import { feature, mesh } from 'topojson-client'
 const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
 const ORIGEN = require.resolve('world-atlas/countries-110m.json')
-const DESTINO = join(FRONTEND, 'src', 'paginas', 'conciencia', 'globo', 'mapamundi.json')
+const DESTINO = join(FRONTEND, 'src', 'componentes', 'tierra', 'mapamundi.json')
 
 const bruto = readFileSync(ORIGEN)
 const mundo = JSON.parse(bruto.toString('utf8'))

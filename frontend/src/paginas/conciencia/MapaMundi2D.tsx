@@ -18,7 +18,7 @@ import { ControlesZoom } from '@/paginas/grafo/ControlesZoom'
 import { useZoomLienzo } from '@/paginas/grafo/zoom'
 
 import { conexiones, ladosDeEtiqueta, resumenMundo, sitiosDeFuera } from './globo'
-import mapa from './globo/mapamundi.json'
+import mapa from '@/componentes/tierra/mapamundi.json'
 import type { Organizacion } from './modelo'
 import { PanelConexiones } from './PanelConexiones'
 import type { Evaluacion } from './simulacion'

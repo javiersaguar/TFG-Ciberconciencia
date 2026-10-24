@@ -285,6 +285,9 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   rutas con d3-geo, pausa, filtros, zoom y detalle. No convertirlo en geolocalización de las IP privadas ni presentarlo
   como telemetría real. La geografía se carga en su ruta y no debe arrastrar Recharts. El movimiento reducido deja
   flechas estáticas; el reloj se detiene al pausar u ocultar la pestaña.
+  **En 2D o 3D** (24-10): `GloboMundial.tsx` recibe exactamente las mismas props que `LienzoMundial` (alertas, selección,
+  `reloj`, `enMarcha`) y mueve partículas y anillos en un solo `useFrame` leyendo `reloj.current`: no tiene reloj
+  propio. La Tierra de los dos globos está en `componentes/tierra/` (`Tierra3D`, `esfera.ts` pura, `paleta.ts`).
 
 ## 16. Unificación del 24-10-2026: nada de lo anterior se pierde
 

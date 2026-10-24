@@ -11,100 +11,27 @@
  * (qué cruza la frontera, los arcos) está en `globo.ts`; aquí solo se dibuja.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { geoEquirectangular, geoPath } from 'd3-geo'
 import { Crosshair, Minus, Plus, RotateCw } from 'lucide-react'
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 import { useMovimientoReducido } from '@/componentes/datos/useMovimientoReducido'
+import { leerPaletaGlobo, type PaletaGlobo } from '@/componentes/tierra/paleta'
+import { Tierra3D } from '@/componentes/tierra/Tierra3D'
 import { useTema } from '@/componentes/tema/useTema'
 import { cn } from '@/lib/utils'
 
-import { aEsfera, arcoGeodesico, conexiones, direccionDeVista, ladosDeEtiqueta, resumenMundo, reticula, segmentosEnEsfera, sitiosDeFuera, type Conexion } from './globo'
-import mapa from './globo/mapamundi.json'
+import { aEsfera, arcoGeodesico, conexiones, direccionDeVista, ladosDeEtiqueta, resumenMundo, sitiosDeFuera, type Conexion } from './globo'
 import type { Vec3 } from './maqueta'
 import type { Organizacion } from './modelo'
 import { PanelConexiones } from './PanelConexiones'
 import type { Evaluacion } from './simulacion'
 
-const TOKENS = ['globo-oceano', 'globo-tierra', 'globo-costa', 'globo-frontera', 'globo-reticula', 'maqueta-base', 'superficie', 'sev-critica', 'linea-bloqueada', 'acento'] as const
-type Paleta = Record<(typeof TOKENS)[number], string>
-
-function leerPaleta(): Paleta {
-  const estilo = getComputedStyle(document.documentElement)
-  return Object.fromEntries(TOKENS.map((t) => [t, estilo.getPropertyValue(`--${t}`).trim() || '#8a94a2'])) as Paleta
-}
-
-const datos = mapa as { tierras: number[][][]; fronteras: number[][] }
-
-/** Lista plana [lon, lat, …] como anillo de GeoJSON. */
-const anillo = (plano: readonly number[]) => Array.from({ length: plano.length / 2 }, (_, i) => [plano[i * 2], plano[i * 2 + 1]])
-
-/** La textura del globo: mares y tierras pintados en un lienzo equirectangular con los colores del tema. */
-function texturaTierra(pal: Paleta): THREE.CanvasTexture {
-  const lienzo = document.createElement('canvas')
-  lienzo.width = 2048
-  lienzo.height = 1024
-  const ctx = lienzo.getContext('2d')!
-  ctx.fillStyle = pal['globo-oceano']
-  ctx.fillRect(0, 0, lienzo.width, lienzo.height)
-  const proyeccion = geoEquirectangular().scale(lienzo.width / (2 * Math.PI)).translate([lienzo.width / 2, lienzo.height / 2])
-  const camino = geoPath(proyeccion, ctx)
-  ctx.fillStyle = pal['globo-tierra']
-  for (const poligono of datos.tierras) {
-    ctx.beginPath()
-    camino({ type: 'Polygon', coordinates: poligono.map(anillo) })
-    ctx.fill('evenodd')
-  }
-  const textura = new THREE.CanvasTexture(lienzo)
-  textura.colorSpace = THREE.SRGBColorSpace
-  textura.anisotropy = 4
-  return textura
-}
-
-function Tierra({ pal }: { pal: Paleta }) {
-  const textura = useMemo(() => texturaTierra(pal), [pal])
-  useEffect(() => () => textura.dispose(), [textura])
-  const costas = useMemo(() => segmentosEnEsfera(datos.tierras.flat()), [])
-  const fronteras = useMemo(() => segmentosEnEsfera(datos.fronteras, 1.0012), [])
-  const malla = useMemo(() => reticula(15), [])
-  const geometria = (posiciones: Float32Array) => {
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(posiciones, 3))
-    return g
-  }
-  const [gCostas, gFronteras, gMalla] = useMemo(() => [geometria(costas), geometria(fronteras), geometria(malla)], [costas, fronteras, malla])
-  useEffect(() => () => [gCostas, gFronteras, gMalla].forEach((g) => g.dispose()), [gCostas, gFronteras, gMalla])
-  return (
-    <group>
-      {/* la esfera; el meridiano 0 tiene que caer en +z, como en `aEsfera` */}
-      <mesh rotation={[0, -Math.PI / 2, 0]}>
-        <sphereGeometry args={[1, 128, 96]} />
-        <meshStandardMaterial map={textura} roughness={0.85} metalness={0.02} />
-      </mesh>
-      <lineSegments geometry={gMalla}>
-        <lineBasicMaterial color={pal['globo-reticula']} transparent opacity={0.55} />
-      </lineSegments>
-      <lineSegments geometry={gFronteras}>
-        <lineBasicMaterial color={pal['globo-frontera']} />
-      </lineSegments>
-      <lineSegments geometry={gCostas}>
-        <lineBasicMaterial color={pal['globo-costa']} />
-      </lineSegments>
-      {/* la atmósfera: un halo tenue alrededor del borde */}
-      <mesh>
-        <sphereGeometry args={[1.06, 64, 48]} />
-        <meshBasicMaterial color={pal.acento} transparent opacity={0.08} side={THREE.BackSide} depthWrite={false} />
-      </mesh>
-    </group>
-  )
-}
-
 // --- Conexiones ---------------------------------------------------------------------------------------------------
 
 /** Un arco de luz que CRECE desde su origen al aparecer (o aparece entero con movimiento reducido). */
-function ArcoGlobo({ c, pal, animar, reducido, desfase }: { c: Conexion; pal: Paleta; animar: boolean; reducido: boolean; desfase: number }) {
+function ArcoGlobo({ c, pal, animar, reducido, desfase }: { c: Conexion; pal: PaletaGlobo; animar: boolean; reducido: boolean; desfase: number }) {
   const curva = useMemo(() => new THREE.CatmullRomCurve3(arcoGeodesico(c.desde, c.hasta).map((p) => new THREE.Vector3(...p))), [c.desde, c.hasta])
   const radio = c.ultimo ? 0.0085 : 0.006
   const geometria = useMemo(() => new THREE.TubeGeometry(curva, 96, radio, 8, false), [curva, radio])
@@ -325,7 +252,7 @@ export default function Globo3D({ org, ev, enMarcha, alVolverA2D }: Props) {
   const { tema } = useTema()
   const reducido = useMovimientoReducido()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `tema` marca cuándo releer los tokens
-  const pal = useMemo(() => leerPaleta(), [tema])
+  const pal = useMemo(() => leerPaletaGlobo(), [tema])
   const cs = conexiones(org, ev)
   const sitios = sitiosDeFuera(cs)
   const geo = org.geografia
@@ -370,7 +297,7 @@ export default function Globo3D({ org, ev, enMarcha, alVolverA2D }: Props) {
             <color attach="background" args={[pal['maqueta-base']]} />
             <hemisphereLight args={[pal.superficie, pal['maqueta-base'], tema === 'oscuro' ? 1.1 : 1.3]} />
             <directionalLight position={[-3, 4, 5]} intensity={tema === 'oscuro' ? 1.6 : 1.9} />
-            <Tierra pal={pal} />
+            <Tierra3D pal={pal} />
             {geo && <Sitio lat={geo.sede.lat} lon={geo.sede.lon} color={pal.acento} latir={!!ultimo && ultimo.sentido === 'entrada'} reducido={reducido} />}
             {sitios.map((s) => (
               <Sitio key={`${s.lat},${s.lon}`} lat={s.lat} lon={s.lon} color={pal['sev-critica']} latir={!!ultimo && ultimo.fuera.lat === s.lat && ultimo.fuera.lon === s.lon} reducido={reducido} />

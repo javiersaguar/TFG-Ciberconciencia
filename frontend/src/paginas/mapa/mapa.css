@@ -15,6 +15,8 @@
 .mapa-ciudad { fill: var(--superficie); stroke: var(--texto-suave); stroke-width: 1.4; }
 .mapa-ciudad-seleccionada { fill: var(--acento); stroke: var(--superficie); stroke-width: 1.8; }
 .mapa-etiqueta { fill: var(--texto); stroke: var(--lienzo); stroke-width: 3px; paint-order: stroke; font-size: 12px; font-weight: 600; }
+/* El rótulo de una ciudad sobre el globo 3D: el mismo halo que en el 2D. */
+.mapa-etiqueta-globo { text-shadow: 0 0 3px var(--lienzo), 0 0 3px var(--lienzo), 0 0 2px var(--lienzo); }
 .mapa-icono { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; color: var(--texto-suave); cursor: pointer; }
 .mapa-icono:hover { color: var(--texto); background: var(--superficie-alterna); }
 .mapa-icono:disabled { opacity: 0.35; cursor: default; }

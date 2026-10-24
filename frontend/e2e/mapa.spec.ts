@@ -84,3 +84,41 @@ test('la portada no descarga la cartografía ni el código del mapa', async ({ p
   await expect(page.getByRole('heading', { name: 'Situación', level: 1 })).toBeVisible()
   expect(recursos.some((url) => /PaginaMapaMundial|tierra\.json/.test(url))).toBe(false)
 })
+
+test('mapa: el globo 3D enseña el mismo flujo, se elige una alerta y se recuerda la vista', async ({ page }, info) => {
+  // sin GPU (Chromium de las pruebas), el globo tarda unos segundos en pintar la primera vez
+  test.setTimeout(90_000)
+  const errores: string[] = []
+  page.on('pageerror', (e) => errores.push(e.message))
+  await page.goto('/mapa')
+  const vista = page.getByRole('radiogroup', { name: 'Vista del mapa' })
+  await expect(vista.getByRole('radio', { name: '3D' })).toBeEnabled()
+  await vista.getByRole('radio', { name: '3D' }).click()
+  await expect(page).toHaveURL(/vista=3d/)
+  const globo = page.getByRole('region', { name: 'Globo de rutas geográficas' })
+  await expect(globo.locator('canvas')).toBeVisible({ timeout: 20_000 })
+  await expect(globo.getByRole('img', { name: /Globo con \d+ rutas? de origen a destino/ })).toBeAttached()
+  // la misma selección que en 2D: desde la tabla, con su detalle y el globo resaltándola
+  await page.getByRole('button', { name: 'Pausar demo' }).click()
+  const tabla = page.getByRole('table', { name: 'Alertas geográficas recientes' })
+  const primera = tabla.getByRole('button').first()
+  const ruta = (await primera.getAttribute('aria-label'))!.replace(/^Ver /, '').split(' · ')[0]
+  const [origen, destino] = ruta.split(' a ')
+  await primera.click()
+  await expect(page.getByTestId('detalle-geografico')).toBeVisible()
+  await expect(globo.getByRole('img', { name: new RegExp(`Elegida: de ${origen} a ${destino}`) })).toBeAttached()
+  await expect(globo.getByRole('button', { name: 'Ver todo el mundo' })).toBeVisible()
+  if (info.project.name === '1440') {
+    for (const tema of ['claro', 'oscuro'] as const) {
+      await page.evaluate((t) => localStorage.setItem('tfg-tema', t), tema)
+      await page.goto('/mapa?vista=3d')
+      await expect(page.getByRole('region', { name: 'Globo de rutas geográficas' }).locator('canvas')).toBeVisible({ timeout: 20_000 })
+      await page.waitForTimeout(1500)
+      await page.screenshot({ path: 'capturas/mapa/globo-' + tema + '.png', fullPage: true })
+    }
+  }
+  // sin ?vista=, se recuerda el globo
+  await page.goto('/mapa')
+  await expect(page.getByRole('region', { name: 'Globo de rutas geográficas' }).locator('canvas')).toBeVisible({ timeout: 20_000 })
+  expect(errores).toEqual([])
+})

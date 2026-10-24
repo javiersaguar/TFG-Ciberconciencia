@@ -1,9 +1,13 @@
 /**
  * Mapa mundial del boceto: flujo local continuo, expresamente ilustrativo.
  * Las ubicaciones reales llegarán enriquecidas desde el servidor en F6.3.
+ *
+ * Se ve en 2D (`LienzoMundial`, SVG, por defecto) o en 3D (`GloboMundial`, el globo, en carga diferida): el mismo flujo,
+ * los mismos filtros, el mismo reloj y la misma selección. `?vista=2d|3d`, recordada en el navegador; sin WebGL, el 3D
+ * no se ofrece.
  */
 import { ArrowDownLeft, ArrowRight, ArrowUpRight, Globe2, Info, LocateFixed, Pause, Play, Radio, RotateCcw, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
 import { useMapaMundial } from '@/api/mapa'
@@ -14,10 +18,28 @@ import { Button } from '@/componentes/ui/button'
 import { Skeleton } from '@/componentes/ui/skeleton'
 import { cn } from '@/lib/utils'
 
+import { hayWebGL } from '@/paginas/conciencia/webgl'
+
 import { LienzoMundial } from './LienzoMundial'
 import { alertasEnVentana, COLOR_NIVEL, filtrarAlertas, MAX_RECIENTES, nivelValido, NIVELES, RASTRO_MS, resumirAlertas, TEXTO_NIVEL, type AlertaMapa } from './modelo'
 import { useRelojMapa } from './useRelojMapa'
 import './mapa.css'
+
+// three.js solo se descarga si se elige el globo
+const GloboMundial = lazy(() => import('./GloboMundial'))
+
+type Vista = '2d' | '3d'
+const CLAVE_VISTA = 'tfg-vista-mapa'
+const esVista = (v: unknown): v is Vista => v === '2d' || v === '3d'
+
+function vistaGuardada(): Vista | null {
+  try {
+    const v = localStorage.getItem(CLAVE_VISTA)
+    return esVista(v) ? v : null
+  } catch {
+    return null
+  }
+}
 
 const hora = (ms: number) => new Date(ms).toLocaleTimeString('es-ES', { hour12: false })
 
@@ -70,6 +92,29 @@ export default function PaginaMapaMundial() {
   const visibles = useMemo(() => filtrarAlertas(alertas, nivel, pais), [alertas, nivel, pais])
   const trazos = useMemo(() => visibles.filter((a) => reproduccion.tiempo - a.instanteMs < RASTRO_MS), [visibles, reproduccion.tiempo])
   const resumen = resumirAlertas(visibles)
+  const [preferida, setPreferida] = useState(vistaGuardada)
+  const pedida = parametros.get('vista')
+  // Comprobar WebGL crea un contexto de prueba (lento sin GPU): ya, si se ha pedido el globo; si no, tras pintar.
+  const [webgl, setWebgl] = useState<boolean | null>(() => ((esVista(pedida) ? pedida : preferida) === '3d' ? hayWebGL() : null))
+  useEffect(() => {
+    if (webgl !== null) return
+    const id = window.setTimeout(() => setWebgl(hayWebGL()), 400)
+    return () => window.clearTimeout(id)
+  }, [webgl])
+  const vista: Vista = webgl ? (esVista(pedida) ? pedida : (preferida ?? '2d')) : '2d'
+  function cambiarVista(v: Vista) {
+    try {
+      localStorage.setItem(CLAVE_VISTA, v)
+    } catch {
+      // sin almacenamiento: la elección dura lo que dure la página
+    }
+    setPreferida(v)
+    setParametros((actual) => {
+      const copia = new URLSearchParams(actual)
+      copia.set('vista', v)
+      return copia
+    }, { replace: true })
+  }
   const recientes = visibles.slice(0, MAX_RECIENTES)
   if (seleccion && !recientes.some((a) => a.id === seleccion.id)) recientes.push(seleccion)
 
@@ -88,7 +133,7 @@ export default function PaginaMapaMundial() {
       <EncabezadoPagina
         titulo="Mapa mundial de alertas"
         descripcion="De dónde sale cada señal y a dónde llega, con su dirección y severidad."
-        comoLeer={<><p>Esta es una demo geográfica de Helios Farmacéutica. El flujo se genera localmente y las ubicaciones son ilustrativas: no se han geolocalizado las IP privadas de APT29.</p><p>El punto recorre la ruta del origen al destino. Al llegar aparece un anillo. El mapa conserva los trazos durante nueve segundos y los indicadores resumen los últimos sesenta segundos de la simulación. La ubicación de una IP no identifica al atacante.</p><p>Pausa el flujo para investigar, cambia la velocidad o filtra por país y severidad. Al ampliar puedes arrastrar el mapa. Con movimiento reducido se muestran flechas estáticas.</p></>}
+        comoLeer={<><p>Esta es una demo geográfica de Helios Farmacéutica. El flujo se genera localmente y las ubicaciones son ilustrativas: no se han geolocalizado las IP privadas de APT29.</p><p>El punto recorre la ruta del origen al destino. Al llegar aparece un anillo. El mapa conserva los trazos durante nueve segundos y los indicadores resumen los últimos sesenta segundos de la simulación. La ubicación de una IP no identifica al atacante.</p><p>Pausa el flujo para investigar, cambia la velocidad o filtra por país y severidad. Al ampliar puedes arrastrar el mapa. «2D | 3D» cambia entre el mapa y el globo, que se gira arrastrando: el flujo, los filtros y la selección son los mismos. Con movimiento reducido se muestran flechas estáticas.</p></>}
         acciones={<div className="flex items-center gap-2"><ChipProcedencia procedencia="ilustrativa" fuente={escenario?.fuente} /><span className="text-xs text-texto-suave">Helios Farmacéutica</span></div>}
       />
       <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-aviso/25 bg-aviso/5 px-3 py-2.5 text-xs text-texto-suave">
@@ -108,6 +153,25 @@ export default function PaginaMapaMundial() {
           </div>
           <section className="overflow-hidden rounded-2xl border border-borde bg-superficie" aria-label="Explorador geográfico">
             <div className="flex flex-wrap items-center gap-3 border-b border-borde px-4 py-3">
+              <span role="radiogroup" aria-label="Vista del mapa" className="flex rounded-lg border border-borde bg-superficie-alterna p-0.5">
+                {(['2d', '3d'] as const).map((v) => {
+                  const deshabilitada = v === '3d' && !webgl
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      role="radio"
+                      aria-checked={vista === v}
+                      disabled={deshabilitada}
+                      title={deshabilitada ? (webgl === null ? 'Comprobando si el navegador puede mostrar 3D…' : 'Este navegador no puede mostrar el globo (sin WebGL)') : v === '3d' ? 'Globo 3D' : 'Mapa 2D'}
+                      onClick={() => cambiarVista(v)}
+                      className={cn('rounded-md px-2.5 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50', vista === v ? 'bg-superficie text-acento shadow-sm' : 'text-texto-suave hover:text-texto')}
+                    >
+                      {v.toUpperCase()}
+                    </button>
+                  )
+                })}
+              </span>
               <div className="mr-auto flex items-center gap-2 text-xs">
                 <Radio className={cn('size-4', reproduccion.enMarcha ? 'text-ok' : 'text-texto-suave')} aria-hidden />
                 <strong className={cn('font-semibold', reproduccion.enMarcha ? 'text-ok' : 'text-texto-suave')}>{reproduccion.enMarcha ? 'Demo en directo' : 'Demo en pausa'}</strong>
@@ -134,7 +198,13 @@ export default function PaginaMapaMundial() {
             </div>
             <div className="grid xl:grid-cols-[minmax(0,1fr)_280px]">
               <div className="relative min-w-0">
-                <LienzoMundial alertas={trazos} seleccion={seleccion} reloj={reproduccion.reloj} enMarcha={reproduccion.enMarcha} alSeleccionar={setSeleccion} />
+                {vista === '3d' ? (
+                  <Suspense fallback={<div role="status" aria-label="Cargando el globo"><Skeleton className="aspect-[1000/540] min-h-[340px] w-full rounded-none" /></div>}>
+                    <GloboMundial alertas={trazos} seleccion={seleccion} reloj={reproduccion.reloj} enMarcha={reproduccion.enMarcha} alSeleccionar={setSeleccion} />
+                  </Suspense>
+                ) : (
+                  <LienzoMundial alertas={trazos} seleccion={seleccion} reloj={reproduccion.reloj} enMarcha={reproduccion.enMarcha} alSeleccionar={setSeleccion} />
+                )}
                 {!visibles.length && <p role="status" className="absolute top-1/2 left-1/2 w-64 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-borde bg-superficie/95 p-4 text-center text-sm text-texto-suave">No hay alertas con estos filtros en la ventana actual.</p>}
               </div>
               <Detalle alerta={seleccion} origen={reproduccion.origen} alCerrar={() => setSeleccion(null)} />

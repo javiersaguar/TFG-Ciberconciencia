@@ -26,7 +26,7 @@ mismo redibujado de los cuadros de Grafana. Las convenciones para trabajar en é
 | | Proyecto | `/proyecto` | Avance de las fases del TFG y estado documentado del pipeline (antes, en el centro de la portada) |
 | Demo | Conciencia situacional | `/conciencia?org=<id>&t=<s>&vista=2d\|3d` | Demo de los Pilares B y C, en grafo 2D (por defecto) o como **maqueta 3D** de la organización; su panel lateral es un resumen con enlace a `/respuesta` |
 | Demo | Conciencia situacional | `/conciencia?org=<id>&t=<s>` | Demo de los Pilares B y C; su panel lateral es un resumen con enlace a `/respuesta` |
-| | Mapa mundial | `/mapa?nivel=<nivel>&pais=<código>` | Flujo geográfico ilustrativo de Helios: rutas animadas de origen a destino, severidad, pausa, velocidades 1×/2×/4×, zoom y arrastre, filtros y detalle fijo de cada alerta |
+| | Mapa mundial | `/mapa?nivel=<nivel>&pais=<código>&vista=2d\|3d` | Flujo geográfico ilustrativo de Helios, en **mapa 2D o globo 3D**: rutas animadas de origen a destino, severidad, pausa, velocidades 1×/2×/4×, zoom y arrastre (o giro del globo), filtros y detalle fijo de cada alerta |
 | Próximamente | Inteligencia de amenazas | `/inteligencia` | Página «próximamente» (F4 · F8.3) |
 
 ## Puesta en marcha y pruebas
@@ -201,6 +201,14 @@ ninguna coordenada se deduce de las IP privadas de APT29 ni se presenta como ubi
 - Trazos durante nueve segundos y lista reciente acotada; seleccionar una alerta fija el detalle aunque lleguen otras.
 - Zoom y arrastre, selección por teclado y tabla alternativa al mapa. Con movimiento reducido, flechas estáticas.
 - La pestaña oculta suspende el reloj. Las partículas se mueven mediante transform y opacity sin renders por fotograma.
+- **Mapa 2D o globo 3D** (botón «2D | 3D» del explorador, `?vista=`, recordado en el navegador): el globo
+  (`GloboMundial.tsx`, en carga diferida con three.js) enseña **el mismo flujo**, con los mismos filtros, el mismo reloj
+  (lee el mismo `reloj`, así que pausa y velocidad valen igual) y la misma selección: arcos por el círculo máximo del
+  color de su severidad, el punto con estela que vuela del origen al destino, el anillo al llegar y, al elegir una
+  alerta (pinchando el arco o desde la tabla), el arco resaltado y sus dos ciudades rotuladas. Se gira arrastrando o
+  con su botón, y se acerca o aleja. Sin WebGL, el 3D no se ofrece; con movimiento reducido, rutas estáticas con su
+  flecha. La Tierra es la de los globos del portal (`componentes/tierra/`: mares y tierras del tema, costas,
+  fronteras, retícula y atmósfera), la misma que el globo de «Mundo» en `/conciencia`.
 
 La cartografía local (`src/paginas/mapa/tierra.json`) contiene 177 geometrías de **Natural Earth**, de dominio público,
 con URL de origen y SHA-256 dentro del fichero. Para actualizarla, ejecutar manualmente
@@ -211,8 +219,8 @@ La fuente está en `src/api/mapa.ts` y `src/api/simulado/mapa.ts`. El tiempo rea
 públicas, enriquecimiento GeoIP en el servidor y el flujo de alertas de F6.3. No se ha simulado un WebSocket.
 
 Pruebas: `e2e/mapa.spec.ts` comprueba movimiento real de las partículas, pausa, reanudación, detalle estable, filtros,
-zoom, teclado, movimiento reducido, ausencia de peticiones externas y de desbordes; guarda capturas de los dos temas
-en 1280, 1440 y 1920 px. Las pruebas unitarias cubren la ventana acotada, el reloj y el cruce del Pacífico.
+zoom, teclado, movimiento reducido, ausencia de peticiones externas y de desbordes, y el globo (mismo flujo, selección
+desde la tabla, vista recordada); guarda capturas de los dos temas en 1280, 1440 y 1920 px. Las pruebas unitarias cubren la ventana acotada, el reloj y el cruce del Pacífico.
 
 ## Modo presentación
 

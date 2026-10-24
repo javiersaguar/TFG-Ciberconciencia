@@ -48,4 +48,13 @@ describe('mapa mundial del boceto', () => {
     expect(screen.getByText('Demo en pausa')).toBeInTheDocument()
     expect(within(screen.getByRole('table', { name: 'Alertas geográficas recientes' })).getAllByRole('button')).toHaveLength(1)
   })
+
+  it('sin WebGL el globo no se ofrece: el 3D está desactivado y un ?vista=3d se queda en el mapa 2D', async () => {
+    renderizarRutas('/mapa?vista=3d')
+    expect(await screen.findByRole('region', { name: 'Mapa de rutas geográficas' })).toBeInTheDocument()
+    const vista = screen.getByRole('radiogroup', { name: 'Vista del mapa' })
+    expect(within(vista).getByRole('radio', { name: '2D' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(vista).getByRole('radio', { name: '3D' })).toBeDisabled()
+    expect(screen.queryByRole('region', { name: 'Globo de rutas geográficas' })).not.toBeInTheDocument()
+  })
 })
