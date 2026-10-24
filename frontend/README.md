@@ -66,6 +66,7 @@ la interfaz cabe en `useState` y en la URL.
 | `@playwright/test` 1.63.0 (exacta) | desarrollo | Pruebas de extremo a extremo y capturas en los dos temas y tres anchos. Versión fijada para reutilizar el Chromium ya descargado |
 | `three` 0.186.1 y `@react-three/fiber` 9.8.2 (exactas) | producción | La maqueta 3D de `/conciencia`. React Three Fiber permite escribirla como componentes de React y es compatible con React 19 (pide `>=19 <19.4`). Solo se descarga al elegir la vista 3D (chunk `tresd`, ~247 kB con gzip: R3F incluye three.js entero). **Sin drei**: arrastraba hls.js, mediapipe y otras dependencias que no se usan; los controles de órbita salen de `three/addons` y las etiquetas son botones propios |
 | `@types/three` 0.186.0 (exacta) | desarrollo | Tipos de three.js |
+| `world-atlas` 2.0.2 y `topojson-client` 3.1.0 (exactas) | desarrollo | Solo para `npm run generar-mapamundi`, que saca de Natural Earth 1:110m (dominio público; `world-atlas` es ISC) las tierras y fronteras del mapa y el globo de «Mundo» a `src/paginas/conciencia/globo/mapamundi.json` (81 kB, 29 kB con gzip, con su origen y la huella SHA-256 del original). El portal no las importa: usa el JSON generado y `d3-geo`, que ya estaba |
 
 **Grafos**: el del pipeline, el de la demo y el panel de movimiento lateral siguen en SVG propio (funcionan y no ganan
 nada con una librería). React Flow solo en el explorador del grafo de ataque, que es interactivo y de unos veinte
@@ -223,8 +224,9 @@ cifra con su fecha.
 
 ## Conciencia situacional (demo)
 
-> **Vista 2D o maqueta 3D.** Arriba a la izquierda del grafo, «2D | 3D». La 2D sigue siendo la de por defecto y la
-> accesible; la elección se recuerda en el navegador y se puede fijar con `?vista=3d`. Detalle en «Maqueta 3D», abajo.
+> **Sede o Mundo, en 2D o 3D.** Arriba a la izquierda del grafo, dos botones: «Sede | Mundo» (`?ambito=`) y «2D | 3D»
+> (`?vista=`). La sede en 2D es el grafo (por defecto, la accesible) y en 3D la maqueta; el mundo en 2D es el mapa y en
+> 3D el globo. Las dos elecciones se recuerdan en el navegador. Detalle en «Trazas vivas», «Maqueta 3D» y «El mundo», abajo.
 
 Enseña cómo se vería la conciencia cibersituacional cuando existan los Pilares B y C, sobre escenarios simulados:
 **Helios Farmacéutica** (`?org=helios`, ficticia) y **DMEVALS** (`?org=dmevals`, APT29 day1: medido hasta las 03:19 y
@@ -246,6 +248,34 @@ El panel lateral de la demo es ahora un **resumen** (situación, gravedad y las 
 **Niveles de autonomía (demo de la propuesta en estudio, F6.4)**: nivel 0 «recomienda» (por defecto) y nivel 1
 «ejecuta con aprobación», que abre una confirmación explícita con efecto, evidencia, regla y coste. Los niveles 2 y 3
 están deshabilitados (en estudio) y el 4 está descartado por diseño.
+
+## Trazas vivas en el grafo 2D (24-10-2026)
+
+El grafo 2D de la sede conserva su diseño (zonas en columnas, tarjetas con estado). Lo nuevo es que las **trazas del
+ataque se mueven** mientras la simulación corre: cada paso se **dibuja** en su sentido al llegar, por los pasos
+ocurridos **fluye** un trazo claro, una **cabeza** recorre el último salto y la **joya** a la que va la ruta probable
+**late**. En pausa no se mueve nada y con movimiento reducido tampoco (`estilos/movimiento.test.ts` lo comprueba).
+
+## El mundo: mapa 2D y globo 3D (24-10-2026)
+
+De dónde viene y adónde va el ataque: los pasos que **cruzan la frontera** de la organización (el correo que entra, las
+balizas de mando y control que salen, la exfiltración) entre la sede y los sitios de fuera, con las mismas trazas vivas
+que el grafo 2D (crecen al llegar, fluyen mientras corre la simulación, cometa por la última, los extremos laten).
+
+- **Mapa 2D** (`MapaMundi2D.tsx`, SVG con `d3-geo`, proyección Natural Earth): los arcos son círculos máximos (la ruta
+  más corta, curvada en el plano). Se acerca y se mueve como el grafo 2D.
+- **Globo 3D** (`Globo3D.tsx`, en el estilo de la maqueta: luz suave, mares y tierras del tema, costas y fronteras en
+  línea fina y los arcos como tubos de luz). Quieto y mirando a las conexiones al abrirlo; se gira a mano o con su botón.
+- **Lógica pura** (`globo.ts`, con tests): qué pasos cruzan la frontera y a qué sitio va cada uno (por su canal; la
+  exfiltración por el propio canal del implante, T1041, al servidor de C2), los arcos, la vista inicial y a qué lado va
+  cada etiqueta para que dos ciudades cercanas no se pisen.
+- **Ubicaciones ILUSTRATIVAS** (`Organizacion.geografia`): Helios en Tres Cantos con el phishing desde Ámsterdam, el C2
+  en Fráncfort y la exfiltración a Virginia; DMEVALS en Scranton (por los nombres de sus equipos) con Estocolmo y
+  Singapur. Lo dicen el chip y la lista de conexiones: es la ubicación de la IP, no la del atacante, y en el corpus
+  solo hay IP privadas de laboratorio. Con IP públicas y GeoIP en el servidor (F6.3) la API dará los lugares reales y
+  las vistas no cambian.
+- La lista de conexiones (plegable) es también la alternativa en texto; el dibujo lleva su resumen (`role="img"`).
+- Tokens `--globo-*` en los dos temas. El mapa (d3-geo y las costas) y el globo se cargan en diferido.
 
 ## Maqueta 3D (24-10-2026)
 
@@ -369,11 +399,9 @@ frontend/
 - Maqueta 3D: los arcos y las piezas no se pueden enfocar con el teclado dentro del lienzo (las etiquetas sí, y abren
   el porqué); en el hueco de la página, con la maqueta entera a la vista, los modelos se ven pequeños: el detalle luce
   a pantalla completa o en «Seguir el ataque». Sin GPU, la primera carga tarda unos segundos (sombreadores y reflejos).
-- **Idea anotada para F8 (21-10-2026): mapa mundial en tiempo real del origen y el destino de las alertas.** Con el
-  corpus actual no hay qué geolocalizar: todas las direcciones son privadas de laboratorio (10.0.x.x, y el atacante
-  en 192.168.0.4), así que un mapa con estos datos sería **ilustrativo**. Para que sea real hace falta telemetría con IP
-  públicas (o los IOC de la CTI de F4) y una base GeoIP local (p. ej. GeoLite2, sin llamadas a terceros desde el
-  navegador), además del WebSocket de alertas de F6.3. Si se adelanta como demo, va marcado como ilustrativo.
+- **Mapa mundial**: hecho como demo ilustrativa (ver «El mundo»). Para que sea real hace falta telemetría con IP públicas
+  (o los IOC de la CTI de F4), una base GeoIP local en el servidor (p. ej. GeoLite2, sin llamadas a terceros desde el
+  navegador) y el WebSocket de alertas de F6.3.
 - F8.0: nombre y marca definitivos (el logotipo y «Ciberconciencia» son provisionales).
-- `npm audit`: 11 avisos en dependencias que ya estaban (cadena de `shadcn` y `vite`); esta ronda no añade dependencias.
+- `npm audit`: avisos en dependencias que ya estaban (cadena de `shadcn` y `vite`); esta ronda solo añade dos de desarrollo para generar el mapamundi.
 

@@ -4,8 +4,10 @@
  *
  *   selector      las organizaciones vigiladas, cada una con el estado de su simulación en directo
  *   control       lanzar, pausar o reiniciar el ataque simulado, y su velocidad
- *   grafo         la organización por zonas y áreas, con el ataque encima: en 2D (`GrafoOrganizacion`, por defecto)
- *                 o como maqueta 3D (`Maqueta3D`, carga diferida; `?vista=3d`, recordada por navegador)
+ *   grafo         la SEDE por dentro, con el ataque encima: planta 2D (`GrafoOrganizacion`, por defecto) o maqueta
+ *                 3D (`Maqueta3D`); o el MUNDO, de dónde viene y adónde va el ataque: mapa 2D (`MapaMundi2D`) o
+ *                 globo 3D (`Globo3D`). `?ambito=sede|mundo` y `?vista=2d|3d`, recordados por navegador; lo que no
+ *                 es la planta se carga en diferido
  *   cronología    los pasos según ocurren y las respuestas aplicadas
  *   asistente     situación, gravedad y respuesta inmediata (`PanelAsistente`)
  *
@@ -33,36 +35,60 @@ import { desenlace, evaluar } from './simulacion'
 import { useSimulaciones, type Simulacion } from './useSimulaciones'
 import { hayWebGL } from './webgl'
 
-// three.js solo se descarga si se elige la vista 3D.
+// three.js solo se descarga si se elige una vista 3D; el mapa del mundo (d3-geo y las costas), si se elige el mundo.
 const Maqueta3D = lazy(() => import('./Maqueta3D'))
+const Globo3D = lazy(() => import('./Globo3D'))
+const MapaMundi2D = lazy(() => import('./MapaMundi2D'))
 
 type Vista = '2d' | '3d'
+type Ambito = 'sede' | 'mundo'
 const CLAVE_VISTA = 'tfg-vista-conciencia'
+const CLAVE_AMBITO = 'tfg-ambito-conciencia'
 const esVista = (v: unknown): v is Vista => v === '2d' || v === '3d'
+const esAmbito = (v: unknown): v is Ambito => v === 'sede' || v === 'mundo'
 
-function vistaGuardada(): Vista | null {
+function leerGuardado<T>(clave: string, valido: (v: unknown) => v is T): T | null {
   try {
-    const v = localStorage.getItem(CLAVE_VISTA)
-    return esVista(v) ? v : null
+    const v = localStorage.getItem(clave)
+    return valido(v) ? v : null
   } catch {
     return null
   }
 }
 
-function guardarVista(v: Vista) {
+function guardar(clave: string, valor: string) {
   try {
-    localStorage.setItem(CLAVE_VISTA, v)
+    localStorage.setItem(clave, valor)
   } catch {
     // sin almacenamiento (ventana privada, bloqueado): la elección dura lo que dure la página
   }
 }
 
-/** 2D (por defecto, la accesible) o maqueta 3D. Sin WebGL, el 3D no se ofrece. */
-function SelectorVista({ vista, webgl, alCambiar }: { vista: Vista; webgl: boolean | null; alCambiar: (v: Vista) => void }) {
+const BOTON_SELECTOR = 'rounded-md px-2.5 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50'
+
+/** Qué se ve: la sede (sus salas y equipos) o el mundo (de dónde viene y adónde va el ataque). */
+function SelectorAmbito({ ambito, alCambiar }: { ambito: Ambito; alCambiar: (a: Ambito) => void }) {
   return (
-    <span role="radiogroup" aria-label="Vista de la organización" className="absolute top-3 left-3 z-20 flex rounded-lg border border-borde bg-superficie p-0.5 shadow-sm">
+    <span role="radiogroup" aria-label="Qué ver" className="flex rounded-lg border border-borde bg-superficie p-0.5 shadow-sm">
+      {([
+        { valor: 'sede', texto: 'Sede', titulo: 'La organización por dentro: salas, equipos y el ataque' },
+        { valor: 'mundo', texto: 'Mundo', titulo: 'De dónde viene y adónde va el ataque (ubicaciones ilustrativas)' },
+      ] as const).map((o) => (
+        <button key={o.valor} type="button" role="radio" aria-checked={ambito === o.valor} title={o.titulo} onClick={() => alCambiar(o.valor)} className={cn(BOTON_SELECTOR, ambito === o.valor ? 'bg-acento text-sobre-intenso' : 'text-texto-suave hover:text-texto')}>
+          {o.texto}
+        </button>
+      ))}
+    </span>
+  )
+}
+
+/** 2D (por defecto, la accesible) o 3D, para la sede y para el mundo. Sin WebGL, el 3D no se ofrece. */
+function SelectorVista({ vista, ambito, webgl, alCambiar }: { vista: Vista; ambito: Ambito; webgl: boolean | null; alCambiar: (v: Vista) => void }) {
+  return (
+    <span role="radiogroup" aria-label="Vista de la organización" className="flex w-fit rounded-lg border border-borde bg-superficie p-0.5 shadow-sm">
       {(['2d', '3d'] as const).map((v) => {
         const deshabilitada = v === '3d' && !webgl
+        const titulo = ambito === 'mundo' ? (v === '3d' ? 'Globo 3D' : 'Mapa del mundo 2D') : v === '3d' ? 'Maqueta 3D de la organización' : 'Planta 2D de la sede'
         return (
           <button
             key={v}
@@ -70,9 +96,9 @@ function SelectorVista({ vista, webgl, alCambiar }: { vista: Vista; webgl: boole
             role="radio"
             aria-checked={vista === v}
             disabled={deshabilitada}
-            title={deshabilitada ? (webgl === null ? 'Comprobando si el navegador puede mostrar 3D…' : 'Este navegador no puede mostrar la vista 3D (sin WebGL)') : v === '3d' ? 'Maqueta 3D de la organización' : 'Grafo 2D por zonas'}
+            title={deshabilitada ? (webgl === null ? 'Comprobando si el navegador puede mostrar 3D…' : 'Este navegador no puede mostrar la vista 3D (sin WebGL)') : titulo}
             onClick={() => alCambiar(v)}
-            className={cn('rounded-md px-2.5 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50', vista === v ? 'bg-acento text-sobre-intenso' : 'text-texto-suave hover:text-texto')}
+            className={cn(BOTON_SELECTOR, vista === v ? 'bg-acento text-sobre-intenso' : 'text-texto-suave hover:text-texto')}
           >
             {v.toUpperCase()}
           </button>
@@ -115,8 +141,11 @@ function EstadoOrg({ org, sim }: { org: Organizacion; sim: Simulacion }) {
 export default function PaginaConciencia() {
   const [parametros, setParametros] = useSearchParams()
   const org = organizacion(parametros.get('org'))
-  const [preferida, setPreferida] = useState(vistaGuardada)
+  const [preferida, setPreferida] = useState(() => leerGuardado(CLAVE_VISTA, esVista))
+  const [ambitoPreferido, setAmbitoPreferido] = useState(() => leerGuardado(CLAVE_AMBITO, esAmbito))
   const pedida = parametros.get('vista')
+  const ambitoPedido = parametros.get('ambito')
+  const ambito: Ambito = esAmbito(ambitoPedido) ? ambitoPedido : (ambitoPreferido ?? 'sede')
   // Comprobar WebGL crea un contexto de prueba, que sin GPU puede costar medio segundo: si se ha pedido el 3D se
   // comprueba ya (hará falta igualmente); si no, después de pintar la página, para no retrasar la navegación.
   const [webgl, setWebgl] = useState<boolean | null>(() => ((esVista(pedida) ? pedida : preferida) === '3d' ? hayWebGL() : null))
@@ -126,17 +155,24 @@ export default function PaginaConciencia() {
     return () => window.clearTimeout(id)
   }, [webgl])
   const vista: Vista = webgl ? (esVista(pedida) ? pedida : (preferida ?? '2d')) : '2d'
-  const cambiarVista = (v: Vista) => {
-    guardarVista(v)
-    setPreferida(v)
+  const fijarParametro = (clave: string, valor: string) =>
     setParametros(
       (previos) => {
         const nuevos = new URLSearchParams(previos)
-        nuevos.set('vista', v)
+        nuevos.set(clave, valor)
         return nuevos
       },
       { replace: true },
     )
+  const cambiarVista = (v: Vista) => {
+    guardar(CLAVE_VISTA, v)
+    setPreferida(v)
+    fijarParametro('vista', v)
+  }
+  const cambiarAmbito = (a: Ambito) => {
+    guardar(CLAVE_AMBITO, a)
+    setAmbitoPreferido(a)
+    fijarParametro('ambito', a)
   }
   const tiempoInicial = Number(parametros.get('t'))
   const { simulaciones, iniciar, pausar, reiniciar, fijarVelocidad, aplicar } = useSimulaciones(
@@ -163,7 +199,7 @@ export default function PaginaConciencia() {
                 key={o.id}
                 type="button"
                 aria-pressed={elegida}
-                onClick={() => setParametros(esVista(pedida) ? { org: o.id, vista: pedida } : { org: o.id }, { replace: true })}
+                onClick={() => setParametros({ org: o.id, ...(esVista(pedida) ? { vista: pedida } : {}), ...(esAmbito(ambitoPedido) ? { ambito: ambitoPedido } : {}) }, { replace: true })}
                 className={cn(
                   'min-w-52 shrink-0 rounded-2xl border px-3.5 py-2 text-left transition',
                   elegida ? 'border-acento bg-superficie shadow-sm' : 'border-borde bg-superficie/60 hover:bg-superficie',
@@ -239,8 +275,11 @@ export default function PaginaConciencia() {
       <div className="grid min-h-[31rem] flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_25rem]">
         <div className="grid min-h-[36rem] gap-3 lg:min-h-0 lg:grid-rows-[minmax(0,1fr)_10.5rem]">
           <div className="relative min-h-0">
-            <SelectorVista vista={vista} webgl={webgl} alCambiar={cambiarVista} />
-            {vista === '3d' ? (
+            <div className="absolute top-3 left-3 z-20 flex flex-col items-start gap-1.5">
+              <SelectorAmbito ambito={ambito} alCambiar={cambiarAmbito} />
+              <SelectorVista vista={vista} ambito={ambito} webgl={webgl} alCambiar={cambiarVista} />
+            </div>
+            {ambito === 'sede' && vista === '3d' ? (
               <Suspense fallback={<div role="status" aria-label="Cargando la maqueta 3D" className="h-full"><Skeleton className="h-full rounded-lg" /></div>}>
                 <Maqueta3D
                   org={org}
@@ -254,8 +293,12 @@ export default function PaginaConciencia() {
                   alVolverA2D={() => cambiarVista('2d')}
                 />
               </Suspense>
+            ) : ambito === 'mundo' ? (
+              <Suspense fallback={<div role="status" aria-label="Cargando el mapa del mundo" className="h-full"><Skeleton className="h-full rounded-lg" /></div>}>
+                {vista === '3d' ? <Globo3D org={org} ev={ev} enMarcha={sim.enMarcha} alVolverA2D={() => cambiarVista('2d')} /> : <MapaMundi2D org={org} ev={ev} enMarcha={sim.enMarcha} />}
+              </Suspense>
             ) : (
-              <GrafoOrganizacion org={org} ev={ev} ruta={ruta} riesgo={riesgo} />
+              <GrafoOrganizacion org={org} ev={ev} ruta={ruta} riesgo={riesgo} enMarcha={sim.enMarcha} />
             )}
           </div>
           <Cronologia org={org} ev={ev} acciones={sim.acciones} />

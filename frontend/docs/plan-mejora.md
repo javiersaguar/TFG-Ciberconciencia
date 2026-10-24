@@ -169,3 +169,7 @@ sea real y no ilustrativo:
 
 Mientras tanto, si se quiere para la demo, puede hacerse sobre el escenario ficticio de Helios **marcado como
 ilustrativo**, con la misma interfaz que usará la versión real. Propuesta de ubicación: F8.3 (completo).
+
+**Hecho como demo el 24-10-2026**: «Mundo» en `/conciencia`, en mapa 2D y globo 3D, para Helios y DMEVALS, con las
+ubicaciones marcadas como ilustrativas y la nota de que es la ubicación de la IP. La lógica (`globo.ts`) recibe lugares:
+cuando la API dé IP públicas geolocalizadas, las vistas no cambian. Faltan los requisitos 1 a 3 para que sea real.

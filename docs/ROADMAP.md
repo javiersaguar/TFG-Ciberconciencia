@@ -718,9 +718,12 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
   Segunda vuelta el mismo día: un modelo por tipo de activo (puesto, rack, controlador, base de datos, cintas, web,
   VPN, correo, OT), salas más espaciadas, cámara que **sigue el ataque** o **vista general que gira**, y panel
   **«Por qué»** al pinchar un activo (qué lo alcanzó, qué lo detectó, qué lo amenaza).
-  ➕ *Idea anotada el 21-10-2026:* **mapa mundial en tiempo real** del origen y el destino de las alertas. Requiere IP
-  públicas (el corpus actual solo tiene direcciones privadas de laboratorio), GeoIP local en el servidor y el WebSocket
-  de F6.3; sin eso, solo ilustrativo. Detalle en `frontend/docs/plan-mejora.md` §8.
+  Tercera vuelta: las trazas del ataque en 2D se animan mientras avanza la simulación, y se añade el **mundo** (de
+  dónde viene y adónde va el ataque) en **mapa 2D y globo 3D**, con ubicaciones ilustrativas.
+  ➕ *Idea anotada el 21-10-2026, hecha como demo ilustrativa el 24-10:* **mapa mundial** del origen y el destino del
+  ataque (mapa 2D y globo 3D en `/conciencia`). Para que sea real y en tiempo real requiere IP públicas (el corpus solo
+  tiene direcciones privadas de laboratorio), GeoIP local en el servidor y el WebSocket de F6.3. Detalle en
+  `frontend/docs/plan-mejora.md` §8.
 - [ ] **F8.4** Estados de carga y vacíos · responsive · accesibilidad básica ·
   **modo demo** (un botón lanza el replay) · Dockerizar · **grabar vídeo de 3–5 min**.
 

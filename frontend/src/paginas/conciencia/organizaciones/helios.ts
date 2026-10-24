@@ -95,4 +95,14 @@ export const HELIOS: Organizacion = {
     dominio: 'Administrador del dominio (hash de krbtgt robado)',
   },
   pasos,
+  geografia: {
+    sede: { nombre: 'Tres Cantos (Madrid)', pais: 'ES', lat: 40.6, lon: -3.71 },
+    infraestructura: {
+      correo: { nombre: 'Ámsterdam', pais: 'NL', lat: 52.37, lon: 4.9, papel: 'Servidor de envío del phishing' },
+      c2: { nombre: 'Fráncfort', pais: 'DE', lat: 50.11, lon: 8.68, papel: 'Servidor de mando y control (VPS)' },
+      salida: { nombre: 'Ashburn (Virginia)', pais: 'US', lat: 39.04, lon: -77.49, papel: 'Almacenamiento en la nube de la exfiltración' },
+    },
+    procedencia: 'ilustrativa',
+    nota: 'Ubicaciones inventadas para la demo (centros de datos habituales de servidores alquilados).',
+  },
 }

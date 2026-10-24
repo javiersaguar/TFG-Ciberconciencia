@@ -79,6 +79,29 @@ export interface PasoAtaque {
   fuente?: string
 }
 
+/** Un sitio del mapa del mundo. */
+export interface Lugar {
+  /** Ciudad o región, como se escribe en el rótulo. */
+  nombre: string
+  /** País (código ISO de dos letras). */
+  pais: string
+  lat: number
+  lon: number
+}
+
+/**
+ * Dónde está la organización y dónde se GEOLOCALIZA la infraestructura del atacante, por canal: el correo de entrada,
+ * el servidor de mando y control y el destino de la exfiltración. Es la ubicación de la IP, no la del atacante (que usa
+ * servidores alquilados y proxies), y en esta demo es INVENTADA: el corpus solo tiene IP privadas de laboratorio. La
+ * versión real saldrá de las IP públicas de las alertas, geolocalizadas con GeoIP en el servidor (F6.3).
+ */
+export interface Geografia {
+  sede: Lugar
+  infraestructura: Partial<Record<Canal | 'entrada', Lugar & { papel: string }>>
+  procedencia: 'ilustrativa'
+  nota: string
+}
+
 export interface Organizacion {
   id: string
   nombre: string
@@ -93,6 +116,8 @@ export interface Organizacion {
   /** Cuentas que existen en el escenario (para describir las acciones). */
   cuentas: Record<string, string>
   lienzo: { ancho: number; alto: number }
+  /** Para la vista del mundo (globo y mapa). */
+  geografia?: Geografia
 }
 
 /** Qué hace una acción de respuesta sobre la simulación. `informativa` no cambia el curso del ataque. */

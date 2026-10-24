@@ -191,6 +191,48 @@ test('maqueta 3D: sin WebGL no se ofrece y la página se queda en 2D', async ({ 
   await expect(page.getByRole('radio', { name: '3D' })).toBeDisabled()
 })
 
+test('el mundo: mapa 2D y globo 3D con las conexiones del ataque (ilustrativas), y se recuerda', async ({ page }, info) => {
+  // sin GPU, el globo tarda unos segundos en pintar la primera vez
+  test.setTimeout(90_000)
+  const errores = vigilarErrores(page)
+  await page.goto('/conciencia?org=helios&t=90')
+  await page.getByRole('radiogroup', { name: 'Qué ver' }).getByRole('radio', { name: 'Mundo' }).click()
+  await expect(page).toHaveURL(/ambito=mundo/)
+  const mapa = page.getByRole('region', { name: 'Mapa del mundo de Helios Farmacéutica' })
+  // a las 10:55 han cruzado la frontera el phishing, el mando y control y la exfiltración
+  await expect(mapa.locator('[data-conexion]')).toHaveCount(3)
+  await expect(mapa.getByRole('img', { name: /ilustrativas.*Fráncfort/ })).toBeAttached()
+  const panel = mapa.getByRole('region', { name: 'Conexiones con el exterior' })
+  await panel.getByRole('button', { name: /Conexiones con el exterior · 3/ }).click()
+  await expect(panel).toContainText('hacia Ashburn (Virginia) (US)')
+  await expect(panel).toContainText('Ubicación de la IP, no del atacante')
+
+  const vista = page.getByRole('radiogroup', { name: 'Vista de la organización' })
+  await expect(vista.getByRole('radio', { name: '3D' })).toBeEnabled()
+  await vista.getByRole('radio', { name: '3D' }).click()
+  const globo = page.getByRole('region', { name: 'Globo de Helios Farmacéutica' })
+  await expect(globo.locator('canvas')).toBeVisible({ timeout: 20_000 })
+  await expect(globo.getByRole('img', { name: /Sede en Tres Cantos/ })).toBeAttached()
+
+  if (info.project.name === '1440') {
+    for (const tema of ['claro', 'oscuro'] as const) {
+      await page.evaluate((t) => localStorage.setItem('tfg-tema', t), tema)
+      await page.goto('/conciencia?org=helios&t=90&vista=2d')
+      await expect(page.getByRole('region', { name: 'Mapa del mundo de Helios Farmacéutica' })).toBeVisible()
+      await page.screenshot({ path: `capturas/1440/${tema}/conciencia-mundo-2d.png` })
+      await page.goto('/conciencia?org=helios&t=90&vista=3d')
+      await expect(page.getByRole('region', { name: 'Globo de Helios Farmacéutica' }).locator('canvas')).toBeVisible({ timeout: 20_000 })
+      await page.waitForTimeout(800)
+      await page.screenshot({ path: `capturas/1440/${tema}/conciencia-mundo-3d.png` })
+    }
+  } else {
+    // sin ?ambito= ni ?vista=, se recuerdan los últimos elegidos
+    await page.goto('/conciencia?org=dmevals')
+    await expect(page.getByRole('region', { name: 'Globo de DMEVALS' }).locator('canvas')).toBeVisible({ timeout: 20_000 })
+  }
+  expect(errores).toEqual([])
+})
+
 for (const tema of ['claro', 'oscuro'] as const) {
   test(`capturas de cada pantalla en tema ${tema}, sin desbordamiento horizontal`, async ({ page }, info) => {
     await page.addInitScript((t) => localStorage.setItem('tfg-tema', t), tema)
@@ -394,7 +436,7 @@ test('el Copiloto empuja el contenido solo si le deja al menos 1000 px; si no, s
   expect(desborda).toBe(false)
 })
 
-test.describe('maqueta 3D con movimiento normal', () => {
+test.describe('con movimiento normal', () => {
   test.use({ reducedMotion: 'no-preference' })
 
   test('la vista general gira sola y el botón de giro la para', async ({ page }, info) => {
@@ -415,5 +457,19 @@ test.describe('maqueta 3D con movimiento normal', () => {
     const parada = await sitio()
     await page.waitForTimeout(1500)
     expect(await sitio()).toBe(parada)
+  })
+
+  test('el grafo 2D: mientras el ataque avanza, las trazas se mueven; en pausa, no', async ({ page }) => {
+    await page.goto('/conciencia?org=helios&t=40&vista=2d')
+    const grafo = page.getByRole('region', { name: 'Grafo de Helios Farmacéutica' })
+    await expect(grafo.locator('[data-paso]').first()).toBeAttached()
+    await expect(grafo.locator('.trazo-flujo')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Reanudar el ataque' }).click()
+    // flujo por los pasos ocurridos y una cabeza que recorre el último
+    await expect(grafo.locator('.trazo-flujo').first()).toBeAttached()
+    await expect(grafo.locator('[data-paso] animateMotion')).toHaveCount(1)
+    await page.getByRole('button', { name: 'Pausar' }).first().click()
+    await expect(grafo.locator('.trazo-flujo')).toHaveCount(0)
+    await expect(grafo.locator('[data-paso] animateMotion')).toHaveCount(0)
   })
 })

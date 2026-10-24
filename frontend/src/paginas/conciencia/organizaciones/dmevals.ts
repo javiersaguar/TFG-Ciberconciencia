@@ -73,4 +73,15 @@ export const DMEVALS: Organizacion = {
     { id: 'd14', t: 112, hora: '03:34 (ext.)', desde: 'erp', hasta: 'atacante', tactica: 'exfiltration', tecnica: 'T1048', titulo: 'Exfiltración de la contabilidad', detalle: 'Volcado de la base del ERP hacia el exterior.', requiere: ['d13'], canal: 'salida', compromete: false, impacto: 'Contabilidad de la empresa exfiltrada', ...EXT },
     { id: 'd15', t: 118, hora: '03:36 (ext.)', desde: 'newyork', hasta: 'backup', tactica: 'impact', tecnica: 'T1490', titulo: 'Borrado de las copias de seguridad', detalle: 'Preparación típica de un ransomware: sin copias, no hay recuperación.', requiere: ['d12'], cuenta: 'dominio', impacto: 'Copias de seguridad destruidas', ...EXT },
   ],
+  geografia: {
+    // los equipos del dominio llevan nombres de sucursales de Dunder Mifflin: la sede, por eso, en Scranton
+    sede: { nombre: 'Scranton (Pensilvania)', pais: 'US', lat: 41.41, lon: -75.66 },
+    infraestructura: {
+      entrada: { nombre: 'Estocolmo', pais: 'SE', lat: 59.33, lon: 18.07, papel: 'Servidor que entrega el implante (Pupy)' },
+      c2: { nombre: 'Estocolmo', pais: 'SE', lat: 59.33, lon: 18.07, papel: 'Servidor de mando y control (Pupy)' },
+      salida: { nombre: 'Singapur', pais: 'SG', lat: 1.35, lon: 103.82, papel: 'Destino de la exfiltración (extrapolada)' },
+    },
+    procedencia: 'ilustrativa',
+    nota: 'En MITRE Evals el atacante estaba en la red del laboratorio (192.168.0.4): sus ubicaciones aquí son inventadas.',
+  },
 }

@@ -4,9 +4,12 @@
  * atacante.
  *
  *   gris fino            alcanzabilidad de red (lo que el atacante *podría* recorrer)
- *   rojo                 pasos que han ocurrido; el último fluye
+ *   rojo                 pasos que han ocurrido: cada uno se dibuja al llegar; mientras la simulación corre, por ellos
+ *                        fluye un trazo claro y una cabeza recorre el último, que además fluye
  *   gris discontinuo ✕   pasos que la respuesta impidió
- *   ámbar discontinuo    ruta más probable hacia una joya de la corona (razonamiento, Pilar B)
+ *   ámbar discontinuo    ruta más probable hacia una joya de la corona (razonamiento, Pilar B); la joya late mientras
+ *                        el ataque avanza
+ * Con movimiento reducido no se anima nada: el estado se lee igual.
  *
  * Mismo lienzo que el grafo del pipeline: se ajusta al hueco, y se acerca, aleja y mueve con la rueda, el panel
  * táctil, arrastrando o con los botones (`paginas/grafo/zoom.ts`).
@@ -124,6 +127,8 @@ interface Props {
   ev: Evaluacion
   ruta: RutaProbable | null
   riesgo: Set<string>
+  /** La simulación avanza: solo entonces se mueven las trazas. */
+  enMarcha?: boolean
 }
 
 /** Ficha de un activo (la misma desde la vista 2D y desde la maqueta 3D). */
@@ -180,11 +185,12 @@ export function FichaActivo({ org, ev, activo, alCerrar }: { org: Organizacion; 
   )
 }
 
-export function GrafoOrganizacion({ org, ev, ruta, riesgo }: Props) {
+export function GrafoOrganizacion({ org, ev, ruta, riesgo, enMarcha = false }: Props) {
   const marco = useRef<HTMLDivElement>(null)
   const [ajuste, setAjuste] = useState(1)
   const [fichaId, setFichaId] = useState<string | null>(null)
   const reducido = useMovimientoReducido()
+  const vivo = enMarcha && !reducido
   const { vista, arrastrando, acercar, alejar } = useZoomLienzo(marco)
   const { ancho, alto } = org.lienzo
   const activos = porId(org.activos)
@@ -268,13 +274,21 @@ export function GrafoOrganizacion({ org, ev, ruta, riesgo }: Props) {
                 {esUltimo && <path d={s.d} fill="none" stroke={COLOR.ataque} strokeWidth={10} strokeOpacity={0.15} strokeLinecap="round" />}
                 <path
                   d={s.d}
+                  pathLength={ocurrido && !esUltimo ? 1 : undefined}
                   fill="none"
                   stroke={ocurrido ? COLOR.ataque : COLOR.bloqueado}
                   strokeWidth={ocurrido ? 2.8 : 2}
                   strokeDasharray={ocurrido ? (esUltimo ? '10 8' : undefined) : '4 5'}
-                  className={esUltimo && !reducido ? 'arista-flujo' : undefined}
+                  className={reducido || !ocurrido ? undefined : esUltimo ? 'arista-flujo' : 'trazo-dibuja'}
                   markerEnd={`url(#flecha-${org.id}-${ocurrido ? 'ataque' : 'bloqueado'})`}
                 />
+                {/* mientras el ataque avanza: un trazo claro corre por los pasos ocurridos y una cabeza recorre el último */}
+                {ocurrido && !esUltimo && vivo && <path d={s.d} fill="none" stroke="var(--superficie)" strokeWidth={1.1} strokeLinecap="round" className="trazo-flujo" />}
+                {esUltimo && vivo && (
+                  <path d="M-6,-4.5 L6,0 L-6,4.5 z" fill={COLOR.ataque}>
+                    <animateMotion dur="1.4s" repeatCount="indefinite" rotate="auto" path={s.d} />
+                  </path>
+                )}
                 {!ocurrido && (
                   <g transform={`translate(${s.mx} ${s.my})`}>
                     <circle r={9} fill="var(--superficie)" stroke={COLOR.bloqueado} />
@@ -307,6 +321,7 @@ export function GrafoOrganizacion({ org, ev, ruta, riesgo }: Props) {
                 'hover:shadow-[0_10px_24px_rgba(15,23,42,0.14)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento',
                 atacante ? 'border-atacante-borde bg-atacante-fondo text-atacante-texto' : estilo.tarjeta,
                 objetivoRuta && 'ring-2 ring-sev-media/70 ring-offset-2 ring-offset-lienzo',
+                objetivoRuta && vivo && 'objetivo-latido',
               )}
               style={{ left: activo.x - TARJETA.ancho / 2, top: activo.y - TARJETA.alto / 2, width: TARJETA.ancho, height: TARJETA.alto }}
             >

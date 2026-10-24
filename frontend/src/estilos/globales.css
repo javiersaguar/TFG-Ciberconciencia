@@ -111,6 +111,13 @@
   --maqueta-industrial: #c49b34;
   --maqueta-cristal: #9fb6cf;
 
+  /* La Tierra de /conciencia (globo 3D y mapa 2D): océano, tierras, costas, fronteras y retícula. */
+  --globo-oceano: #b7c9db;
+  --globo-tierra: #eef0ea;
+  --globo-costa: #56616e;
+  --globo-frontera: #a9b3bd;
+  --globo-reticula: #b3c2d0;
+
   /* Logotipo (componentes/shell/Logo.tsx; el favicon lleva los mismos valores del tema claro). */
   --logo-marco-luz: #0d4f8c;
   --logo-marco-medio: #0b3e72;
@@ -228,6 +235,11 @@
   --maqueta-led: #4cc497;
   --maqueta-industrial: #b38f2e;
   --maqueta-cristal: #6f8aa8;
+  --globo-oceano: #1b2b3c;
+  --globo-tierra: #3a4655;
+  --globo-costa: #8c9aab;
+  --globo-frontera: #4d5a6a;
+  --globo-reticula: #2a3a4c;
   /* El marco navy se perdería sobre la pizarra de la barra lateral: se aclara sin cambiar el tono. */
   --logo-marco-luz: #3d7cc4;
   --logo-marco-medio: #2f68aa;
@@ -515,6 +527,44 @@
   .arista-flujo,
   .anillo-activo,
   .punto-vivo {
+    animation: none;
+  }
+}
+
+/* --- 6 bis. Las trazas del ataque en 2D (grafo de /conciencia y mapa del mundo), vivas mientras avanza ----------
+ * Cada paso nuevo se DIBUJA en el sentido del ataque (una vez); mientras la simulación corre, por los pasos ocurridos
+ * fluye un trazo claro y la joya a la que va el atacante late. En pausa, quieto. */
+@keyframes trazo-dibuja {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.trazo-dibuja {
+  stroke-dasharray: 1;
+  animation: trazo-dibuja 700ms cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+@keyframes trazo-flujo {
+  to { stroke-dashoffset: -44; }
+}
+.trazo-flujo {
+  stroke-dasharray: 8 14;
+  animation: trazo-flujo 1.2s linear infinite;
+}
+.trazo-flujo-rapido {
+  stroke-dasharray: 12 10;
+  animation: trazo-flujo 0.7s linear infinite;
+}
+@keyframes objetivo-latido {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sev-media) 55%, transparent); }
+  60% { box-shadow: 0 0 0 10px transparent; }
+}
+.objetivo-latido {
+  animation: objetivo-latido 1.6s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trazo-dibuja,
+  .trazo-flujo,
+  .trazo-flujo-rapido,
+  .objetivo-latido {
     animation: none;
   }
 }

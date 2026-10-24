@@ -262,3 +262,22 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   fijos: con el hilo ocupado los tics llegan tarde y la simulación se frenaba.
 - **Playwright**: las pruebas de la maqueta esperan al lienzo hasta 20 s (sin GPU, compilar sombreadores tarda). El
   giro solo se prueba en un `describe` con `reducedMotion: 'no-preference'`; el resto corre con movimiento reducido.
+
+### 15.2 Trazas vivas en 2D y el mundo en 2D y 3D (24-10-2026, tercera vuelta)
+
+- **Selector** sobre el grafo de `/conciencia`: «Sede | Mundo» (`?ambito=`, `tfg-ambito-conciencia`) y «2D | 3D»
+  (`?vista=`). Sede 2D = grafo por zonas (por defecto, la accesible); sede 3D = maqueta; mundo 2D = mapa; mundo 3D =
+  globo.
+- **Lo que Javier descartó (no volver a proponerlo)**: una maqueta isométrica de línea con ciudad alrededor (coches,
+  calles, edificios) y una planta 2D de arquitectura. Se queda el diseño 2D original y la maqueta de §15.1, con cada
+  zona en su plataforma separada: los componentes no tienen por qué estar en el mismo sitio físico y así se entiende
+  mejor. Nada de decorado urbano en ninguna vista.
+- **Trazas vivas** (grafo 2D y mapa): `.trazo-dibuja` (el paso se dibuja al llegar, una vez, con `pathLength={1}`),
+  `.trazo-flujo` / `.trazo-flujo-rapido` (trazo claro que corre por los pasos ocurridos), `animateMotion` (cabeza por el
+  último) y `.objetivo-latido` (la joya a la que va). Solo mientras la simulación corre (`enMarcha`) y nunca con
+  movimiento reducido: todas están en el bloque `prefers-reduced-motion` y en `movimiento.test.ts`. En el globo, lo
+  mismo en three.js (el tubo crece con `setDrawRange`, cometas, anillos que laten).
+- **El mundo** (`globo.ts` puro; `MapaMundi2D.tsx` con `d3-geo`; `Globo3D.tsx` en el estilo de la maqueta):
+  conexiones = pasos con el atacante en un extremo, al sitio de su canal (T1041 → C2). Ubicaciones de
+  `Organizacion.geografia`, **ilustrativas** y dichas así (chip y nota: «ubicación de la IP, no del atacante»).
+  Mapamundi de Natural Earth generado por `npm run generar-mapamundi` (no se edita a mano). Tokens `--globo-*`.
