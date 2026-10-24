@@ -48,6 +48,33 @@ npm run e2e                # Playwright contra `vite preview` (requiere un build
 npm run sincronizar-datos  # vuelve a copiar a src/api/datos/ los resultados medidos del repositorio
 ```
 
+### En Docker
+
+La imagen compila el portal con Node y lo sirve con Caddy. En la imagen final solo están los ficheros estáticos, sin
+Node ni `node_modules`:
+
+```bash
+cd infra
+docker compose --profile portal up -d --build   # http://localhost:4173
+docker compose --profile portal down            # parar y quitar el contenedor
+```
+
+- `frontend/Dockerfile`, en dos etapas: `npm ci` + `npm run build` con `node:22.23.2-alpine`, y servido con
+  `caddy:2.10.2-alpine`.
+- El contenedor corre como usuario sin privilegios (UID 10001), con el sistema de ficheros de solo lectura,
+  `cap_drop: [ALL]` y `no-new-privileges`. Solo escucha en `127.0.0.1:4173`.
+- `frontend/Caddyfile`: las rutas de la SPA (`/ataque`, `/mapa?…`) se resuelven a `index.html`, y un `/assets/…` que no
+  existe da 404. Los ficheros de `/assets` (llevan huella en el nombre) se cachean un año; `index.html` se revalida
+  siempre. Las respuestas van comprimidas con zstd o gzip.
+- Cabeceras de seguridad: CSP sin `unsafe-inline` para scripts, `X-Frame-Options`, `nosniff`, `Referrer-Policy` y
+  `Permissions-Policy`. El script del tema de `index.html` entra en la CSP por su huella SHA-256, que
+  `scripts/csp-caddy.mjs` calcula en cada compilación. Si cambia el script, la huella cambia sola.
+- Los datos van dentro de la compilación (`src/api/datos/`), así que la imagen no lee nada de fuera de `frontend/`. Tras
+  `npm run sincronizar-datos` hay que reconstruirla (`--build`). Cuando exista la API de F6.3, Caddy le reenviará `/api`
+  (el bloque está comentado en el `Caddyfile`).
+
+Para desarrollar sigue siendo mejor `npm run dev`, que recarga al guardar.
+
 **Playwright** (`e2e/portal.spec.ts`, 13 escenarios × 3 anchos: 1280, 1440 y 1920 px) recorre la navegación, el
 cambio de tema (recordado al recargar y aplicado antes del primer pintado), los filtros, la selección y la reproducción del
 grafo de ataque, el brush de la línea temporal, el maestro-detalle de incidentes, Ctrl+K, la matriz por táctica, el
@@ -371,7 +398,8 @@ completa con sus conexiones.
 La telemetría la escribe el atacante: procesos, reglas, cuentas y rutas se pintan siempre como texto de React (cero
 `dangerouslySetInnerHTML`). Todos los parámetros de URL se validan contra listas cerradas o un formato y lo inválido se
 ignora (`?sel`, `?campana`, `?id`, `?tecnica`, `?host`, `?org`, `?cuadro`; `?t` acotado). `localStorage` siempre en
-try/catch. Ningún secreto en variables `VITE_*`. Enlaces externos con `rel="noopener noreferrer"`.
+try/catch. Ningún secreto en variables `VITE_*`. Enlaces externos con `rel="noopener noreferrer"`. Servido en Docker,
+lleva CSP y cabeceras de seguridad (ver «En Docker»).
 
 ## Rendimiento
 

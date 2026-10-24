@@ -151,6 +151,25 @@ services:
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --default-artifact-root /mlflow/artifacts
 
+  # Portal web (F8): la SPA compilada servida por Caddy (frontend/Dockerfile). Hoy no habla con ningún otro servicio
+  # (los datos van dentro de la compilación); cuando exista la API de F6.3, Caddy le reenviará /api.
+  portal:
+    build:
+      context: ../frontend
+    image: tfg/portal:local
+    container_name: portal
+    profiles: ["portal"]
+    ports:
+      - "127.0.0.1:4173:8080"   # http://localhost:4173 (también desde el navegador de Windows)
+    read_only: true
+    tmpfs:
+      - /data:uid=10001,gid=10001,mode=0700
+      - /config:uid=10001,gid=10001,mode=0700
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
 volumes:
   redpanda_data:
   flink_data:

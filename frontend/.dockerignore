@@ -1,0 +1,16 @@
+# Lo que la imagen no necesita (se instala o se genera dentro)
+node_modules
+dist
+# pruebas de extremo a extremo y sus resultados
+e2e
+test-results
+playwright-report
+capturas
+docs
+*.md
+*.local
+.vscode
+.idea
+.DS_Store
+Dockerfile
+.dockerignore

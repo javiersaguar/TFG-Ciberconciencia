@@ -1,0 +1,44 @@
+# Servidor del portal compilado (frontend/Dockerfile). Solo ficheros estáticos: hoy no hay API (F6.3).
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:8080 {
+	root * /srv
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Cross-Origin-Opener-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+	# Content-Security-Policy con la huella del script del tema (scripts/csp-caddy.mjs)
+	import /etc/caddy/csp.caddy
+
+	# Los ficheros de /assets llevan huella en el nombre: caché de un año. Lo demás (index.html) se revalida siempre,
+	# para que un despliegue nuevo se vea sin vaciar la caché.
+	@conHuella path /assets/*
+	header @conHuella Cache-Control "public, max-age=31536000, immutable"
+	@sinHuella not path /assets/*
+	header @sinHuella Cache-Control "no-cache"
+
+	# Cuando exista la API de F6.3 (FastAPI), irá aquí, por el mismo origen que la SPA:
+	# handle /api/* {
+	# 	reverse_proxy api:8000
+	# }
+
+	# Un fichero de /assets que no existe es un 404 de verdad (no el index.html con tipo equivocado).
+	handle /assets/* {
+		file_server
+	}
+	# Cualquier otra ruta es de la SPA (react-router): /ataque, /mapa?… se resuelven en el navegador.
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
