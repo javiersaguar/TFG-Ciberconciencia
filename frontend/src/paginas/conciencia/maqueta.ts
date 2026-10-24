@@ -8,8 +8,9 @@
  *   arcos         pasos del ataque (ocurridos o impedidos), ruta probable y enlaces de red
  *   marcas        pasos locales (abrir un adjunto, volcar LSASS en el propio equipo): un anillo sobre la pieza
  *
- * Coordenadas: el lienzo 2D de la organización (px) pasa a unidades de escena dividiendo entre 100; `x` del lienzo es
- * `x` de la escena y su `y` es la profundidad `z`. El eje vertical `y` es la altura.
+ * Coordenadas: el lienzo 2D de la organización (px) pasa a unidades de escena (`ESCALA_X`, `ESCALA_Z`; una unidad es
+ * más o menos un metro de la maqueta); `x` del lienzo es `x` de la escena y su `y` es la profundidad `z`. El eje
+ * vertical `y` es la altura. Las escalas dejan mucho aire: entre zonas, un pasillo; entre activos, más de un puesto.
  */
 import { porId, type Activo, type Organizacion, type TipoActivo } from './modelo'
 import type { RutaProbable } from './razonamiento'
@@ -17,12 +18,13 @@ import type { EstadoActivo, Evaluacion } from './simulacion'
 
 export type Vec3 = readonly [number, number, number]
 
-export const ESCALA = 1 / 100
+export const ESCALA_X = 1 / 52
+export const ESCALA_Z = 1 / 58
 /** Altura de la primera plataforma y lo que sube cada zona respecto a la anterior. */
-export const ALTURA_BASE = 0.2
-export const ESCALON = 0.45
-const ANCHO_PLATAFORMA = 2.2
-const MARGEN_FONDO = 0.5
+export const ALTURA_BASE = 0.25
+export const ESCALON = 0.55
+const ANCHO_PLATAFORMA = 3.8
+const MARGEN_FONDO = 1.2
 
 export type Forma = 'caja' | 'cilindro' | 'octaedro'
 export type EstadoPieza = EstadoActivo | 'riesgo' | 'atacante'
@@ -39,6 +41,8 @@ export interface Pieza {
   id: string
   nombre: string
   tipo: TipoActivo
+  /** 1-5, como en el modelo de la organización (distingue, por ejemplo, el SCADA de una consola HMI). */
+  criticidad: number
   forma: Forma
   /** Centro de la base de la pieza, sobre su plataforma. */
   base: Vec3
@@ -56,6 +60,8 @@ export type TipoArco = 'ataque' | 'impedido' | 'ruta' | 'red'
 export interface Arco {
   id: string
   tipo: TipoArco
+  /** Activos que une (origen, destino): para resaltar lo que toca a la pieza elegida. */
+  extremos: readonly [string, string]
   desde: Vec3
   hasta: Vec3
   /** Altura máxima de la curva sobre el más alto de sus extremos. */
@@ -80,21 +86,25 @@ export interface Escena {
   extension: { min: Vec3; max: Vec3 }
 }
 
-const FORMA: Record<TipoActivo, { forma: Forma; medidas: Vec3 }> = {
-  atacante: { forma: 'octaedro', medidas: [0.9, 0.9, 0.9] },
-  estacion: { forma: 'caja', medidas: [0.72, 0.42, 0.5] },
-  servidor: { forma: 'caja', medidas: [0.6, 0.95, 0.6] },
-  dc: { forma: 'caja', medidas: [0.7, 1.15, 0.7] },
-  datos: { forma: 'cilindro', medidas: [0.78, 0.72, 0.78] },
-  backup: { forma: 'cilindro', medidas: [0.86, 0.5, 0.86] },
-  web: { forma: 'caja', medidas: [0.78, 0.5, 0.6] },
-  vpn: { forma: 'caja', medidas: [0.78, 0.36, 0.6] },
-  correo: { forma: 'caja', medidas: [0.78, 0.44, 0.6] },
-  ot: { forma: 'caja', medidas: [0.7, 0.7, 0.7] },
+/**
+ * Caja que ocupa el modelo de cada tipo (ancho, alto, fondo): de ella salen la cima donde nacen los arcos, el sitio de
+ * la etiqueta y el encuadre. `forma` es la silueta simple que se usa donde no hay modelo detallado.
+ */
+export const FORMA: Record<TipoActivo, { forma: Forma; medidas: Vec3 }> = {
+  atacante: { forma: 'octaedro', medidas: [1.2, 1.2, 1.2] },
+  estacion: { forma: 'caja', medidas: [1.6, 1.3, 1.2] },
+  servidor: { forma: 'caja', medidas: [0.9, 2.1, 0.95] },
+  dc: { forma: 'caja', medidas: [1.95, 2.3, 0.95] },
+  datos: { forma: 'cilindro', medidas: [1.25, 1.55, 1.25] },
+  backup: { forma: 'caja', medidas: [1.9, 1.35, 0.95] },
+  web: { forma: 'caja', medidas: [0.95, 2.05, 0.95] },
+  vpn: { forma: 'caja', medidas: [1.3, 1.15, 0.85] },
+  correo: { forma: 'caja', medidas: [1.3, 1.2, 0.85] },
+  ot: { forma: 'caja', medidas: [1.15, 2.0, 0.8] },
 }
 
 /** El atacante flota sobre Internet: no está dentro de la red. */
-const FLOTACION_ATACANTE = 0.55
+const FLOTACION_ATACANTE = 0.9
 
 export function alturaPlataforma(columna: number): number {
   return ALTURA_BASE + columna * ESCALON
@@ -126,9 +136,9 @@ function centroZona(org: Organizacion, zona: string): number {
 
 export function construirEscena(org: Organizacion, ev: Evaluacion, ruta: RutaProbable | null, riesgo: ReadonlySet<string>): Escena {
   const { ancho, alto } = org.lienzo
-  const aX = (x: number) => (x - ancho / 2) * ESCALA
-  const aZ = (y: number) => (y - alto / 2) * ESCALA
-  const fondo = alto * ESCALA - MARGEN_FONDO
+  const aX = (x: number) => (x - ancho / 2) * ESCALA_X
+  const aZ = (y: number) => (y - alto / 2) * ESCALA_Z
+  const fondo = alto * ESCALA_Z - MARGEN_FONDO
   const columnaDe = new Map(org.zonas.map((z) => [z.id, z.columna]))
 
   const plataformas: Plataforma[] = [...org.zonas]
@@ -148,6 +158,7 @@ export function construirEscena(org: Organizacion, ev: Evaluacion, ruta: RutaPro
       id: a.id,
       nombre: a.nombre,
       tipo: a.tipo,
+      criticidad: a.criticidad,
       forma,
       base: [aX(a.x), suelo + (a.tipo === 'atacante' ? FLOTACION_ATACANTE : 0), aZ(a.y)],
       medidas,
@@ -165,7 +176,7 @@ export function construirEscena(org: Organizacion, ev: Evaluacion, ruta: RutaPro
     const a = pieza.get(e.desde)
     const b = pieza.get(e.hasta)
     if (!a || !b || a.tipo === 'atacante' || b.tipo === 'atacante') continue
-    arcos.push({ id: `red-${e.desde}-${e.hasta}`, tipo: 'red', desde: [a.base[0], a.base[1] + 0.02, a.base[2]], hasta: [b.base[0], b.base[1] + 0.02, b.base[2]], elevacion: 0.05, ultimo: false, pasos: [e.servicio] })
+    arcos.push({ id: `red-${e.desde}-${e.hasta}`, tipo: 'red', extremos: [e.desde, e.hasta], desde: [a.base[0], a.base[1] + 0.02, a.base[2]], hasta: [b.base[0], b.base[1] + 0.02, b.base[2]], elevacion: 0.05, ultimo: false, pasos: [e.servicio] })
   }
 
   // Pasos entre activos distintos: un arco por pareja (origen, destino). Si alguno de sus pasos ocurrió, es ataque.
@@ -183,10 +194,11 @@ export function construirEscena(org: Organizacion, ev: Evaluacion, ruta: RutaPro
     porPareja.set(clave, {
       id: `paso-${clave}`,
       tipo,
+      extremos: [paso.desde, paso.hasta],
       desde: cima(a),
       hasta: cima(b),
       // lo que sale a Internet (mando y control, exfiltración) o llega de ella, por arriba de todo
-      elevacion: haciaFuera ? 1.4 + largo * 0.08 : 0.55 + largo * 0.1,
+      elevacion: haciaFuera ? 2.6 + largo * 0.08 : 1 + largo * 0.12,
       ultimo: (previo?.ultimo ?? false) || (ocurrido && paso === ultimo),
       pasos: [...(previo?.pasos ?? []), paso.titulo],
     })
@@ -199,7 +211,7 @@ export function construirEscena(org: Organizacion, ev: Evaluacion, ruta: RutaPro
       const a = pieza.get(ruta.camino[i])
       const b = pieza.get(hasta)
       if (!a || !b) return
-      arcos.push({ id: `ruta-${ruta.camino[i]}-${hasta}`, tipo: 'ruta', desde: cima(a), hasta: cima(b), elevacion: 0.3, ultimo: false, pasos: [`Ruta probable hacia ${pieza.get(ruta.joya)?.nombre ?? ruta.joya}`] })
+      arcos.push({ id: `ruta-${ruta.camino[i]}-${hasta}`, tipo: 'ruta', extremos: [ruta.camino[i], hasta], desde: cima(a), hasta: cima(b), elevacion: 0.55, ultimo: false, pasos: [`Ruta probable hacia ${pieza.get(ruta.joya)?.nombre ?? ruta.joya}`] })
     })
   }
 
@@ -237,4 +249,29 @@ export function resumenEscena(org: Organizacion, escena: Escena): string {
   const objetivo = escena.piezas.find((p) => p.objetivo)
   if (objetivo) partes.push(`Ruta probable hacia ${objetivo.nombre}.`)
   return partes.join(' ')
+}
+
+/**
+ * Encuadre de la cámara que SIGUE el ataque en un paso: mira al punto medio del salto (o a la pieza, si el paso es
+ * local) desde delante, arriba y un poco por detrás del sentido del salto, a una distancia que deja ver el salto entero
+ * y lo que lo rodea. `null` si el paso no está en la escena.
+ */
+export function encuadreDePaso(escena: Escena, paso: { desde: string; hasta: string } | null): { objetivo: Vec3; posicion: Vec3 } | null {
+  if (!paso) return null
+  const a = escena.piezas.find((p) => p.id === paso.desde)
+  const b = escena.piezas.find((p) => p.id === paso.hasta) ?? a
+  if (!a || !b) return null
+  const objetivo: Vec3 = [(a.base[0] + b.base[0]) / 2, (a.base[1] + b.base[1]) / 2 + 0.6, (a.base[2] + b.base[2]) / 2]
+  const dx = b.base[0] - a.base[0]
+  const dz = b.base[2] - a.base[2]
+  const largo = Math.hypot(dx, dz)
+  // horizontal: hacia delante (+z), corrido hacia atrás del salto para verlo «avanzar»
+  const hx = largo > 0 ? (-dx / largo) * 0.45 : -0.25
+  const hz = 1 + (largo > 0 ? (-dz / largo) * 0.45 : 0)
+  const vertical = 0.95
+  const norma = Math.hypot(hx, vertical, hz)
+  // un paso local también se ve con sus vecinos de sala alrededor, no solo la pieza
+  const distancia = Math.max(16, largo * 1.3 + 9)
+  const posicion: Vec3 = [objetivo[0] + (hx / norma) * distancia, objetivo[1] + (vertical / norma) * distancia, objetivo[2] + (hz / norma) * distancia]
+  return { objetivo, posicion }
 }

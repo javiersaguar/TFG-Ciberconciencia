@@ -96,7 +96,8 @@ describe('modo presentación en el portal', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Presentación' })).not.toBeInTheDocument())
     expect(enrutador.state.location.pathname).toBe('/cronologia')
     expect(enrutador.state.location.search).toBe('')
-  })
+    // recorre tres páginas enteras (la del grafo de ataque entre ellas): con la máquina cargada pasa de 5 s
+  }, 15_000)
 
   it('sin el parámetro no hay tarjeta, y un valor no válido tampoco la abre', async () => {
     renderizarRutas('/?presentacion=99')

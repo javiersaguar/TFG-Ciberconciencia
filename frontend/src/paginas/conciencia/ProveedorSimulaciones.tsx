@@ -12,12 +12,19 @@ export function ProveedorSimulaciones({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hayEnMarcha) return
+    // El reloj suma el tiempo REAL transcurrido, no un tic fijo: si la página va cargada (la maqueta 3D sin GPU, una
+    // pestaña en segundo plano) los tics llegan tarde y, con un incremento fijo, la simulación se frenaba. El tope de 2 s
+    // evita un salto de varios pasos de golpe al volver a una pestaña dormida.
+    let anterior = Date.now()
     const intervalo = setInterval(() => {
+      const ahora = Date.now()
+      const segundos = Math.min(2, Math.max(0, (ahora - anterior) / 1000))
+      anterior = ahora
       setSimulaciones((todas) => {
         const siguientes = { ...todas }
         for (const [id, sim] of Object.entries(todas)) {
           if (!sim.enMarcha) continue
-          const tiempo = Math.min(sim.limite, sim.tiempo + (PASO_RELOJ_MS / 1000) * sim.velocidad)
+          const tiempo = Math.min(sim.limite, sim.tiempo + segundos * sim.velocidad)
           siguientes[id] = { ...sim, tiempo, enMarcha: tiempo < sim.limite }
         }
         return siguientes

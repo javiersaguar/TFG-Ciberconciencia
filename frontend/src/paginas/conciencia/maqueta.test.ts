@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { alturaPlataforma, cima, construirEscena, puntoDelArco, resumenEscena } from './maqueta'
+import { alturaPlataforma, cima, construirEscena, encuadreDePaso, puntoDelArco, resumenEscena } from './maqueta'
 import type { AccionAplicada, Efecto, Organizacion } from './modelo'
 import { DMEVALS } from './organizaciones/dmevals'
 import { HELIOS } from './organizaciones/helios'
@@ -95,5 +95,22 @@ describe('maqueta 3D: el ataque encima', () => {
     expect(texto).toContain('Maqueta 3D de Helios Farmacéutica')
     expect(texto).toContain('DC01')
     expect(texto).toMatch(/Ruta probable hacia/)
+  })
+
+  it('la cámara que sigue el ataque mira al salto desde arriba y delante, con el salto entero a la vista', () => {
+    const { escena: e } = escena(HELIOS, 62)
+    const enc = encuadreDePaso(e, { desde: 'pc-fin', hasta: 'dc' })!
+    const a = e.piezas.find((p) => p.id === 'pc-fin')!
+    const b = e.piezas.find((p) => p.id === 'dc')!
+    expect(enc.objetivo[0]).toBeCloseTo((a.base[0] + b.base[0]) / 2)
+    expect(enc.posicion[1]).toBeGreaterThan(enc.objetivo[1] + 5)
+    expect(enc.posicion[2]).toBeGreaterThan(enc.objetivo[2])
+    const distancia = Math.hypot(...([0, 1, 2] as const).map((i) => enc.posicion[i] - enc.objetivo[i]) as [number, number, number])
+    expect(distancia).toBeGreaterThan(Math.hypot(b.base[0] - a.base[0], b.base[2] - a.base[2]))
+    // un paso local se encuadra sobre su pieza, sin pegarse a ella; uno que no está en la escena, no
+    const local = encuadreDePaso(e, { desde: 'pc-mkt', hasta: 'pc-mkt' })!
+    expect(local.objetivo[0]).toBeCloseTo(e.piezas.find((p) => p.id === 'pc-mkt')!.base[0])
+    expect(Math.hypot(...([0, 1, 2] as const).map((i) => local.posicion[i] - local.objetivo[i]) as [number, number, number])).toBeGreaterThanOrEqual(16)
+    expect(encuadreDePaso(e, { desde: 'nada', hasta: 'dc' })).toBeNull()
   })
 })

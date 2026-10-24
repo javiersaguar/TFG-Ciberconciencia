@@ -97,9 +97,19 @@
   --atacante-icono: #e8a39a;
   --atacante-suave: #d9c3bf;
 
-  /* Maqueta 3D de /conciencia: plataformas de las zonas y piezas sin incidencias (las demás, por su estado). */
-  --maqueta-plataforma: #c9d0d9;
-  --maqueta-pieza: #f1f3f6;
+  /* Maqueta 3D de /conciencia: materiales (suelo técnico, metal de los armarios, mobiliario, pantallas, LED) y el
+   * suelo bajo las salas. El estado de cada activo no va aquí: lo dan --sev-*, --acento y --ok. */
+  --maqueta-plataforma: #b9c2cd;
+  --maqueta-suelo: #d7dde5;
+  --maqueta-base: #cfd5dd;
+  --maqueta-pieza: #eef1f4;
+  --maqueta-metal: #3a434f;
+  --maqueta-metal-claro: #9aa6b4;
+  --maqueta-mueble: #b9ab95;
+  --maqueta-pantalla: #2f6fb0;
+  --maqueta-led: #24946b;
+  --maqueta-industrial: #c49b34;
+  --maqueta-cristal: #9fb6cf;
 
   /* Logotipo (componentes/shell/Logo.tsx; el favicon lleva los mismos valores del tema claro). */
   --logo-marco-luz: #0d4f8c;
@@ -207,8 +217,17 @@
   --estado-protegido: #183126;
   --atacante-fondo: #3b2224;
   --atacante-borde: #6b3f3b;
-  --maqueta-plataforma: #3a4554;
+  --maqueta-plataforma: #323c49;
+  --maqueta-suelo: #444f5e;
+  --maqueta-base: #141a22;
   --maqueta-pieza: #8d9aab;
+  --maqueta-metal: #262d36;
+  --maqueta-metal-claro: #6c7988;
+  --maqueta-mueble: #7f735f;
+  --maqueta-pantalla: #5b9fe6;
+  --maqueta-led: #4cc497;
+  --maqueta-industrial: #b38f2e;
+  --maqueta-cristal: #6f8aa8;
   /* El marco navy se perdería sobre la pizarra de la barra lateral: se aclara sin cambiar el tono. */
   --logo-marco-luz: #3d7cc4;
   --logo-marco-medio: #2f68aa;

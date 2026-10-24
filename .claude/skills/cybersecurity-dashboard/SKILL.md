@@ -220,10 +220,10 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   lógica nueva en el componente, solo dibujo.
   - Colores: tokens leídos con `getComputedStyle` al cambiar de tema (`--maqueta-plataforma`, `--maqueta-pieza`,
     `--sev-*`, `--acento`, `--ok`…). Ningún hex en el componente.
-  - Movimiento: `frameloop="demand"`; solo se anima el punto del último paso mientras la simulación avanza y sin
-    `prefers-reduced-motion`. La cámara no persigue el ataque.
-  - Etiquetas: botones del DOM proyectados sobre el lienzo (`Proyector`, sin pasar por React en cada fotograma), que abren
-    la misma `FichaActivo` que en 2D; el lienzo es `role="img"` con `resumenEscena`.
+  - Movimiento: `frameloop="demand"` salvo mientras algo se mueve (la simulación o el giro). Con
+    `prefers-reduced-motion` no hay giro, ni cometa, ni vuelos de cámara: los encuadres cambian de golpe.
+  - Etiquetas: botones del DOM proyectados sobre el lienzo (`Proyector`, sin pasar por React en cada fotograma); el
+    lienzo es `role="img"` con `resumenEscena`.
   - WebGL: `hayWebGL()` crea un contexto de prueba (lento sin GPU): se comprueba tras pintar, salvo que se haya pedido
     el 3D. Sin WebGL, el 3D no se ofrece; si el contexto falla al crear el lienzo, aviso y «Volver a la vista 2D».
   - Playwright: el Chromium de las pruebas ya tiene WebGL; **no** añadas `--use-angle=swiftshader` (crear el contexto
@@ -235,3 +235,30 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   izquierda de las tarjetas (`border-l-4`); nada de iconos `Sparkles`/`Bot` para lo que decide un motor de reglas; nada
   de `backdrop-blur` ni fondos translúcidos sobre lienzos; un solo aviso por pantalla de «no ejecuta acciones»; botones
   que solo aparecen cuando hacen algo («Restablecer»). Si un adorno no comunica nada, no va.
+
+### 15.1 Maqueta 3D realista (24-10-2026, segunda vuelta)
+
+- **Modelos** (`modelos3d.tsx`): un modelo por tipo de activo, escrito como **receta de piezas** (`caja`, `cil`, `toro`
+  con posición, giro y material) que `Fusion` junta en **una malla por material** (`mergeGeometries`). Un activo nuevo
+  es una receta nueva en `receta()`, no mallas sueltas. Las medidas de cada tipo están en `FORMA` (`maqueta.ts`), que
+  usan también las etiquetas y los indicadores. Estado en LED, pantallas y balizas (`paleta3d.ts`: `colorEstado`,
+  `colorPantalla`) y en `Indicadores` (halo, anillo de riesgo, jaula, cúpula, objetivo, selección, gema de joya).
+- **Materiales**: tokens `--maqueta-*` (plataforma, suelo, base, pieza, metal, metal-claro, mueble, pantalla, led,
+  industrial, cristal) en los dos temas. Nada de hex en `modelos3d.tsx` ni en `Maqueta3D.tsx`.
+- **Cámara**: dos modos, grupo de radio «Modo de cámara». **Vista general**: encuadre que mete la maqueta entera en el
+  hueco que dejan los controles (`encuadreGeneral`, por bisección) y giro lento (`autoRotate`), que se para al tocar,
+  al elegir un activo o con «Girar la vista» y vuelve a los 3,5 s. **Seguir el ataque**: `encuadreDePaso` (pura, con
+  test) para cada paso nuevo; al acabar vuelve a la general. Los vuelos son un `lerp` en `useFrame` con el
+  `autoRotate` en pausa mientras dura (si no, se pelean y el giro no se para). El efecto de modo no corre al montar.
+- **Por qué** (`explicacion.ts`, pura, con test; `PanelPorQue.tsx`): pasos recibidos, detección (P1/P2 y Sigma),
+  pivotes desde él, vecinos comprometidos, ruta, respuesta, impedidos y contexto, cada motivo con su procedencia. Es
+  lo que se abre al pinchar un activo; la `FichaActivo` queda a un botón.
+- **Rendimiento**: la escena se memoriza por su contenido (`claveEscena`), no por el objeto que da `evaluar` en cada
+  tic; `ModeloActivo` va con `memo`; los puntos de la ruta son `InstancedMesh`. `VigiaRendimiento`: con la mediana de
+  20 fotogramas por encima de 50 ms pasa a «modo ligero» (sin sombras ni `RoomEnvironment`, `dpr` 0,75), con aviso.
+- **Pantalla completa**: `createPortal` al `<body>` (el `transform` de la animación de entrada encierra el
+  `position: fixed`). Esc sale.
+- **Reloj de la simulación** (`ProveedorSimulaciones`): suma el tiempo real transcurrido (tope 2 s por tic), no 250 ms
+  fijos: con el hilo ocupado los tics llegan tarde y la simulación se frenaba.
+- **Playwright**: las pruebas de la maqueta esperan al lienzo hasta 20 s (sin GPU, compilar sombreadores tarda). El
+  giro solo se prueba en un `describe` con `reducedMotion: 'no-preference'`; el resto corre con movimiento reducido.

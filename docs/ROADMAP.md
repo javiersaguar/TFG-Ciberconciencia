@@ -715,6 +715,9 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
   ➕ *Hecho el 24-10-2026:* **maqueta 3D de la organización** en la demo de conciencia situacional (three.js + React Three
   Fiber, carga diferida): zonas como plataformas escalonadas, ataque en arcos, ruta probable; la vista 2D sigue por
   defecto. Y el **explorador del grafo** pasa a columnas por momento con pasos numerados y un recorrido paso a paso.
+  Segunda vuelta el mismo día: un modelo por tipo de activo (puesto, rack, controlador, base de datos, cintas, web,
+  VPN, correo, OT), salas más espaciadas, cámara que **sigue el ataque** o **vista general que gira**, y panel
+  **«Por qué»** al pinchar un activo (qué lo alcanzó, qué lo detectó, qué lo amenaza).
   ➕ *Idea anotada el 21-10-2026:* **mapa mundial en tiempo real** del origen y el destino de las alertas. Requiere IP
   públicas (el corpus actual solo tiene direcciones privadas de laboratorio), GeoIP local en el servidor y el WebSocket
   de F6.3; sin eso, solo ilustrativo. Detalle en `frontend/docs/plan-mejora.md` §8.

@@ -242,7 +242,17 @@ export default function PaginaConciencia() {
             <SelectorVista vista={vista} webgl={webgl} alCambiar={cambiarVista} />
             {vista === '3d' ? (
               <Suspense fallback={<div role="status" aria-label="Cargando la maqueta 3D" className="h-full"><Skeleton className="h-full rounded-lg" /></div>}>
-                <Maqueta3D org={org} ev={ev} ruta={ruta} riesgo={riesgo} enMarcha={sim.enMarcha} alVolverA2D={() => cambiarVista('2d')} />
+                <Maqueta3D
+                  org={org}
+                  ev={ev}
+                  ruta={ruta}
+                  riesgo={riesgo}
+                  acciones={sim.acciones}
+                  enMarcha={sim.enMarcha}
+                  alIniciar={() => iniciar(org.id)}
+                  alPausar={() => pausar(org.id)}
+                  alVolverA2D={() => cambiarVista('2d')}
+                />
               </Suspense>
             ) : (
               <GrafoOrganizacion org={org} ev={ev} ruta={ruta} riesgo={riesgo} />

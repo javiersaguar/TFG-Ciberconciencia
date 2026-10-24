@@ -64,7 +64,7 @@ la interfaz cabe en `useState` y en la URL.
 |---|---|---|
 | `@xyflow/react` ^12.12.0 | producción | El explorador del grafo de ataque necesita zoom, desplazamiento, minimapa, nodos agrupados (procesos dentro de su host), selección accesible por teclado y aristas con etiqueta propia. Hacerlo a mano en SVG habría sido reescribir React Flow. Solo se carga en `/ataque` (chunk `flujo`). La atribución de React Flow queda visible (abajo a la izquierda) |
 | `@playwright/test` 1.63.0 (exacta) | desarrollo | Pruebas de extremo a extremo y capturas en los dos temas y tres anchos. Versión fijada para reutilizar el Chromium ya descargado |
-| `three` 0.186.1 y `@react-three/fiber` 9.8.2 (exactas) | producción | La maqueta 3D de `/conciencia`. React Three Fiber permite escribirla como componentes de React y es compatible con React 19 (pide `>=19 <19.4`). Solo se descarga al elegir la vista 3D (chunk `tresd`, ~245 kB con gzip: R3F incluye three.js entero). **Sin drei**: arrastraba hls.js, mediapipe y otras dependencias que no se usan; los controles de órbita salen de `three/addons` y las etiquetas son botones propios |
+| `three` 0.186.1 y `@react-three/fiber` 9.8.2 (exactas) | producción | La maqueta 3D de `/conciencia`. React Three Fiber permite escribirla como componentes de React y es compatible con React 19 (pide `>=19 <19.4`). Solo se descarga al elegir la vista 3D (chunk `tresd`, ~247 kB con gzip: R3F incluye three.js entero). **Sin drei**: arrastraba hls.js, mediapipe y otras dependencias que no se usan; los controles de órbita salen de `three/addons` y las etiquetas son botones propios |
 | `@types/three` 0.186.0 (exacta) | desarrollo | Tipos de three.js |
 
 **Grafos**: el del pipeline, el de la demo y el panel de movimiento lateral siguen en SVG propio (funcionan y no ganan
@@ -249,31 +249,65 @@ están deshabilitados (en estudio) y el 4 está descartado por diseño.
 
 ## Maqueta 3D (24-10-2026)
 
-La misma organización y el mismo instante que la vista 2D, en volumen: **las zonas de red son plataformas escalonadas**
-(Internet abajo a la izquierda, los activos críticos arriba a la derecha: el atacante «sube»), cada activo es una pieza
-con forma según su tipo y color según su estado, **los pasos del ataque son arcos** que saltan de pieza en pieza (rojo si
-ocurrieron, gris si la respuesta los impidió, con ✕), la **ruta probable** hacia la siguiente joya va en puntos ámbar y
-los pasos locales (abrir un adjunto, volcar LSASS en el propio equipo) son un anillo sobre la pieza. Las joyas llevan
-una gema encima; el objetivo de la ruta y lo que acaba de recibir el último paso, un anillo en la base.
+La misma organización y el mismo instante que la vista 2D, como una maqueta de verdad:
 
-- **Lógica pura y probada** (`paginas/conciencia/maqueta.ts`): convierte (organización, evaluación, ruta, riesgo) en
-  plataformas, piezas, arcos y marcas. `Maqueta3D.tsx` solo dibuja. No hay datos nuevos ni lógica nueva: es otra forma
-  de pintar lo que ya calculan `evaluar` y `rutaProbable`, así que la procedencia (ilustrativo / documentado) no cambia.
-- **Colores**: los tokens del tema (`--sev-*`, `--acento`, `--ok` y dos propios, `--maqueta-plataforma` y
-  `--maqueta-pieza`), releídos al cambiar de tema. Ningún hex en el componente.
-- **Movimiento**: solo se anima el punto que recorre el último paso, **mientras la simulación avanza** y si el usuario no
-  ha pedido menos movimiento. El resto del tiempo el lienzo se pinta solo cuando algo cambia (`frameloop="demand"`). La
-  cámara no se mueve al avanzar el ataque; se puede girar, desplazar y acercar, y «Encuadrar» la recoloca.
-- **Encuadre**: la distancia de la cámara se busca proyectando las esquinas de la escena (con la perspectiva real) para
-  que quepa en el hueco que dejan el selector, los botones y la leyenda.
-- **Accesibilidad**: el lienzo es una imagen con un resumen (qué está comprometido, aislado y hacia dónde va la ruta);
-  las etiquetas de los activos son **botones** de verdad, colocados sobre el lienzo, que abren la misma ficha que en 2D;
-  el estado va con icono y color, nunca solo con color.
-- **Sin WebGL** la opción 3D se desactiva y la página se queda en 2D. La comprobación crea un contexto de prueba, que
-  sin GPU puede costar medio segundo: se hace tras pintar la página, salvo que se haya pedido el 3D.
-- **Pruebas**: `maqueta.test.ts` (escalonado, cada activo en su zona, arcos de ataque e impedidos, ruta, último paso,
-  resumen); e2e con WebGL real en Chromium (elegir 3D, ficha de un activo, recordar la vista, capturas en los dos temas)
-  y sin WebGL (simulado: el 3D no se ofrece).
+- **Salas**: cada zona de red es una sala con suelo técnico (baldosas de 0,6 m), mampara de cristal al fondo y un canto
+  de luz al frente, **escalonadas** de Internet (abajo a la izquierda) a los activos críticos (arriba a la derecha): el
+  atacante «sube». Mucho aire entre salas (un pasillo) y entre activos.
+- **Un modelo por tipo** (`modelos3d.tsx`), reconocible por su silueta: puesto de trabajo (mesa, monitor encendido,
+  teclado, torre y silla), rack de servidor (bandejas y LED), controlador de dominio (dos racks y una llave), base de
+  datos (discos apilados con anillos de luz), librería de cintas (ventana y cartuchos), servidor web (rack y globo de
+  malla), cortafuegos/VPN (con candado), pasarela de correo (con sobre), industrial en tres variantes (armario PLC con
+  baliza, rack SCADA, consola HMI) y el atacante (cristal oscuro sobre un anillo rojo).
+- **Estado** en los LED, las pantallas y la baliza (verde, ámbar o roja), y alrededor de la pieza: halo rojo
+  (comprometido), anillo discontinuo ámbar (en riesgo), jaula azul (aislado), cúpula verde (protegido), anillo ámbar
+  (objetivo de la ruta) y gema dorada encima de las joyas.
+- **Ataque**: arcos que saltan de activo en activo con punta de flecha; el último, más grueso y con un cometa que lo
+  recorre mientras la simulación avanza. Impedidos en gris con ✕, ruta probable en puntos ámbar y cables de red por el
+  suelo (bajan o suben de sala en el pasillo).
+- **Luz**: sombras suaves, mapa de reflejos de estudio (`RoomEnvironment`), niebla y suelo bajo las salas.
+
+**Dos modos de cámara** (arriba, en el centro):
+
+- **Vista general**: la maqueta entera **girando despacio en círculo** (una vuelta por minuto, más o menos). Se puede
+  girar, desplazar y acercar a mano; el giro se para mientras se toca, al elegir un activo y con el botón de giro, y
+  vuelve a los pocos segundos. Al **pinchar un activo** (en la pieza o en su etiqueta) la cámara se centra en él, se
+  resaltan sus pasos y se apagan los demás, y se abre el panel **«Por qué»**.
+- **Seguir el ataque**: lanza la simulación y la cámara **acompaña cada paso**, desde delante, arriba y un poco por
+  detrás del salto, a una distancia que deja ver alrededor (`encuadreDePaso`, pura y con test). Si se mueve a mano,
+  deja de seguir hasta el paso siguiente; al acabar el ataque vuelve sola a la vista general. Abajo a la izquierda, el
+  paso en curso (n de N, hora, táctica y título) con su botón de pausa.
+
+**Panel «Por qué»** (`explicacion.ts`, pura y probada; `PanelPorQue.tsx`): para el activo elegido, qué pasos del
+atacante lo alcanzaron (con hora, técnica, desde dónde y con qué cuenta), **qué lo detectó** (el patrón CEP P1/P2 y sus
+alertas Sigma), qué hizo el atacante desde él, qué vecino comprometido llega a él y por qué servicio, si está en la
+ruta probable o es su siguiente objetivo, la respuesta aplicada y lo que impidió, y su contexto de negocio. Cada motivo
+lleva la procedencia de su paso (documentado en DMEVALS hasta las 03:19, ilustrativo en el resto). Desde ahí, la ficha
+completa con sus conexiones.
+
+**Pantalla completa** (botón arriba a la derecha, Esc para salir): la maqueta va directa al `<body>` con un portal; un
+`transform` en un contenedor (la animación de entrada de la página) habría encerrado el `position: fixed`.
+
+- **Lógica pura y probada**: `maqueta.ts` (escena y encuadre de seguimiento), `explicacion.ts` (el porqué). El
+  componente solo dibuja. No hay datos ni lógica nuevos: es otra forma de pintar `evaluar` y `rutaProbable`.
+- **Colores**: tokens del tema (`--maqueta-*` para los materiales; el estado con `--sev-*`, `--acento`, `--ok`),
+  releídos al cambiar de tema. Ningún hex en los componentes.
+- **Movimiento**: el giro de la vista general es la única animación en bucle del portal, y es una petición expresa:
+  se para con un botón, al tocar o al elegir un activo, y **no existe con `prefers-reduced-motion`** (tampoco los
+  vuelos de cámara: los cambios de encuadre son instantáneos). El cometa solo corre mientras la simulación avanza.
+- **Rendimiento**: los modelos son recetas de piezas que se **fusionan por material** (un rack pasa de unas 40 mallas
+  a 5) y los puntos de la ruta son una malla instanciada. La escena solo se rehace cuando cambia algo que se ve (no a
+  cada tic de 250 ms de la simulación) y los modelos van memorizados. **Calidad adaptativa**: si mientras se mueve sola
+  la mediana de los fotogramas pasa de 50 ms, baja la resolución y quita sombras y reflejos («Modo ligero», con aviso).
+  Medido en el Chromium de las pruebas, sin GPU: de 4 a 15 fotogramas por segundo; con GPU no debería activarse.
+- **El reloj de la simulación** suma ahora el tiempo real transcurrido (con tope de 2 s) en vez de 250 ms fijos por
+  tic: con la página cargada, los tics llegaban tarde y la simulación se frenaba.
+- **Accesibilidad**: el lienzo es una imagen con su resumen; las etiquetas son botones (`aria-pressed`), los modos un
+  grupo de radio, los botones de cámara con nombre; el estado va con icono y color, nunca solo color. La vista 2D sigue
+  a un clic.
+- **Pruebas**: `maqueta.test.ts`, `explicacion.test.ts`; e2e: elegir 3D, el porqué de DC01 y su ficha, recordar la
+  vista, «Seguir el ataque» con la simulación en marcha, pantalla completa y Esc, el giro que se para con su botón (con
+  movimiento normal) y sin WebGL.
 
 ## Seguridad
 
@@ -294,7 +328,7 @@ Flow) y `graficos` (Recharts). La paleta de comandos y cada fichero de datos se 
 | React Flow (`flujo`) | — | solo en `/ataque` | solo en `/ataque` (+230 kB al abrirlo) |
 | Recharts (`graficos`) | siempre | solo en Observabilidad | solo en Observabilidad |
 
-Desde el 24-10, three.js y React Three Fiber van en el chunk `tresd` (930 kB, 245 kB con gzip), que solo se descarga al
+Desde el 24-10, three.js y React Three Fiber van en el chunk `tresd` (936 kB, 247 kB con gzip), que solo se descarga al
 elegir la maqueta 3D; Playwright comprueba que ni la portada ni el grafo de ataque lo bajan.
 
 La portada sigue sin descargar React Flow ni Recharts (lo comprueba Playwright); sus gráficos son HTML. Las alertas se
@@ -332,8 +366,9 @@ frontend/
 - Grafo de ataque: resuelto el 24-10 lo de que con todo el día a la vista el texto quedaba diminuto. El eje ya no es
   lineal en minutos sino una columna por momento con evidencia, así que el grafo entero cabe a un zoom legible (~0,8
   en 1440 px). A 1280 px con la barra lateral abierta baja a ~0,6 y las tarjetas ocultan su segunda línea.
-- Maqueta 3D: los arcos y las piezas no se pueden enfocar con el teclado dentro del lienzo (las etiquetas sí, y abren la
-  ficha); con muchos activos en la misma zona las etiquetas pueden tocarse a lo lejos, y se separan al acercar.
+- Maqueta 3D: los arcos y las piezas no se pueden enfocar con el teclado dentro del lienzo (las etiquetas sí, y abren
+  el porqué); en el hueco de la página, con la maqueta entera a la vista, los modelos se ven pequeños: el detalle luce
+  a pantalla completa o en «Seguir el ataque». Sin GPU, la primera carga tarda unos segundos (sombreadores y reflejos).
 - **Idea anotada para F8 (21-10-2026): mapa mundial en tiempo real del origen y el destino de las alertas.** Con el
   corpus actual no hay qué geolocalizar: todas las direcciones son privadas de laboratorio (10.0.x.x, y el atacante
   en 192.168.0.4), así que un mapa con estos datos sería **ilustrativo**. Para que sea real hace falta telemetría con IP

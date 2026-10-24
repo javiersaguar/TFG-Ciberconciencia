@@ -117,6 +117,8 @@ test('demo de conciencia situacional: simular, acelerar y aplicar una respuesta 
 })
 
 test('maqueta 3D: se elige, dibuja la organización, abre la ficha de un activo y se recuerda', async ({ page }, info) => {
+  // sin GPU (Chromium de las pruebas), la primera carga de la maqueta tarda unos segundos
+  test.setTimeout(90_000)
   const errores = vigilarErrores(page)
   await page.goto('/conciencia?org=helios&t=62')
   const vista = page.getByRole('radiogroup', { name: 'Vista de la organización' })
@@ -124,28 +126,56 @@ test('maqueta 3D: se elige, dibuja la organización, abre la ficha de un activo 
   await expect(vista.getByRole('radio', { name: '3D' })).toBeEnabled()
   await vista.getByRole('radio', { name: '3D' }).click()
   const maqueta = page.getByRole('region', { name: 'Maqueta 3D de Helios Farmacéutica' })
-  await expect(maqueta.locator('canvas')).toBeVisible()
+  await expect(maqueta.locator('canvas')).toBeVisible({ timeout: 20_000 })
   await expect(page).toHaveURL(/vista=3d/)
   // el resumen para lectores de pantalla y las etiquetas, que son botones
   await expect(maqueta.getByRole('img', { name: /Comprometidos: .*DC01/ })).toBeAttached()
   const dc = maqueta.getByRole('button', { name: /^DC01 · Infraestructura TI · comprometido/ })
   await expect(dc).toBeVisible()
   await dc.click()
+  // el porqué: qué paso lo comprometió y con qué técnica, sin salir de la maqueta
+  const porQue = maqueta.getByRole('complementary', { name: 'Por qué: DC01' })
+  await expect(porQue).toContainText('DCSync contra DC01')
+  await expect(porQue).toContainText('T1003.006')
+  await porQue.getByRole('button', { name: /Ficha completa/ }).click()
   await expect(page.getByRole('dialog', { name: /DC01/ })).toBeVisible()
   await page.keyboard.press('Escape')
+  await porQue.getByRole('button', { name: 'Cerrar el panel' }).click()
+  await expect(porQue).toHaveCount(0)
   if (info.project.name === '1440') {
     for (const tema of ['claro', 'oscuro'] as const) {
       await page.evaluate((t) => localStorage.setItem('tfg-tema', t), tema)
       await page.goto('/conciencia?org=helios&t=62')
-      await expect(page.getByRole('region', { name: 'Maqueta 3D de Helios Farmacéutica' }).locator('canvas')).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Maqueta 3D de Helios Farmacéutica' }).locator('canvas')).toBeVisible({ timeout: 20_000 })
       await page.waitForTimeout(800)
       await page.screenshot({ path: `capturas/1440/${tema}/conciencia-3d.png` })
     }
   } else {
     // sin ?vista=, se recuerda la última elegida
     await page.goto('/conciencia?org=dmevals')
-    await expect(page.getByRole('region', { name: 'Maqueta 3D de DMEVALS' }).locator('canvas')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Maqueta 3D de DMEVALS' }).locator('canvas')).toBeVisible({ timeout: 20_000 })
   }
+  expect(errores).toEqual([])
+})
+
+test('maqueta 3D: «Seguir el ataque» lo lanza y lo narra; la pantalla completa tapa todo y se sale con Esc', async ({ page }) => {
+  test.setTimeout(60_000)
+  const errores = vigilarErrores(page)
+  await page.goto('/conciencia?org=dmevals&vista=3d')
+  const maqueta = page.getByRole('region', { name: 'Maqueta 3D de DMEVALS' })
+  await expect(maqueta.locator('canvas')).toBeVisible({ timeout: 20_000 })
+  await maqueta.getByRole('button', { name: 'Pantalla completa' }).click()
+  const caja = await maqueta.boundingBox()
+  const pantalla = page.viewportSize()!
+  expect(caja && caja.x <= 1 && caja.y <= 1 && caja.width >= pantalla.width - 2 && caja.height >= pantalla.height - 2).toBe(true)
+  await maqueta.getByRole('radio', { name: 'Seguir el ataque' }).click()
+  await expect(maqueta.getByRole('radio', { name: 'Seguir el ataque' })).toHaveAttribute('aria-checked', 'true')
+  // la simulación arranca y el pie cuenta el paso en curso
+  await expect(maqueta.getByRole('button', { name: 'Pausar el ataque' })).toBeVisible()
+  await expect(maqueta.getByRole('status').filter({ hasText: /Paso \d+ de 15/ })).toBeVisible({ timeout: 15_000 })
+  await maqueta.getByRole('button', { name: 'Pausar el ataque' }).click()
+  await page.keyboard.press('Escape')
+  await expect(maqueta.getByRole('button', { name: 'Pantalla completa' })).toBeVisible()
   expect(errores).toEqual([])
 })
 
@@ -362,4 +392,28 @@ test('el Copiloto empuja el contenido solo si le deja al menos 1000 px; si no, s
   else expect(info.project.name).not.toBe('1920') // a 1920 px siempre hay sitio para empujar
   const desborda = await page.locator('#contenido [data-contenedor-tabla]').evaluateAll((els) => els.some((e) => e.scrollWidth > e.clientWidth + 1))
   expect(desborda).toBe(false)
+})
+
+test.describe('maqueta 3D con movimiento normal', () => {
+  test.use({ reducedMotion: 'no-preference' })
+
+  test('la vista general gira sola y el botón de giro la para', async ({ page }, info) => {
+    test.skip(info.project.name !== '1440', 'basta con un ancho')
+    test.setTimeout(60_000)
+    await page.goto('/conciencia?org=helios&t=62&vista=3d')
+    const maqueta = page.getByRole('region', { name: 'Maqueta 3D de Helios Farmacéutica' })
+    await expect(maqueta.locator('canvas')).toBeVisible({ timeout: 20_000 })
+    const etiqueta = maqueta.locator('[data-activo="dc"]')
+    const sitio = () => etiqueta.evaluate((el) => el.style.transform)
+    await page.waitForTimeout(800)
+    const antes = await sitio()
+    await page.waitForTimeout(2000)
+    expect(await sitio()).not.toBe(antes)
+    await maqueta.getByRole('button', { name: 'Girar la vista' }).click()
+    await expect(maqueta.getByRole('button', { name: 'Girar la vista' })).toHaveAttribute('aria-pressed', 'false')
+    await page.waitForTimeout(1500)
+    const parada = await sitio()
+    await page.waitForTimeout(1500)
+    expect(await sitio()).toBe(parada)
+  })
 })
