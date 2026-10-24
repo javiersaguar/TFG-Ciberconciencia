@@ -3,12 +3,13 @@
  * sin volver a renderizar React en cada fotograma. El reloj lo controla la reproducción.
  */
 import { Maximize2, Minus, Plus } from 'lucide-react'
-import { memo, useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react'
 
 import { useMovimientoReducido } from '@/componentes/datos/useMovimientoReducido'
 import { cn } from '@/lib/utils'
 
-import { acotarVista, ALTO, ANCHO, CONTORNO, interpolarRuta, PAISES, proyeccion, RETICULA, rutaGeografica, VISTA_MUNDO } from './geografia'
+import { FondoMundo } from './FondoMundo'
+import { acotarVista, ALTO, ANCHO, interpolarRuta, proyeccion, rutaGeografica, VISTA_MUNDO } from './geografia'
 import { COLOR_NIVEL, NIVELES, TEXTO_NIVEL, VUELO_MS, type AlertaMapa } from './modelo'
 
 interface Props {
@@ -18,16 +19,6 @@ interface Props {
   enMarcha: boolean
   alSeleccionar: (alerta: AlertaMapa) => void
 }
-
-const FondoMundo = memo(function FondoMundo({ origen, destino }: { origen?: string; destino?: string }) {
-  return (
-    <g aria-hidden>
-      <path d={CONTORNO} className="mapa-oceano" />
-      <path d={RETICULA} className="mapa-reticula" />
-      {PAISES.map((p, i) => <path key={p.codigo + i} d={p.trazo} className={cn('mapa-pais', (p.codigo === origen || p.codigo === destino) && 'mapa-pais-seleccionado')} />)}
-    </g>
-  )
-})
 
 export function LienzoMundial({ alertas, seleccion, reloj, enMarcha, alSeleccionar }: Props) {
   const identificador = useId().replaceAll(':', '')

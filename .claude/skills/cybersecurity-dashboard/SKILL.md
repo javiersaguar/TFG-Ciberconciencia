@@ -277,10 +277,13 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   último) y `.objetivo-latido` (la joya a la que va). Solo mientras la simulación corre (`enMarcha`) y nunca con
   movimiento reducido: todas están en el bloque `prefers-reduced-motion` y en `movimiento.test.ts`. En el globo, lo
   mismo en three.js (el tubo crece con `setDrawRange`, cometas, anillos que laten).
-- **El mundo** (`globo.ts` puro; `MapaMundi2D.tsx` con `d3-geo`; `Globo3D.tsx` en el estilo de la maqueta):
+- **El mundo** (`globo.ts` puro; `MapaMundi2D.tsx` sobre el mismo fondo que `/mapa`; `Globo3D.tsx` en el estilo de la maqueta):
   conexiones = pasos con el atacante en un extremo, al sitio de su canal (T1041 → C2). Ubicaciones de
   `Organizacion.geografia`, **ilustrativas** y dichas así (chip y nota: «ubicación de la IP, no del atacante»).
   Mapamundi de Natural Earth generado por `npm run generar-mapamundi` (no se edita a mano). Tokens `--globo-*`.
+  **Un solo mapa 2D del mundo** (24-10, pedido por Javier): el fondo de los dos mapas 2D (`/mapa` y «Mundo») es
+  `paginas/mapa/FondoMundo.tsx` con la proyección de `paginas/mapa/geografia.ts`. No vuelvas a dibujar otro fondo:
+  si un mapa 2D del mundo necesita algo, se añade encima o al componente compartido.
 - **Mapa mundial** (`/mapa`, `paginas/mapa/`), **boceto construido el 21-10-2026:** flujo ilustrativo de Helios, cartografía Natural Earth local,
   rutas con d3-geo, pausa, filtros, zoom y detalle. No convertirlo en geolocalización de las IP privadas ni presentarlo
   como telemetría real. La geografía se carga en su ruta y no debe arrastrar Recharts. El movimiento reducido deja

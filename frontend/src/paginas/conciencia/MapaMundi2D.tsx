@@ -1,6 +1,8 @@
 /**
- * La Tierra en 2D: el mapa del mundo (proyección Natural Earth) con la sede y los sitios de fuera con los que el ataque
- * la conecta, y los pasos como arcos por el círculo máximo (la ruta más corta, que en un mapa plano se curva).
+ * La Tierra en 2D: el mapa del mundo con la sede y los sitios de fuera con los que el ataque la conecta, y los pasos
+ * como arcos por el círculo máximo (la ruta más corta, que en un mapa plano se curva). El fondo (proyección, océano,
+ * retícula y países) es EL MISMO que el del mapa mundial de alertas (`paginas/mapa/FondoMundo`): un solo mapa 2D del
+ * mundo en todo el portal.
  *
  * Trazas vivas, como en la planta 2D: cada conexión se DIBUJA al llegar; mientras la simulación corre, por las ocurridas
  * fluye un trazo claro, una cabeza recorre la última y su sitio de fuera late. En pausa, quieto; con movimiento
@@ -9,35 +11,19 @@
  * Mismo lienzo que la planta: se ajusta al hueco y se acerca, aleja y mueve con la rueda, arrastrando o con los botones.
  * Ubicaciones ILUSTRATIVAS (ver `modelo.ts` → `Geografia`); la lista de conexiones lo dice.
  */
-import { geoGraticule10, geoNaturalEarth1, geoPath } from 'd3-geo'
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { useMovimientoReducido } from '@/componentes/datos/useMovimientoReducido'
 import { cn } from '@/lib/utils'
 import { ControlesZoom } from '@/paginas/grafo/ControlesZoom'
 import { useZoomLienzo } from '@/paginas/grafo/zoom'
+import { FondoMundo } from '@/paginas/mapa/FondoMundo'
+import { ALTO, ANCHO, proyeccion, trazarLinea } from '@/paginas/mapa/geografia'
 
 import { conexiones, ladosDeEtiqueta, resumenMundo, sitiosDeFuera } from './globo'
-import mapa from '@/componentes/tierra/mapamundi.json'
 import type { Organizacion } from './modelo'
 import { PanelConexiones } from './PanelConexiones'
 import type { Evaluacion } from './simulacion'
-
-const ANCHO = 1000
-const ALTO = 520
-
-const datos = mapa as { tierras: number[][][]; fronteras: number[][] }
-const anillo = (plano: readonly number[]) => Array.from({ length: plano.length / 2 }, (_, i) => [plano[i * 2], plano[i * 2 + 1]])
-
-/** El fondo del mapa (océano, retícula, tierras y fronteras): no cambia, se calcula una vez. */
-const proyeccion = geoNaturalEarth1().fitExtent([[12, 12], [ANCHO - 12, ALTO - 12]], { type: 'Sphere' })
-const camino = geoPath(proyeccion)
-const FONDO = {
-  esfera: camino({ type: 'Sphere' }) ?? '',
-  reticula: camino(geoGraticule10()) ?? '',
-  tierras: camino({ type: 'MultiPolygon', coordinates: datos.tierras.map((p) => p.map(anillo)) }) ?? '',
-  fronteras: camino({ type: 'MultiLineString', coordinates: datos.fronteras.map(anillo) }) ?? '',
-}
 
 interface Props {
   org: Organizacion
@@ -73,7 +59,7 @@ export default function MapaMundi2D({ org, ev, enMarcha }: Props) {
     return () => obs.disconnect()
   }, [])
 
-  const arcos = cs.map((c) => ({ c, d: camino({ type: 'LineString', coordinates: [[c.desde.lon, c.desde.lat], [c.hasta.lon, c.hasta.lat]] }) ?? '' }))
+  const arcos = cs.map((c) => ({ c, d: trazarLinea([[c.desde.lon, c.desde.lat], [c.hasta.lon, c.hasta.lat]]) }))
   const punto = (lon: number, lat: number) => proyeccion([lon, lat]) ?? [0, 0]
   const id = (nombre: string) => `${nombre}-mapa-${org.id}`
 
@@ -93,11 +79,7 @@ export default function MapaMundi2D({ org, ev, enMarcha }: Props) {
               </marker>
             ))}
           </defs>
-          <path d={FONDO.esfera} fill="var(--globo-oceano)" />
-          <path d={FONDO.reticula} fill="none" stroke="var(--globo-reticula)" strokeWidth={0.6} />
-          <path d={FONDO.tierras} fill="var(--globo-tierra)" stroke="var(--globo-costa)" strokeWidth={0.7} strokeLinejoin="round" />
-          <path d={FONDO.fronteras} fill="none" stroke="var(--globo-frontera)" strokeWidth={0.5} />
-          <path d={FONDO.esfera} fill="none" stroke="var(--globo-costa)" strokeWidth={1.2} />
+          <FondoMundo />
 
           {arcos.map(({ c, d }) => (
             <g key={c.id} data-conexion={c.paso.id} data-ocurrido={c.ocurrido ? 'true' : 'false'}>

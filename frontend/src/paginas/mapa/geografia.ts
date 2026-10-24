@@ -16,8 +16,13 @@ export const PAISES = tierra.features.map((f) => ({
   trazo: dibujar(f as GeoPermissibleObjects) ?? '',
 }))
 
+/** Una línea por el círculo máximo entre puntos [lon, lat], en el plano del mapa (D3 la recorta en el antimeridiano). */
+export function trazarLinea(puntos: [number, number][]): string {
+  return dibujar({ type: 'LineString', coordinates: puntos }) ?? ''
+}
+
 export function rutaGeografica(desde: UbicacionMapa, hasta: UbicacionMapa): string {
-  return dibujar({ type: 'LineString', coordinates: [desde.coordenadas, hasta.coordenadas] }) ?? ''
+  return trazarLinea([desde.coordenadas, hasta.coordenadas])
 }
 
 export function interpolarRuta(desde: UbicacionMapa, hasta: UbicacionMapa) {

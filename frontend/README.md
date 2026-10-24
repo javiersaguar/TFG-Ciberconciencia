@@ -95,7 +95,7 @@ la interfaz cabe en `useState` y en la URL.
 | `@playwright/test` 1.63.0 (exacta) | desarrollo | Pruebas de extremo a extremo y capturas en los dos temas y tres anchos. Versión fijada para reutilizar el Chromium ya descargado |
 | `three` 0.186.1 y `@react-three/fiber` 9.8.2 (exactas) | producción | La maqueta 3D de `/conciencia`. React Three Fiber permite escribirla como componentes de React y es compatible con React 19 (pide `>=19 <19.4`). Solo se descarga al elegir la vista 3D (chunk `tresd`, ~247 kB con gzip: R3F incluye three.js entero). **Sin drei**: arrastraba hls.js, mediapipe y otras dependencias que no se usan; los controles de órbita salen de `three/addons` y las etiquetas son botones propios |
 | `@types/three` 0.186.0 (exacta) | desarrollo | Tipos de three.js |
-| `world-atlas` 2.0.2 y `topojson-client` 3.1.0 (exactas) | desarrollo | Solo para `npm run generar-mapamundi`, que saca de Natural Earth 1:110m (dominio público; `world-atlas` es ISC) las tierras y fronteras del mapa y el globo de «Mundo» a `src/paginas/conciencia/globo/mapamundi.json` (81 kB, 29 kB con gzip, con su origen y la huella SHA-256 del original). El portal no las importa: usa el JSON generado y `d3-geo`, que ya estaba |
+| `world-atlas` 2.0.2 y `topojson-client` 3.1.0 (exactas) | desarrollo | Solo para `npm run generar-mapamundi`, que saca de Natural Earth 1:110m (dominio público; `world-atlas` es ISC) las tierras y fronteras de los globos 3D (`/mapa` y «Mundo») a `src/componentes/tierra/mapamundi.json` (81 kB, 29 kB con gzip, con su origen y la huella SHA-256 del original). El portal no las importa: usa el JSON generado y `d3-geo`, que ya estaba |
 | `d3-geo` + `@types/d3-geo` | producción + tipos de desarrollo | Proyección Natural Earth y rutas geodésicas con recorte en el antimeridiano para el mapa mundial. Chunk `geografia`, separado de Recharts |
 
 **Grafos**: el del pipeline, el de la demo y el panel de movimiento lateral siguen en SVG propio (funcionan y no ganan
@@ -336,8 +336,11 @@ De dónde viene y adónde va el ataque: los pasos que **cruzan la frontera** de 
 balizas de mando y control que salen, la exfiltración) entre la sede y los sitios de fuera, con las mismas trazas vivas
 que el grafo 2D (crecen al llegar, fluyen mientras corre la simulación, cometa por la última, los extremos laten).
 
-- **Mapa 2D** (`MapaMundi2D.tsx`, SVG con `d3-geo`, proyección Natural Earth): los arcos son círculos máximos (la ruta
-  más corta, curvada en el plano). Se acerca y se mueve como el grafo 2D.
+- **Mapa 2D** (`MapaMundi2D.tsx`, SVG): **el mismo mapa que el de `/mapa`** (24-10). El fondo (proyección Natural
+  Earth, océano, retícula y los 177 países con sus contornos) es el componente compartido `paginas/mapa/FondoMundo.tsx`,
+  con la proyección de `paginas/mapa/geografia.ts`. Encima van las capas propias de esta vista: pasos del ataque,
+  sede y sitios de fuera. Los arcos son círculos máximos (la ruta más corta, curvada en el plano). Se acerca y se mueve
+  como el grafo 2D. La cartografía va en un trozo compartido por los dos mapas, que solo se descarga al abrir uno.
 - **Globo 3D** (`Globo3D.tsx`, en el estilo de la maqueta: luz suave, mares y tierras del tema, costas y fronteras en
   línea fina y los arcos como tubos de luz). Quieto y mirando a las conexiones al abrirlo; se gira a mano o con su botón.
 - **Lógica pura** (`globo.ts`, con tests): qué pasos cruzan la frontera y a qué sitio va cada uno (por su canal; la

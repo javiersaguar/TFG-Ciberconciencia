@@ -1,7 +1,7 @@
 /**
  * npm run generar-mapamundi
  *
- * Genera `src/componentes/tierra/mapamundi.json`, el mapa de los globos 3D y del mapa del mundo de la demo: las tierras emergidas (para
+ * Genera `src/componentes/tierra/mapamundi.json`, el mapa de los globos 3D (los mapas 2D usan `paginas/mapa/tierra.json`, país a país): las tierras emergidas (para
  * colorear los continentes) y las fronteras entre países (para dibujarlas como líneas), a partir de Natural Earth
  * 1:110m (dominio público) en la redistribución TopoJSON del paquete `world-atlas` (licencia ISC).
  *
