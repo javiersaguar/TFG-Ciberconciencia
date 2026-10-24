@@ -12,6 +12,7 @@ import {
   PaginaAtaque,
   PaginaAttack,
   PaginaConciencia,
+  PaginaMapaMundial,
   PaginaCopiloto,
   PaginaCronologia,
   PaginaEvaluacion,
@@ -31,6 +32,7 @@ export const rutas: RouteObject[] = [
     children: [
       { index: true, element: <PaginaSituacion /> },
       { path: 'conciencia', element: <PaginaConciencia /> },
+      { path: 'mapa', element: <PaginaMapaMundial /> },
       { path: 'incidentes', element: <PaginaIncidentes /> },
       { path: 'ataque', element: <PaginaAtaque /> },
       { path: 'cronologia', element: <PaginaCronologia /> },

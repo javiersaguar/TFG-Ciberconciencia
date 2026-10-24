@@ -5,6 +5,7 @@
  */
 import { ArrowDownLeft, ArrowUpRight, Ban, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { ChipProcedencia } from '@/componentes/datos/Chips'
 import { cn } from '@/lib/utils'
@@ -48,6 +49,8 @@ export function PanelConexiones({ org, conexiones, className }: { org: Organizac
         </ol>
       )}
       {abierto && <p className="mt-1.5 border-t border-separador pt-1 text-[10.5px] leading-snug text-texto-suave">Ubicación de la IP, no del atacante. Con IP públicas y GeoIP en el servidor (F6.3) se pintarán las reales.</p>}
+      {/* La otra vista geográfica: aquí, los pasos de UN ataque; en /mapa, el flujo continuo de alertas */}
+      <Link to="/mapa" className="mt-1 inline-block text-[11px] font-medium text-acento hover:underline">Flujo de alertas en el mapa mundial →</Link>
     </section>
   )
 }

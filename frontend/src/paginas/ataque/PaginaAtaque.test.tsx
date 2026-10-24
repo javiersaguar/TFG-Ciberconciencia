@@ -62,4 +62,23 @@ describe('explorador del grafo de ataque', () => {
     await usuario.click(within(detalle).getByRole('button', { name: 'Cerrar el detalle' }))
     expect(screen.queryByRole('complementary', { name: 'Detalle del elemento elegido' })).not.toBeInTheDocument()
   })
+
+  it('selectores de la versión anterior: la cámara sigue el ataque por defecto y el eje puede ser de tiempo real', async () => {
+    const usuario = userEvent.setup()
+    renderizarRutas('/ataque')
+    const camara = await screen.findByRole('radiogroup', { name: 'Cámara' })
+    expect(within(camara).getByRole('radio', { name: 'Seguir el ataque' })).toHaveAttribute('aria-checked', 'true')
+    await usuario.click(within(camara).getByRole('radio', { name: 'Quieta' }))
+    expect(within(camara).getByRole('radio', { name: 'Quieta' })).toHaveAttribute('aria-checked', 'true')
+    const eje = screen.getByRole('radiogroup', { name: 'Eje' })
+    expect(within(eje).getByRole('radio', { name: 'Por momentos' })).toHaveAttribute('aria-checked', 'true')
+    await usuario.click(within(eje).getByRole('radio', { name: 'Tiempo real' }))
+    expect(within(eje).getByRole('radio', { name: 'Tiempo real' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('la lista de elementos está abierta de entrada (siempre a mano, como el panel lateral de antes)', async () => {
+    renderizarRutas('/ataque')
+    const lista = await screen.findByRole('list', { name: 'Nodos' })
+    expect(lista.closest('details')).toHaveAttribute('open')
+  })
 })

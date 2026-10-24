@@ -15,7 +15,7 @@ mismo redibujado de los cuadros de Grafana. Las convenciones para trabajar en é
 |---|---|---|---|
 | Investigación | Situación | `/` | Panel SOC que cabe en 1440 × 900 sin desplazarse: tres indicadores principales y tres secundarios (la reducción de P1, con su nota de no comparabilidad), alertas de APT29 day1 por minuto apiladas por nivel, reparto por severidad (263 altas, 413 medias, 55 bajas, 10 informativas), mapa de calor táctica × host y las campañas de day1 con enlace a su incidente |
 | | Incidentes | `/incidentes?id=<campaña>` | Maestro-detalle de las 12 campañas, agrupadas por dataset (las 7 variantes LSASS en un grupo plegable), sin columna de prioridad (el Pilar C no existe aún) y con el detalle al lado: confianza con sus factores, evidencia por etapa, técnicas, conexiones y enlaces al grafo, a la línea temporal y al asistente |
-| | Grafo de ataque | `/ataque?sel=<id>` | React Flow en carriles por host; de izquierda a derecha, **una columna por momento con evidencia** (no minutos lineales), con su hora encima y el tiempo que pasa entre columnas; los **pasos numerados** sobre su elemento y, debajo, el **recorrido** con los diez pasos (clic para ir a uno, o «Reproducir ataque» con la cámara quieta); fundamento de cada relación (observado, inferido, hipótesis); detalle en un panel sobre el lienzo solo con algo elegido |
+| | Grafo de ataque | `/ataque?sel=<id>` | React Flow en carriles por host con dos selectores: **Eje** «Por momentos» (una columna por momento con evidencia, con su hora y el tiempo entre columnas; por defecto) o «Tiempo real» (a escala, una marca cada 2 min), y **Cámara** «Seguir el ataque» (por defecto: al reproducir, la vista acompaña cada paso) o «Quieta». Pasos numerados sobre su elemento y, debajo, el **recorrido** de los diez pasos; fundamento de cada relación (observado, inferido, hipótesis); detalle en un panel sobre el lienzo al elegir algo y la lista de elementos abierta debajo |
 | | Línea temporal | `/cronologia?sel=<id>&desde=HH:MM&hasta=HH:MM` | Las 741 alertas de day1 en carriles por host, coloreadas por nivel, con las campañas como bandas y P2 como conectores; selector de rango arrastrando (y atajos accesibles), lista compacta sincronizada y detalle con «Ver en el grafo» |
 | | Matriz ATT&CK | `/attack?tecnica=<ID>` | Una columna por táctica (orden del catálogo v19), subtécnicas plegables, tres capas fechadas (potencial; observada en F2, 28-07, 34; observada hoy, 21-10, 47), punto de «observada» y tooltip con nombre, reglas, alertas y datasets |
 | Respuesta | Asistente de respuesta | `/respuesta?caso=<id>` | Para cada campaña real o caso de la demo: situación, HECHOS OBSERVADOS, INFERENCIAS DEL SISTEMA y RECOMENDACIONES (técnica ATT&CK → acción NIST SP 800-61 y D3FEND, con porqué y coste), con la procedencia por bloque. No ejecuta nada: copiar el plan como texto o, en la demo, ver su efecto en la simulación |
@@ -25,6 +25,8 @@ mismo redibujado de los cuadros de Grafana. Las convenciones para trabajar en é
 | | Observabilidad | `/observabilidad?cuadro=<uid>` | Los cuatro cuadros de Grafana, más densos: filas de un número compactadas sin romper la disposición, chip de procedencia sin recortes |
 | | Proyecto | `/proyecto` | Avance de las fases del TFG y estado documentado del pipeline (antes, en el centro de la portada) |
 | Demo | Conciencia situacional | `/conciencia?org=<id>&t=<s>&vista=2d\|3d` | Demo de los Pilares B y C, en grafo 2D (por defecto) o como **maqueta 3D** de la organización; su panel lateral es un resumen con enlace a `/respuesta` |
+| Demo | Conciencia situacional | `/conciencia?org=<id>&t=<s>` | Demo de los Pilares B y C; su panel lateral es un resumen con enlace a `/respuesta` |
+| | Mapa mundial | `/mapa?nivel=<nivel>&pais=<código>` | Flujo geográfico ilustrativo de Helios: rutas animadas de origen a destino, severidad, pausa, velocidades 1×/2×/4×, zoom y arrastre, filtros y detalle fijo de cada alerta |
 | Próximamente | Inteligencia de amenazas | `/inteligencia` | Página «próximamente» (F4 · F8.3) |
 
 ## Puesta en marcha y pruebas
@@ -39,7 +41,7 @@ No hace falta levantar ningún servicio. Los enlaces de las fichas del grafo del
 necesitan el perfil correspondiente de docker compose en el mismo equipo.
 
 ```bash
-npm test -- --run          # 368 tests (Vitest + Testing Library), en 34 ficheros
+npm test -- --run          # 422 tests (Vitest + Testing Library), en 40 ficheros
 npm run lint               # ESLint
 npm run build              # tsc + vite build → dist/
 npm run e2e                # Playwright contra `vite preview` (requiere un build previo)
@@ -67,6 +69,7 @@ la interfaz cabe en `useState` y en la URL.
 | `three` 0.186.1 y `@react-three/fiber` 9.8.2 (exactas) | producción | La maqueta 3D de `/conciencia`. React Three Fiber permite escribirla como componentes de React y es compatible con React 19 (pide `>=19 <19.4`). Solo se descarga al elegir la vista 3D (chunk `tresd`, ~247 kB con gzip: R3F incluye three.js entero). **Sin drei**: arrastraba hls.js, mediapipe y otras dependencias que no se usan; los controles de órbita salen de `three/addons` y las etiquetas son botones propios |
 | `@types/three` 0.186.0 (exacta) | desarrollo | Tipos de three.js |
 | `world-atlas` 2.0.2 y `topojson-client` 3.1.0 (exactas) | desarrollo | Solo para `npm run generar-mapamundi`, que saca de Natural Earth 1:110m (dominio público; `world-atlas` es ISC) las tierras y fronteras del mapa y el globo de «Mundo» a `src/paginas/conciencia/globo/mapamundi.json` (81 kB, 29 kB con gzip, con su origen y la huella SHA-256 del original). El portal no las importa: usa el JSON generado y `d3-geo`, que ya estaba |
+| `d3-geo` + `@types/d3-geo` | producción + tipos de desarrollo | Proyección Natural Earth y rutas geodésicas con recorte en el antimeridiano para el mapa mundial. Chunk `geografia`, separado de Recharts |
 
 **Grafos**: el del pipeline, el de la demo y el panel de movimiento lateral siguen en SVG propio (funcionan y no ganan
 nada con una librería). React Flow solo en el explorador del grafo de ataque, que es interactivo y de unos veinte
@@ -159,6 +162,30 @@ una alerta** ni cambia la severidad de nada: se puede descartar (por organizaci�
 | Alertas sin técnica | ≥ 20 alertas sin técnica ATT&CK en un host en 5 min | SCRANTON: la ráfaga del «Dropper Via PowerShell», invisible para P1 y P2 |
 | P1 a medias | campaña P1 con ≤ 1 etapa de refuerzo además del ancla | SCRANTON 03:10 (confianza 0,65) |
 | Pasos sin patrón (demo) | ≥ 2 pasos en un activo sin ningún patrón que los confirme | Según el instante de la simulación |
+
+## Mapa mundial de alertas
+
+En **Demo → Mapa mundial** (`/mapa`), un flujo continuo representa alertas ficticias entre ciudades de Helios
+Farmacéutica. El punto viaja del origen al destino y un anillo señala su llegada. La procedencia es **ilustrativa**:
+ninguna coordenada se deduce de las IP privadas de APT29 ni se presenta como ubicación de un atacante.
+
+- Pausa y reanudación congelan tanto el reloj como las partículas; velocidades 1×, 2× y 4× y reinicio.
+- Filtros por severidad y país (origen o destino) en la URL; indicadores sobre los últimos 60 segundos de demo.
+- Trazos durante nueve segundos y lista reciente acotada; seleccionar una alerta fija el detalle aunque lleguen otras.
+- Zoom y arrastre, selección por teclado y tabla alternativa al mapa. Con movimiento reducido, flechas estáticas.
+- La pestaña oculta suspende el reloj. Las partículas se mueven mediante transform y opacity sin renders por fotograma.
+
+La cartografía local (`src/paginas/mapa/tierra.json`) contiene 177 geometrías de **Natural Earth**, de dominio público,
+con URL de origen y SHA-256 dentro del fichero. Para actualizarla, ejecutar manualmente
+`node scripts/actualizar-cartografia.mjs`. La página funciona sin peticiones a cartografía, GeoIP o servicios externos.
+`d3-geo`, el mapa y sus datos se cargan solo en su ruta; no arrastran Recharts ni React Flow.
+
+La fuente está en `src/api/mapa.ts` y `src/api/simulado/mapa.ts`. El tiempo real de producción sigue pendiente de IP
+públicas, enriquecimiento GeoIP en el servidor y el flujo de alertas de F6.3. No se ha simulado un WebSocket.
+
+Pruebas: `e2e/mapa.spec.ts` comprueba movimiento real de las partículas, pausa, reanudación, detalle estable, filtros,
+zoom, teclado, movimiento reducido, ausencia de peticiones externas y de desbordes; guarda capturas de los dos temas
+en 1280, 1440 y 1920 px. Las pruebas unitarias cubren la ventana acotada, el reloj y el cruce del Pacífico.
 
 ## Modo presentación
 
@@ -369,7 +396,7 @@ procesan una vez, en el hook (`useActividadDay1`), no en cada render.
 ```
 frontend/
 ├── e2e/                  pruebas de Playwright
-├── scripts/              sincronizar-datos.mjs
+├── scripts/              sincronizar-datos.mjs, actualizar-cartografia.mjs
 ├── docs/                 plan-mejora.md, copiloto-rag.md
 ├── src/
 │   ├── api/              hooks por sección, exportaciones.ts (datos de eval/portal), tipos.ts, fuente.ts
@@ -377,7 +404,7 @@ frontend/
 │   │   └── datos/        copias de resultados del repositorio + procedencia.json
 │   ├── componentes/      shell (barras, paleta Ctrl+K, ComoLeer), tema, datos (chips, horas, estado de sesión), graficos, ui
 │   ├── paginas/          situacion, incidentes, ataque (carriles, reproducción), cronologia (linea.ts), attack, respuesta
-│   │                     (plan.ts), copiloto, proyecto, evaluacion, grafo, observabilidad (compactar.ts), conciencia…
+│   │                     (plan.ts), copiloto, proyecto, evaluacion, grafo, observabilidad (compactar.ts), conciencia, mapa…
 │   ├── estilos/          globales.css (tokens de los dos temas), contraste.test.ts, movimiento.test.ts
 │   └── pruebas/          configuración de Vitest y utilidades de render
 └── playwright.config.ts
@@ -404,4 +431,12 @@ frontend/
   navegador) y el WebSocket de alertas de F6.3.
 - F8.0: nombre y marca definitivos (el logotipo y «Ciberconciencia» son provisionales).
 - `npm audit`: avisos en dependencias que ya estaban (cadena de `shadcn` y `vite`); esta ronda solo añade dos de desarrollo para generar el mapamundi.
+- Grafo de ataque: con todo el día a la vista el texto queda pequeño (el eje cubre 28 min); «Reproducir ataque» y el zoom
+  acercan cada paso. Se compactó la escala de tiempo (34 px por minuto, antes 46).
+- **Mapa mundial:** boceto ilustrativo construido en `/mapa`. El corpus actual solo contiene direcciones privadas
+  de laboratorio (10.0.x.x y 192.168.0.4). Para que sea real hace falta telemetría con IP
+  públicas (o los IOC de la CTI de F4) y una base GeoIP local (p. ej. GeoLite2, sin llamadas a terceros desde el
+  navegador), además del WebSocket de alertas de F6.3.
+- F8.0: nombre y marca definitivos (el logotipo y «Ciberconciencia» son provisionales).
+- `npm audit`: se mantienen los 11 avisos anteriores tras incorporar `d3-geo` y sus tipos.
 

@@ -9,6 +9,7 @@ import { lazy } from 'react'
 
 export const PaginaSituacion = lazy(() => import('@/paginas/situacion/PaginaSituacion'))
 export const PaginaConciencia = lazy(() => import('@/paginas/conciencia/PaginaConciencia'))
+export const PaginaMapaMundial = lazy(() => import('@/paginas/mapa/PaginaMapaMundial'))
 export const PaginaAtaque = lazy(() => import('@/paginas/ataque/PaginaAtaque'))
 export const PaginaIncidentes = lazy(() => import('@/paginas/incidentes/PaginaIncidentes'))
 export const PaginaCronologia = lazy(() => import('@/paginas/cronologia/PaginaCronologia'))

@@ -724,6 +724,11 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
   ataque (mapa 2D y globo 3D en `/conciencia`). Para que sea real y en tiempo real requiere IP públicas (el corpus solo
   tiene direcciones privadas de laboratorio), GeoIP local en el servidor y el WebSocket de F6.3. Detalle en
   `frontend/docs/plan-mejora.md` §8.
+  ➕ *Idea anotada el 21-10-2026:* **mapa mundial en tiempo real** del origen y el destino de las alertas. Requiere IP
+  públicas (el corpus actual solo tiene direcciones privadas de laboratorio), GeoIP local en el servidor y el WebSocket
+  de F6.3; sin eso, solo ilustrativo. Detalle en `frontend/docs/plan-mejora.md` §8.
+  ↪️ **Boceto ilustrativo construido (21-10-2026)** en `/mapa`: rutas animadas de Helios con pausa, filtros,
+  zoom y detalle, cartografía local y procedencia explícita. La conexión a datos reales sigue pendiente.
 - [ ] **F8.4** Estados de carga y vacíos · responsive · accesibilidad básica ·
   **modo demo** (un botón lanza el replay) · Dockerizar · **grabar vídeo de 3–5 min**.
 

@@ -11,6 +11,10 @@
  * Las bandas de campaña y las asas de las conexiones se colocan con una interpolación lineal a trozos entre las horas
  * de las columnas, así que respetan el orden aunque su hora no coincida con la de ninguna tarjeta.
  *
+ * Hay un segundo eje, «tiempo real» (`eje = 'tiempo'`, el de la versión anterior del explorador): la posición es
+ * proporcional a la hora (`PX_POR_MINUTO`), con una marca cada dos minutos; lo que se solapa en un carril baja a otra
+ * fila. Enseña los huecos reales del ataque a escala; el de columnas, el orden sin amontonar. El usuario elige.
+ *
  * Coordenadas: los carriles (nodos host) en absoluto; el resto, relativas a su carril (`parentId` de React Flow).
  */
 import type { AristaAtaque, NodoAtaque } from '@/api/ataque'
@@ -83,6 +87,13 @@ export interface Disposicion {
 
 export const idCarril = (host: string) => `host-${host.toLowerCase()}`
 
+/** Eje horizontal: por momentos con evidencia (columnas) o a escala de tiempo real. */
+export type Eje = 'momentos' | 'tiempo'
+/** Escala del eje de tiempo real. */
+export const PX_POR_MINUTO = 40
+/** En el eje de tiempo real, una marca de hora cada tantos minutos. */
+const MINUTOS_POR_MARCA = 2
+
 /** Carril de un nodo: en P2 la banda va al destino (donde se ejecuta el salto); el resto, a su host. */
 export function carrilDe(n: NodoAtaque): string | undefined {
   if (n.tipo === 'host') return n.hosts[0]
@@ -148,7 +159,7 @@ const MINUTO = 60_000
 const dosCifras = (n: number) => String(n).padStart(2, '0')
 const textoHora = (ms: number) => `${dosCifras(Math.floor(ms / 3_600_000))}:${dosCifras(Math.floor(ms / MINUTO) % 60)}:${dosCifras(Math.floor(ms / 1000) % 60)}`
 
-export function disponerEnCarriles(nodos: readonly NodoAtaque[], aristas: readonly AristaAtaque[], m = MEDIDAS): Disposicion {
+export function disponerEnCarriles(nodos: readonly NodoAtaque[], aristas: readonly AristaAtaque[], m = MEDIDAS, eje: Eje = 'momentos'): Disposicion {
   const tarjetas = nodos
     .filter((n) => n.tipo !== 'host' && n.tipo !== 'campana' && n.ms != null)
     .map((n) => ({ id: n.id, ms: n.ms!, carril: carrilDe(n)! }))
@@ -174,8 +185,24 @@ export function disponerEnCarriles(nodos: readonly NodoAtaque[], aristas: readon
   ]
   // Si la primera columna coincide con el inicio, ancla el inicio en ella.
   if (nColumnas && msColumna[0] <= msInicio) puntos[0] = { ms: msInicio, x: centro(0) }
-  const xDe = (ms: number) => interpolar(puntos, ms)
-  const ancho = Math.round(Math.max(ultimaX, xColumna(Math.max(0, nColumnas - 1)) + m.tarjeta.ancho) + m.inicio)
+  const enTiempo = eje === 'tiempo'
+  const xLineal = (ms: number) => m.etiqueta + m.inicio + m.tarjeta.ancho / 2 + ((ms - msInicio) / MINUTO) * PX_POR_MINUTO
+  const xDe = (ms: number) => (enTiempo ? xLineal(ms) : interpolar(puntos, ms))
+  const ancho = enTiempo
+    ? Math.round(xLineal(msFin) + m.tarjeta.ancho / 2 + m.inicio)
+    : Math.round(Math.max(ultimaX, xColumna(Math.max(0, nColumnas - 1)) + m.tarjeta.ancho) + m.inicio)
+  // Tiempo real: cada tarjeta centrada en su hora; en su carril, las que se solapan bajan de fila.
+  const enTiempoReal = new Map<string, { x: number; fila: number }>()
+  if (enTiempo) {
+    for (const host of CARRILES) {
+      const items = tarjetas
+        .filter((x) => x.carril === host)
+        .sort((a, b) => a.ms - b.ms)
+        .map((x) => ({ id: x.id, x: xLineal(x.ms) - m.tarjeta.ancho / 2, ancho: m.tarjeta.ancho }))
+      const filas = repartirEnFilas(items, m.hueco)
+      for (const it of items) enTiempoReal.set(it.id, { x: it.x, fila: filas.get(it.id)! })
+    }
+  }
 
   const cajas: Record<string, Caja> = {}
   const padres: Record<string, string> = {}
@@ -202,8 +229,10 @@ export function disponerEnCarriles(nodos: readonly NodoAtaque[], aristas: readon
     let nFilas = 0
     for (const n of propios.filter((x) => x.tipo !== 'campana')) {
       const u = ubicacion.get(n.id)!
-      nFilas = Math.max(nFilas, u.fila + 1)
-      cajas[n.id] = { x: xColumna(u.columna), y: m.margen + altoBandas + u.fila * (m.tarjeta.alto + m.fila), ancho: m.tarjeta.ancho, alto: m.tarjeta.alto }
+      const real = enTiempoReal.get(n.id)
+      const fila = real ? real.fila : u.fila
+      nFilas = Math.max(nFilas, fila + 1)
+      cajas[n.id] = { x: real ? real.x : xColumna(u.columna), y: m.margen + altoBandas + fila * (m.tarjeta.alto + m.fila), ancho: m.tarjeta.ancho, alto: m.tarjeta.alto }
       padres[n.id] = carril
     }
     const contenido = altoBandas + nFilas * (m.tarjeta.alto + m.fila) - (nBandas + nFilas > 0 ? m.fila : 0)
@@ -242,6 +271,16 @@ export function disponerEnCarriles(nodos: readonly NodoAtaque[], aristas: readon
       ;(asas[a.destino] ??= []).push({ id: asa, tipo: 'target', lado: io >= id ? 'abajo' : 'arriba', x: Math.min(banda.ancho - 10, Math.max(10, cx - banda.x)) })
       asasArista[a.id] = { destino: asa }
     }
+  }
+
+  if (enTiempo) {
+    // Una marca cada MINUTOS_POR_MARCA minutos, con su franja centrada en la hora (la cabecera cae sobre la marca).
+    const paso = MINUTOS_POR_MARCA * MINUTO
+    const marcas: Columna[] = []
+    for (let ms = Math.ceil(msInicio / paso) * paso; ms <= msFin; ms += paso) {
+      marcas.push({ x: xLineal(ms) - (MINUTOS_POR_MARCA * PX_POR_MINUTO) / 2, ancho: MINUTOS_POR_MARCA * PX_POR_MINUTO, ms, texto: textoHora(ms).slice(0, 5) })
+    }
+    return { cajas, padres, asas, asasArista, columnas: marcas, saltos: [], ancho, alto: y - m.entreCarriles }
   }
 
   const columnas: Columna[] = msColumna.map((ms, c) => ({ x: xColumna(c) - (m.columna - m.tarjeta.ancho) / 2, ancho: m.columna, ms, texto: textoHora(ms) }))

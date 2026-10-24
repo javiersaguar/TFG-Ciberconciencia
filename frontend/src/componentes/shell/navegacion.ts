@@ -6,7 +6,7 @@
  * plataforma y la demo. `SECCIONES_FUTURAS` fijan desde la base la navegación final (ROADMAP F8.3): cada una dice en
  * qué fase se construye y qué enseñará, para que el menú no cambie de forma cuando lleguen.
  */
-import { BookOpenText, Clock3, Gauge, Grid3x3, LayoutDashboard, LifeBuoy, LineChart, MessagesSquare, Milestone, Network, Radar, Share2, Siren, type LucideIcon } from 'lucide-react'
+import { BookOpenText, Clock3, Gauge, Globe2, Grid3x3, LayoutDashboard, LifeBuoy, LineChart, MessagesSquare, Milestone, Network, Radar, Share2, Siren, type LucideIcon } from 'lucide-react'
 
 export type GrupoSeccion = 'investigacion' | 'respuesta' | 'plataforma' | 'demo'
 
@@ -120,6 +120,13 @@ export const SECCIONES: readonly Seccion[] = [
     titulo: 'Conciencia situacional',
     descripcion: 'Demo: qué parte de cada organización se ataca, hacia dónde va el atacante y qué hacer ya.',
     icono: Radar,
+    grupo: 'demo',
+  },
+  {
+    ruta: '/mapa',
+    titulo: 'Mapa mundial',
+    descripcion: 'Demo geográfica: flujo animado de alertas entre ubicaciones ilustrativas, con pausa, filtros y detalle.',
+    icono: Globe2,
     grupo: 'demo',
   },
 ]

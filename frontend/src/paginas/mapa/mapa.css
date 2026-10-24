@@ -1,0 +1,27 @@
+/* El mapa hereda los dos temas del portal. El movimiento se calcula sobre transform y opacity en el SVG. */
+.mapa-lienzo { display: flex; height: 100%; align-items: center; background: var(--lienzo); }
+.mapa-svg { display: block; width: 100%; min-height: 340px; aspect-ratio: 1000 / 540; user-select: none; }
+.mapa-oceano { fill: var(--lienzo); stroke: var(--borde); stroke-width: 0.7; }
+.mapa-reticula { fill: none; stroke: var(--linea-red); stroke-width: 0.4; opacity: 0.22; }
+.mapa-pais { fill: var(--superficie-hundida); stroke: var(--linea-red); stroke-width: 0.45; stroke-opacity: 0.65; }
+.mapa-pais-seleccionado { fill: var(--acento-suave); stroke: var(--acento); stroke-opacity: 0.85; }
+.dark .mapa-pais { fill: var(--superficie-alterna); }
+.dark .mapa-pais-seleccionado { fill: var(--acento-suave); }
+.mapa-arco { fill: none; stroke: currentColor; stroke-linecap: round; }
+.mapa-ruta:focus-visible .mapa-zona-ruta { stroke: var(--acento); stroke-opacity: 0.23; }
+@media (hover: hover) and (pointer: fine) {
+  .mapa-ruta:hover .mapa-arco { stroke-width: 3; opacity: 1; }
+}
+.mapa-ciudad { fill: var(--superficie); stroke: var(--texto-suave); stroke-width: 1.4; }
+.mapa-ciudad-seleccionada { fill: var(--acento); stroke: var(--superficie); stroke-width: 1.8; }
+.mapa-etiqueta { fill: var(--texto); stroke: var(--lienzo); stroke-width: 3px; paint-order: stroke; font-size: 12px; font-weight: 600; }
+.mapa-icono { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; color: var(--texto-suave); cursor: pointer; }
+.mapa-icono:hover { color: var(--texto); background: var(--superficie-alterna); }
+.mapa-icono:disabled { opacity: 0.35; cursor: default; }
+.mapa-select { min-height: 30px; border: 1px solid var(--borde); border-radius: 6px; padding: 3px 6px; color: var(--texto); background: var(--superficie); font-size: 12px; }
+@media (max-width: 1279px) {
+  .mapa-detalle { min-height: 180px; }
+  .mapa-detalle > div:last-child:not(:first-child) { max-width: 44rem; }
+  .mapa-extremos { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .mapa-extremos > div + div { margin-top: 0; border-top: 0; border-left: 1px solid var(--borde); padding-top: 0; padding-left: 1rem; }
+}

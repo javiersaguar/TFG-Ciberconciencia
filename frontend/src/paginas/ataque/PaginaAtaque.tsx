@@ -4,6 +4,7 @@
  *   filtros     campaña, host, fundamento (observado / inferido / hipótesis) y tipo de relación
  *   lienzo      hosts con sus procesos y alertas, cuentas y campañas; zoom, desplazamiento y minimapa
  *   secuencia   el ataque en orden temporal, paso a paso, resaltando lo alcanzado
+ *   selectores  «Cámara: seguir el ataque | quieta» y «Eje: por momentos | tiempo real» (se recuerdan en la sesión)
  *   recorrido   los pasos del ataque numerados (el mismo número que en el lienzo), con reproducción
  *   detalle     panel sobre el lienzo, solo con algo elegido: evidencia, horas, técnicas, procedencia y confianza
  *   lista       los mismos elementos como botones: alternativa de teclado y lector de pantalla al lienzo
@@ -30,7 +31,7 @@ import { Button } from '@/componentes/ui/button'
 import { Skeleton } from '@/componentes/ui/skeleton'
 import { cn } from '@/lib/utils'
 
-import { absoluta, CARRILES, disponerEnCarriles, idCarril, type Disposicion } from './carriles'
+import { absoluta, CARRILES, disponerEnCarriles, idCarril, type Disposicion, type Eje } from './carriles'
 import { AristaRelacion, InsigniasPaso, NodoHost, NodoTarjeta, type AristaFlujo, type NodoFlujo } from './ElementosFlujo'
 import { ESTILO_FUNDAMENTO } from './estilo'
 import {
@@ -66,6 +67,27 @@ const HOSTS = ['SCRANTON', 'NASHUA', 'NEWYORK', 'UTICA'] as const
 const AJUSTE_TODO: FitViewOptions = { padding: { top: '74px', x: '18px', bottom: '26px' }, minZoom: 0.2, maxZoom: 1 }
 /** En un paso, si el grafo entero no se lee: el paso y el anterior, de cerca, con el texto legible (≥ 11 px). */
 const AJUSTE_PASO = { padding: 0.3, minZoom: 0.8, maxZoom: 1.05 }
+
+/** Cámara al reproducir: «seguir» acerca la vista a cada paso (como en la versión anterior); «quieta» solo se mueve si el grafo entero no se lee. */
+type Camara = 'seguir' | 'quieta'
+const esCamara = (v: unknown): v is Camara => v === 'seguir' || v === 'quieta'
+const esEje = (v: unknown): v is Eje => v === 'momentos' || v === 'tiempo'
+
+/** Selector de dos o tres opciones excluyentes (grupo de radio), del mismo estilo que el de velocidad. */
+function Segmentado<T extends string>({ etiqueta, valor, opciones, alCambiar }: { etiqueta: string; valor: T; opciones: readonly { valor: T; texto: string; titulo: string }[]; alCambiar: (v: T) => void }) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-texto-suave">
+      {etiqueta}
+      <span role="radiogroup" aria-label={etiqueta} className="flex rounded-md bg-superficie-alterna p-0.5">
+        {opciones.map((o) => (
+          <button key={o.valor} type="button" role="radio" aria-checked={valor === o.valor} title={o.titulo} onClick={() => alCambiar(o.valor)} className={cn('rounded px-2 py-0.5 text-xs font-semibold', valor === o.valor ? 'bg-superficie text-acento shadow-sm' : 'text-texto-suave hover:text-texto')}>
+            {o.texto}
+          </button>
+        ))}
+      </span>
+    </span>
+  )
+}
 
 const TEXTOS_ARIA = {
   'node.a11yDescription.default': 'Pulsa Enter o Espacio para ver el detalle. Escape quita la selección.',
@@ -180,7 +202,7 @@ const ZOOM_NOMBRES = 0.5
  * controles de reproducción. Es la forma de seguir el camino sin perderse: el lienzo no se mueve mientras quepa
  * entero y legible, y aquí se lee qué pasa en cada paso.
  */
-function Recorrido({ grafo, reproduccion }: { grafo: GrafoAtaque; reproduccion: ReturnType<typeof useReproduccion> }) {
+function Recorrido({ grafo, reproduccion, camara, alCambiarCamara }: { grafo: GrafoAtaque; reproduccion: ReturnType<typeof useReproduccion>; camara: Camara; alCambiarCamara: (c: Camara) => void }) {
   const { paso } = reproduccion
   const hito = paso == null ? null : grafo.hitos[paso]
   const total = grafo.hitos.length
@@ -206,6 +228,15 @@ function Recorrido({ grafo, reproduccion }: { grafo: GrafoAtaque; reproduccion: 
             </button>
           ))}
         </span>
+        <Segmentado
+          etiqueta="Cámara"
+          valor={camara}
+          alCambiar={alCambiarCamara}
+          opciones={[
+            { valor: 'seguir', texto: 'Seguir el ataque', titulo: 'Al reproducir, la vista se acerca a cada paso y al anterior' },
+            { valor: 'quieta', texto: 'Quieta', titulo: 'La vista no se mueve mientras el grafo entero se lea' },
+          ]}
+        />
         {paso != null && (
           <Button size="sm" variant="ghost" onClick={() => reproduccion.accion({ tipo: 'verTodo' })}>
             <X aria-hidden />
@@ -265,7 +296,10 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
   const campanaUrl = leerCampana(parametros.get('campana'), grafo)
   const [filtros, setFiltros] = useEstadoSesion<Filtros>(campanaUrl ? `ataque:filtros:${campanaUrl}` : 'ataque:filtros:v2', () => ({ ...FILTROS_INICIALES, campana: campanaUrl }), esFiltros)
   const reproduccion = useReproduccion(grafo.hitos.length)
-  const disposicion = useMemo(() => disponerEnCarriles(grafo.nodos, grafo.aristas), [grafo])
+  const [camara, setCamara] = useEstadoSesion<Camara>('ataque:camara', 'seguir', esCamara)
+  const [eje, setEje] = useEstadoSesion<Eje>('ataque:eje', 'momentos', esEje)
+  const [listaAbierta, setListaAbierta] = useEstadoSesion<boolean>('ataque:lista', true, (v): v is boolean => typeof v === 'boolean')
+  const disposicion = useMemo(() => disponerEnCarriles(grafo.nodos, grafo.aristas, undefined, eje), [grafo, eje])
   const pasosPorNodo = useMemo(() => numerarPasos(grafo), [grafo])
   const [bajoRaton, setBajoRaton] = useState<string | null>(null)
   const [minimapa, setMinimapa] = useState(false)
@@ -291,10 +325,10 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
     return [...new Set(ids)].map((id) => ({ id }))
   }, [grafo, paso, idsVisibles])
   const zoomTodo = useRef(1)
-  const estadoCamara = useRef({ focoTodo, focoPaso, enPaso: paso != null })
+  const estadoCamara = useRef({ focoTodo, focoPaso, enPaso: paso != null, camara })
   useEffect(() => {
-    estadoCamara.current = { focoTodo, focoPaso, enPaso: paso != null }
-  }, [focoTodo, focoPaso, paso])
+    estadoCamara.current = { focoTodo, focoPaso, enPaso: paso != null, camara }
+  }, [focoTodo, focoPaso, paso, camara])
 
   const seleccionar = useCallback(
     (id: string | null) =>
@@ -405,12 +439,12 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
     [getInternalNode, getViewport, setViewport],
   )
 
-  // Cámara. Sin paso: todo el grafo, y se apunta a qué zoom queda. En un paso: si el grafo entero se lee, la cámara NO
-  // se mueve (seguir el camino es más fácil con el lienzo quieto); si no, encuadra el paso y el anterior.
+  // Cámara. Sin paso: todo el grafo, y se apunta a qué zoom queda. En un paso, según el selector: «seguir» encuadra
+  // siempre el paso y el anterior (la vista acompaña al atacante); «quieta» no se mueve si el grafo entero se lee.
   const encuadrar = useCallback(
     (duracion: number) => {
-      const { focoTodo: todo, focoPaso: delPaso, enPaso } = estadoCamara.current
-      if (enPaso && zoomTodo.current >= ZOOM_LEGIBLE) return
+      const { focoTodo: todo, focoPaso: delPaso, enPaso, camara: modo } = estadoCamara.current
+      if (enPaso && modo === 'quieta' && zoomTodo.current >= ZOOM_LEGIBLE) return
       if (enPaso && delPaso.length) {
         void fitView({ ...AJUSTE_PASO, nodes: delPaso, duration: duracion })
         return
@@ -425,7 +459,7 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
   useEffect(() => {
     const id = requestAnimationFrame(() => encuadrar(reducido ? 0 : 450))
     return () => cancelAnimationFrame(id)
-  }, [focoTodo, focoPaso, encuadrar, reducido])
+  }, [focoTodo, focoPaso, camara, eje, encuadrar, reducido])
   useEffect(() => {
     let id = 0
     const alRedimensionar = () => {
@@ -458,7 +492,8 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
         <h1 className="text-xl">Grafo de ataque · APT29 day1</h1>
         <p className="text-xs text-texto-suave">Quién atacó a quién, en orden y con el fundamento de cada relación.</p>
         <ComoLeer className="mt-0.5">
-          <p>Un carril por host. De izquierda a derecha, el orden del ataque: cada columna es un momento con evidencia, con su hora (UTC del dataset, 2-5-2020) encima, y entre columnas se indica el tiempo que pasa. Los números son los pasos de la secuencia.</p>
+          <p>Un carril por host. Con el eje «Por momentos», de izquierda a derecha va el orden del ataque: cada columna es un momento con evidencia, con su hora (UTC del dataset, 2-5-2020) encima, y entre columnas se indica el tiempo que pasa. Con «Tiempo real», la distancia es proporcional al tiempo, con una marca cada dos minutos. Los números son los pasos de la secuencia.</p>
+          <p>Al reproducir, la cámara «Seguir el ataque» acerca la vista a cada paso; «Quieta» deja el lienzo fijo mientras se lea entero.</p>
           <p>Cada relación dice su fundamento: observado (telemetría), inferido (correlación del sistema) o hipótesis; ninguna está inventada. El tráfico de dominio de fondo está oculto: actívalo en «Relaciones».</p>
         </ComoLeer>
       </header>
@@ -515,6 +550,15 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
             )}
           </section>
           <SelectorRelaciones activas={filtros.relaciones} alCambiar={(r) => cambiarFiltros({ relaciones: alternar(filtros.relaciones, r) })} />
+          <Segmentado
+            etiqueta="Eje"
+            valor={eje}
+            alCambiar={setEje}
+            opciones={[
+              { valor: 'momentos', texto: 'Por momentos', titulo: 'Una columna por momento con evidencia, en orden, con el tiempo entre columnas' },
+              { valor: 'tiempo', texto: 'Tiempo real', titulo: 'Distancia proporcional al tiempo, con una marca cada dos minutos' },
+            ]}
+          />
           {!sinCambios && (
             <Button size="sm" variant="ghost" onClick={() => setFiltros(FILTROS_INICIALES)}>
               <RotateCcw aria-hidden />
@@ -569,9 +613,9 @@ function Explorador({ grafo }: { grafo: GrafoAtaque }) {
         )}
       </div>
 
-      <Recorrido grafo={grafo} reproduccion={reproduccion} />
+      <Recorrido grafo={grafo} reproduccion={reproduccion} camara={camara} alCambiarCamara={setCamara} />
 
-      <details className="rounded-lg border border-borde bg-superficie px-3 py-2">
+      <details open={listaAbierta} onToggle={(e) => setListaAbierta(e.currentTarget.open)} className="rounded-lg border border-borde bg-superficie px-3 py-2">
         <summary className="cursor-pointer text-xs font-semibold text-texto">
           Lista de elementos · {visibles.nodos.length} nodos, {visibles.aristas.length} relaciones
         </summary>

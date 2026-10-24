@@ -66,6 +66,10 @@ function pares(t: Record<string, string>): [string, string, string, number][] {
   texto('atacante-texto', 'atacante-fondo')
   texto('atacante-suave', 'atacante-fondo')
   grafico('linea-red', 'lienzo')
+  // Rutas geográficas activas, etiquetas y controles sobre el océano del mapa.
+  for (const severidad of SEVERIDAD) grafico(severidad, 'lienzo')
+  texto('texto', 'lienzo')
+  texto('texto-suave', 'lienzo')
   grafico('linea-red', 'zona')
   for (const f of FAMILIAS) grafico(`fam-${f}-linea`, 'lienzo')
   for (const fund of ['fund-observado', 'fund-inferido', 'fund-hipotesis']) {

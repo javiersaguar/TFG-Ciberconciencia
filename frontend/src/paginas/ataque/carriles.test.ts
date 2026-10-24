@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { cargarAristasP2, cargarCampanaP2, cargarCampanasP1 } from '@/api/exportaciones'
 import { construirGrafoAtaque } from '@/api/simulado/grafoAtaque'
 
-import { absoluta, asignarColumnas, CARRILES, carrilDe, disponerEnCarriles, idCarril, interpolar, MEDIDAS, repartirEnFilas } from './carriles'
+import { absoluta, asignarColumnas, CARRILES, carrilDe, disponerEnCarriles, idCarril, interpolar, MEDIDAS, PX_POR_MINUTO, repartirEnFilas } from './carriles'
 
 const [campanasP1, campanaP2, aristas] = await Promise.all([cargarCampanasP1(), cargarCampanaP2(), cargarAristasP2()])
 const grafo = construirGrafoAtaque({ campanasP1, campanaP2, aristas })
@@ -110,5 +110,31 @@ describe('disposición en carriles', () => {
   it('repartir en filas pone en otra fila lo que no cabe', () => {
     const filas = repartirEnFilas([{ id: 'a', x: 0, ancho: 100 }, { id: 'b', x: 50, ancho: 100 }, { id: 'c', x: 120, ancho: 50 }], 10)
     expect([filas.get('a'), filas.get('b'), filas.get('c')]).toEqual([0, 1, 0])
+  })
+})
+
+describe('eje de tiempo real (el de la versión anterior, a elegir)', () => {
+  const t = disponerEnCarriles(grafo.nodos, grafo.aristas, undefined, 'tiempo')
+  const tarjetas = grafo.nodos.filter((n) => n.tipo !== 'host' && n.tipo !== 'campana' && n.ms != null)
+
+  it('la posición es proporcional a la hora: la distancia entre dos tarjetas es su diferencia de tiempo a escala', () => {
+    const [a, b] = [...tarjetas].sort((x, y) => x.ms! - y.ms!).filter((_, i, l) => i === 0 || i === l.length - 1)
+    const centro = (id: string) => t.cajas[id].x + t.cajas[id].ancho / 2
+    expect(centro(b.id) - centro(a.id)).toBeCloseTo(((b.ms! - a.ms!) / 60_000) * PX_POR_MINUTO, 3)
+  })
+
+  it('una marca de hora cada dos minutos, sin huecos indicados (el hueco ya se ve a escala)', () => {
+    expect(t.saltos).toEqual([])
+    expect(t.columnas.length).toBeGreaterThan(5)
+    for (let i = 1; i < t.columnas.length; i++) expect(t.columnas[i].ms - t.columnas[i - 1].ms).toBe(120_000)
+    for (const c of t.columnas) expect(c.texto).toMatch(/^\d{2}:\d{2}$/)
+  })
+
+  it('en un carril, lo que se solaparía baja de fila: ninguna tarjeta pisa a otra', () => {
+    for (const a of tarjetas) for (const b of tarjetas) if (a.id < b.id && t.padres[a.id] === t.padres[b.id]) expect(seSolapan(t.cajas[a.id], t.cajas[b.id]), `${a.id} / ${b.id}`).toBe(false)
+  })
+
+  it('los dos ejes colocan los mismos nodos en los mismos carriles', () => {
+    expect(t.padres).toEqual(d.padres)
   })
 })

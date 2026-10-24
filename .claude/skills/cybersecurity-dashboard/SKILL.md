@@ -281,3 +281,26 @@ Cuando exista F6.3: cada hook cambia su `queryFn` por `fetch('/api/…')` tipado
   conexiones = pasos con el atacante en un extremo, al sitio de su canal (T1041 → C2). Ubicaciones de
   `Organizacion.geografia`, **ilustrativas** y dichas así (chip y nota: «ubicación de la IP, no del atacante»).
   Mapamundi de Natural Earth generado por `npm run generar-mapamundi` (no se edita a mano). Tokens `--globo-*`.
+- **Mapa mundial** (`/mapa`, `paginas/mapa/`), **boceto construido el 21-10-2026:** flujo ilustrativo de Helios, cartografía Natural Earth local,
+  rutas con d3-geo, pausa, filtros, zoom y detalle. No convertirlo en geolocalización de las IP privadas ni presentarlo
+  como telemetría real. La geografía se carga en su ruta y no debe arrastrar Recharts. El movimiento reducido deja
+  flechas estáticas; el reloj se detiene al pausar u ocultar la pestaña.
+
+## 16. Unificación del 24-10-2026: nada de lo anterior se pierde
+
+La ronda 4 (rama `frontend`) sustituyó cosas que Javier quería conservar; al llevarla a `main` se unificó todo:
+
+- **Regla de trabajo**: un cambio de diseño que reemplace una funcionalidad se ofrece como **opción** (selector, con la
+  versión anterior disponible) o se pregunta antes; no se quita en silencio. «Sobrio» significa sin adornos, no con
+  menos funciones.
+- **Grafo de ataque**: dos selectores recordados en la sesión (`useEstadoSesion`):
+  - «Cámara: Seguir el ataque | Quieta» (`ataque:camara`, por defecto **seguir**): al reproducir, la vista encuadra
+    cada paso y el anterior (`AJUSTE_PASO`); «quieta» solo se mueve si el grafo entero no se lee.
+  - «Eje: Por momentos | Tiempo real» (`ataque:eje`, por defecto por momentos): `disponerEnCarriles(…, eje)`;
+    en tiempo real la posición es proporcional a la hora (`PX_POR_MINUTO` = 40) con una marca cada 2 min y las
+    tarjetas que se solapan bajan de fila. Los dos ejes ponen los mismos nodos en los mismos carriles (test).
+  - La lista de elementos (nodos y relaciones como botones) está **abierta de entrada** (`ataque:lista`).
+- **Mapas**: `/mapa` (flujo continuo de alertas) y la vista «Mundo» de `/conciencia` (pasos de un ataque) conviven y se
+  enlazan en los dos sentidos. Chunks: `geografia` (d3-geo) y `d3-comun` con `d3-array`, para que ninguno arrastre
+  Recharts; `tresd` para three.js.
+

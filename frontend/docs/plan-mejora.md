@@ -173,3 +173,36 @@ ilustrativo**, con la misma interfaz que usará la versión real. Propuesta de u
 **Hecho como demo el 24-10-2026**: «Mundo» en `/conciencia`, en mapa 2D y globo 3D, para Helios y DMEVALS, con las
 ubicaciones marcadas como ilustrativas y la nota de que es la ubicación de la IP. La lógica (`globo.ts`) recibe lugares:
 cuando la API dé IP públicas geolocalizadas, las vistas no cambian. Faltan los requisitos 1 a 3 para que sea real.
+
+## 9. Mapa mundial del boceto (21-10-2026)
+
+Construido por petición de Javier en la sección Demo, ruta /mapa. El flujo de Helios es ilustrativo y está identificado
+como tal en la cabecera y en el detalle: las IP privadas del corpus no se geolocalizan.
+
+SVG con cartografía Natural Earth local, d3-geo y rutas geodésicas (incluido el antimeridiano). Partículas y anillo de
+llegada ligados al reloj de la demo, con pausa, reinicio, velocidades, filtros por país/nivel, zoom, arrastre y detalle
+estable. Ventana de sesenta segundos, lista acotada, suspensión al ocultar la pestaña y movimiento reducido.
+La cartografía y el código se descargan solo al abrir su ruta; se ha separado d3-array del grupo de Recharts para
+evitar que el mapa descargue la biblioteca de gráficos completa.
+
+Verificación: 422 pruebas unitarias, lint y build; Playwright cubre la animación, pausa, filtros, teclado, zoom,
+movimiento reducido, ausencia de llamadas externas, carga diferida y diseño en ambos temas a tres anchos.
+La conexión a telemetría real sigue pendiente de los requisitos de la sección 8.
+
+## 10. Unificación (24-10-2026)
+
+La rama `frontend` (ronda 4: maqueta 3D, «Por qué», mundo en 2D y 3D, logo, sobriedad) llegó a `main` por avance
+rápido, pero había sustituido funciones de la versión anterior y la página `/mapa` no estaba en ella. Se unificó:
+
+| Qué faltaba | Cómo queda |
+|---|---|
+| Página «Mapa mundial» (`/mapa`), sin guardar del 21-10 | Restaurada en el menú Demo y enlazada con la vista «Mundo» (y al revés) |
+| Cámara que sigue el ataque al reproducir el grafo | Selector «Cámara: Seguir el ataque (por defecto) / Quieta» |
+| Eje de tiempo real del grafo | Selector «Eje: Por momentos (por defecto) / Tiempo real» |
+| Panel lateral siempre visible con la lista de elementos | La lista de elementos va abierta de entrada; el detalle, en su panel al elegir |
+| Adornos quitados por sobriedad | Se mantiene lo sobrio; la urgencia de cada acción sigue como etiqueta, el «el LLM solo redacta» en Notas y el «no ejecuta acciones» en el Copiloto |
+
+Verificación: 466 pruebas unitarias en 43 ficheros, ESLint y build limpios; Playwright 80 escenarios en verde en
+1280, 1440 y 1920 px (4 saltos previstos). Con el stack de PIDS levantado la máquina va cargada: las baterías completas
+necesitan menos hilos y más margen de tiempo (`--maxWorkers=4 --testTimeout=30000`, `--workers=2 --timeout=120000`).
+

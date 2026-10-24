@@ -25,7 +25,7 @@ export function BarraSuperior({ alBuscar }: { alBuscar: () => void }) {
       </nav>
       <span className="ml-auto hidden items-center gap-1.5 whitespace-nowrap text-texto-suave @3xl/barra:flex" title="Datos que enseña el portal">
         <Database className="size-3.5" aria-hidden />
-        APT29 day1 · corpus F3
+        {pathname === '/mapa' ? 'Helios · demo geográfica' : 'APT29 day1 · corpus F3'}
       </span>
       <AvisoSimulado className="@max-3xl/barra:ml-auto" />
       <BotonCopiloto mac={mac} />
