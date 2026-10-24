@@ -5,15 +5,15 @@
  * demo y, al llegar, se abre un anillo. Pinchar un arco (o una alerta de la tabla) la elige: se resalta, se iluminan
  * sus dos países (como en el 2D) y se rotulan sus dos ciudades.
  *
- * El globo gira solo mientras se mira el mundo entero. Se para al elegir una alerta o filtrar por país, y desde ahí
- * solo se mueve a mano: arrastrando o con las flechas de la esquina. Si lo elegido queda a espaldas, la vista se
+ * El globo no gira solo (decisión de Javier, 24-10): se mueve a mano, arrastrando o con las flechas de la esquina. La
+ * única excepción es elegir algo que queda a espaldas (una alerta desde la tabla, un país del filtro): la vista se
  * vuelve una vez hacia ello; si ya se ve, no se mueve.
  *
  * Mismo convenio que el 2D: el reloj lo controla la reproducción (pausa real, velocidad); con movimiento reducido no
- * hay partículas ni giro y cada ruta lleva su punta de flecha. Ubicaciones ILUSTRATIVAS: lo dice la página.
+ * hay partículas ni transiciones de cámara y cada ruta lleva su punta de flecha. Ubicaciones ILUSTRATIVAS: lo dice la página.
  */
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minus, Plus, RotateCw } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minus, Plus } from 'lucide-react'
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -45,7 +45,7 @@ interface Props {
   reloj: RefObject<number>
   enMarcha: boolean
   alSeleccionar: (alerta: AlertaMapa) => void
-  /** Código del país filtrado (vacío: todo el mundo). Con un país filtrado el globo no gira solo. */
+  /** Código del país filtrado (vacío: todo el mundo): si queda a espaldas, la vista se vuelve hacia él. */
   pais?: string
 }
 
@@ -216,15 +216,11 @@ interface Enfoque {
   puntos: Vec3[]
 }
 
-function Camara({ girar, reducido, orden, enfoque, alTocar }: { girar: boolean; reducido: boolean; orden: Orden | null; enfoque: Enfoque | null; alTocar: () => void }) {
+function Camara({ reducido, orden, enfoque }: { reducido: boolean; orden: Orden | null; enfoque: Enfoque | null }) {
   const { camera, gl, invalidate } = useThree()
   const controles = useRef<OrbitControls | null>(null)
   const meta = useRef<THREE.Vector3 | null>(null)
   const [aux] = useState(() => ({ dir: new THREE.Vector3(), objetivo: new THREE.Vector3(), eje: new THREE.Vector3() }))
-  const alTocarRef = useRef(alTocar)
-  useEffect(() => {
-    alTocarRef.current = alTocar
-  }, [alTocar])
   useEffect(() => {
     camera.position.set(...DIRECCION_INICIAL).multiplyScalar(DISTANCIA)
     camera.lookAt(0, 0, 0)
@@ -235,11 +231,10 @@ function Camara({ girar, reducido, orden, enfoque, alTocar }: { girar: boolean; 
     c.minDistance = 1.7
     c.maxDistance = 7
     c.rotateSpeed = 0.6
-    c.autoRotateSpeed = 0.6
     const alCambiar = () => invalidate()
+    // arrastrar cancela la transición en curso (de una flecha o de volver la vista): manda la mano
     const alEmpezar = () => {
       meta.current = null
-      alTocarRef.current()
     }
     c.addEventListener('change', alCambiar)
     c.addEventListener('start', alEmpezar)
@@ -252,10 +247,6 @@ function Camara({ girar, reducido, orden, enfoque, alTocar }: { girar: boolean; 
       controles.current = null
     }
   }, [camera, gl, invalidate, reducido])
-  useEffect(() => {
-    if (controles.current) controles.current.autoRotate = girar && !reducido
-    invalidate()
-  }, [girar, reducido, invalidate])
   const irA = (destino: THREE.Vector3) => {
     if (reducido) {
       camera.position.copy(destino)
@@ -308,7 +299,7 @@ function Camara({ girar, reducido, orden, enfoque, alTocar }: { girar: boolean; 
 
 /**
  * La luz principal va con la cámara (arriba a la izquierda y por detrás de quien mira), para que la cara que se ve
- * esté siempre iluminada igual mientras el globo gira o se mueve con las flechas.
+ * esté siempre iluminada igual al moverlo a mano o con las flechas.
  */
 function LuzQueSigue({ intensidad }: { intensidad: number }) {
   const luz = useRef<THREE.DirectionalLight>(null)
@@ -354,26 +345,11 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
   const reducido = useMovimientoReducido()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `tema` marca cuándo releer los tokens
   const pal = useMemo(() => leerPaletaGlobo(), [tema])
-  // gira solo mientras se mira el mundo entero; elegir una alerta, filtrar por país o moverlo a mano lo para
-  const [girar, setGirar] = useState(true)
-  const [tocado, setTocado] = useState(false)
-  const detenido = !!seleccion || !!pais
-  // al volver al mundo entero (sin alerta ni país), vuelve a girar aunque se hubiera movido a mano entretanto
-  const [detenidoAntes, setDetenidoAntes] = useState(detenido)
-  if (detenido !== detenidoAntes) {
-    setDetenidoAntes(detenido)
-    if (!detenido) setTocado(false)
-  }
   const [orden, setOrden] = useState<Orden | null>(null)
   const [piezas] = useState(() => new Map<string, Piezas>())
   const [rotulos] = useState(() => new Map<string, HTMLElement>())
   const registrar = useMemo(() => (id: string, p: Piezas | null) => (p ? piezas.set(id, p) : piezas.delete(id)), [piezas])
-  const autoGiro = girar && !tocado && !detenido && !reducido
   const ordenar = (tipo: Orden['tipo']) => setOrden((o) => ({ tipo, n: (o?.n ?? 0) + 1 }))
-  const mover = (sentido: Sentido) => {
-    setTocado(true)
-    ordenar(sentido)
-  }
   // los países demasiado pequeños para el mapamundi 1:110m (Singapur) no tienen polígono: se mira a su ciudad
   const ciudadDelPais = pais ? alertas.flatMap((a) => [a.desde, a.hasta]).find((u) => u.codigoPais === pais) : undefined
   const enfoque = useMemo<Enfoque | null>(() => {
@@ -404,7 +380,7 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
     <div className="mapa-lienzo relative aspect-[1000/540] min-h-[340px] w-full overflow-hidden" role="region" aria-label="Globo de rutas geográficas">
       <SinWebGL alternativa={alternativa}>
         <div role="img" aria-label={resumen} className="absolute inset-0 cursor-grab">
-          <Canvas frameloop={(enMarcha && !reducido) || autoGiro ? 'always' : 'demand'} dpr={[1, 1.75]} camera={{ fov: 30, near: 0.1, far: 50, position: [0, 0, DISTANCIA] }} gl={{ antialias: true }} fallback={alternativa}>
+          <Canvas frameloop={enMarcha && !reducido ? 'always' : 'demand'} dpr={[1, 1.75]} camera={{ fov: 30, near: 0.1, far: 50, position: [0, 0, DISTANCIA] }} gl={{ antialias: true }} fallback={alternativa}>
             <color attach="background" args={[pal['maqueta-base']]} />
             <hemisphereLight args={[pal.superficie, pal['maqueta-base'], tema === 'oscuro' ? 1.1 : 1.3]} />
             <LuzQueSigue intensidad={tema === 'oscuro' ? 1.6 : 1.9} />
@@ -423,7 +399,7 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
               <Ruta key={a.id} alerta={a} pal={pal} elegida={seleccion?.id === a.id} apagada={!!seleccion && seleccion.id !== a.id} reducido={reducido} registrar={registrar} alSeleccionar={alSeleccionar} />
             ))}
             {!reducido && <Movimiento piezas={piezas} reloj={reloj} enMarcha={enMarcha} />}
-            <Camara girar={autoGiro} reducido={reducido} orden={orden} enfoque={enfoque} alTocar={() => setTocado(true)} />
+            <Camara reducido={reducido} orden={orden} enfoque={enfoque} />
             <Proyector anclas={anclas} elementos={rotulos} />
           </Canvas>
         </div>
@@ -445,34 +421,15 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
         </div>
 
         <div className="absolute top-3 right-3 z-10 flex items-center gap-1 rounded-lg border border-borde bg-superficie/95 p-1">
-          {!reducido && (
-            <button
-              type="button"
-              className={cn('mapa-icono', autoGiro && 'text-acento')}
-              aria-label="Girar el globo"
-              aria-pressed={autoGiro}
-              disabled={detenido}
-              title={detenido ? 'Parado mientras hay una alerta elegida o un país filtrado: muévelo a mano' : autoGiro ? 'Parar el giro' : 'Girar el globo'}
-              onClick={() => {
-                if (autoGiro) setGirar(false)
-                else {
-                  setGirar(true)
-                  setTocado(false)
-                }
-              }}
-            >
-              <RotateCw className="size-4" aria-hidden />
-            </button>
-          )}
           <button type="button" className="mapa-icono" aria-label="Acercar el globo" onClick={() => ordenar('acercar')}><Plus className="size-4" aria-hidden /></button>
           <button type="button" className="mapa-icono" aria-label="Alejar el globo" onClick={() => ordenar('alejar')}><Minus className="size-4" aria-hidden /></button>
           <button type="button" className="mapa-icono border-l border-borde" aria-label="Ver todo el mundo" onClick={() => ordenar('mundo')}><Maximize2 className="size-3.5" aria-hidden /></button>
         </div>
         <div className="absolute bottom-3 left-4 flex gap-4 text-[10px] text-texto-suave">
           <a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener noreferrer" className="hover:underline">Natural Earth · dominio público</a>
-          <span className="hidden sm:inline">Arrastra o usa las flechas para girar el globo</span>
+          <span className="hidden sm:inline">Arrastra o usa las flechas para mover el globo</span>
         </div>
-        {/* flechas: giran la vista 20° por pulsación, como arrastrar, y paran el giro automático */}
+        {/* flechas: mueven la vista 20° por pulsación, como arrastrar */}
         <div role="group" aria-label="Mover la vista del globo" className="mapa-flechas absolute right-3 bottom-3 z-10 grid grid-cols-3 gap-0.5 rounded-lg border border-borde bg-superficie/95 p-0.5">
           {([
             ['arriba', 'Mover la vista hacia arriba (norte)', ChevronUp, 'col-start-2'],
@@ -480,7 +437,7 @@ export default function GloboMundial({ alertas, seleccion, reloj, enMarcha, alSe
             ['derecha', 'Mover la vista a la derecha (este)', ChevronRight, 'col-start-3 row-start-2'],
             ['abajo', 'Mover la vista hacia abajo (sur)', ChevronDown, 'col-start-2 row-start-3'],
           ] as const).map(([sentido, nombre, Icono, sitio]) => (
-            <button key={sentido} type="button" className={cn('mapa-icono mapa-flecha', sitio)} aria-label={nombre} title={nombre} onClick={() => mover(sentido)}>
+            <button key={sentido} type="button" className={cn('mapa-icono mapa-flecha', sitio)} aria-label={nombre} title={nombre} onClick={() => ordenar(sentido)}>
               <Icono className="size-3.5" aria-hidden />
             </button>
           ))}

@@ -210,15 +210,14 @@ ninguna coordenada se deduce de las IP privadas de APT29 ni se presenta como ubi
 - **Globo: países, giro y flechas** (24-10, ajustes de Javier):
   - **Países iluminados**: al elegir una alerta se iluminan sus países de origen y destino, como en el 2D, con los
     mismos polígonos (`tierra.json`) pintados en una capa transparente sobre la Tierra.
-  - **Gira solo mientras se mira el mundo entero.** Se para al elegir una alerta o filtrar por país, y desde ahí solo se
-    mueve a mano. Al quitar la alerta y el filtro vuelve a girar. Arrastrar o usar las flechas también lo para; el
-    botón de giro lo reanuda.
+  - **No gira solo en ningún momento** (Javier lo decidió así el 24-10, tras probar un giro automático): se mueve
+    arrastrándolo o con las flechas. No hay botón de giro.
   - **Vuelve la vista solo si hace falta**: si lo elegido (los dos extremos, o el país filtrado) queda a espaldas, la
     vista gira una vez hacia ello; si ya se ve, no se mueve. Singapur no tiene polígono en el 1:110m, así que se mira a
     su ciudad.
   - **Flechas** abajo a la derecha (arriba = norte, izquierda = oeste…): 20° por pulsación, con transición suave y
     tope de 75° de latitud para no pasar por encima del polo. Se acumulan si se pulsan seguidas.
-  - La luz principal acompaña a la cámara, para que la cara que se ve esté siempre iluminada igual mientras gira.
+  - La luz principal acompaña a la cámara, para que la cara que se ve esté siempre iluminada igual al moverlo.
   - Lógica pura en `vistaGlobo.ts` (países por código, centro de la parte principal de cada país, pintado, flechas y
     «queda detrás»), con su test. La Tierra es la de los globos del portal (`componentes/tierra/`: mares y tierras del tema, costas,
   fronteras, retícula y atmósfera), la misma que el globo de «Mundo» en `/conciencia`.
@@ -233,7 +232,7 @@ públicas, enriquecimiento GeoIP en el servidor y el flujo de alertas de F6.3. N
 
 Pruebas: `e2e/mapa.spec.ts` comprueba movimiento real de las partículas, pausa, reanudación, detalle estable, filtros,
 zoom, teclado, movimiento reducido, ausencia de peticiones externas y de desbordes, y el globo (mismo flujo, selección
-desde la tabla, países iluminados, giro que se para al elegir o filtrar y vuelve al quitarlo, flechas, vista recordada); guarda capturas de los dos temas en 1280, 1440 y 1920 px. Las pruebas unitarias cubren la ventana acotada, el reloj y el cruce del Pacífico.
+desde la tabla, países iluminados, sin giro automático, flechas, vista recordada); guarda capturas de los dos temas en 1280, 1440 y 1920 px. Las pruebas unitarias cubren la ventana acotada, el reloj y el cruce del Pacífico.
 
 ## Modo presentación
 
