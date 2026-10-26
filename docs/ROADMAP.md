@@ -492,7 +492,15 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
     - descubrimiento híbrido;
     - una lista de exclusiones medida.
   - Sin campaña: LSASS_02/04-07 (reconocimiento sin escalada) y NEWYORK (monitorización).
-  - **Pendiente:** P3 en Flink y su emisión; validar en day2.
+  - **P3 en Flink (26-10-2026)**, en `infra/flink/jobs/p3_0*.sql` y `st_03_p3.sql`, en batch y en streaming. Respecto al oráculo:
+    - la evidencia y las campañas son las mismas;
+    - la confianza es la misma;
+    - el orden del plan coincide en SCRANTON.
+  - Emite 3 hallazgos OCSF, así que `tfg.campaigns` queda con P1 11, P2 1 y P3 3.
+  - **Decisión pendiente:** la extensión de la campaña. Flink la acota a su evidencia y el oráculo absorbe ±10 min. En P3 eso
+    cambia mucho el contexto contado (LSASS_01: 3 alertas de descubrimiento frente a 23). Hay que decidirlo antes de medir la
+    reducción de alertas en F7.
+  - **Pendiente:** validar en day2.
 - [ ] **Falsos positivos** sobre la porción benigna.
 - [ ] **Ratio de reducción de alertas** = 1 − (campañas / alertas individuales) ← *métrica estrella*.
 - [ ] **Latencia de detección**: del último evento de la secuencia a la emisión.
