@@ -69,17 +69,25 @@ docker exec redpanda rpk cluster health >/dev/null 2>&1 \
 
 # --- Topics -----------------------------------------------------------------
 # Contrato de particiones del roadmap: raw 3, norm 6, det 3, dlq 1.
+#
+# SIN CADUCIDAD (retention.ms=-1). Redpanda borra por defecto los mensajes de
+# mas de 7 dias, y el corpus es un conjunto FIJO de evaluacion, no un flujo en
+# vivo: hay que poder releerlo semanas despues. Medido el 25-10-2026: el corpus
+# cargado el 14-09 habia desaparecido de norm.events y det.alerts (primer offset
+# = ultimo en todas las particiones) y Flink leia los topics vacios sin ningun
+# error. ClickHouse lo conservaba porque guarda su propia copia.
+RETENCION=(-c retention.ms=-1)
 if [[ $RECREAR_TOPICS -eq 1 ]]; then
   echo "== Recreando topics del pipeline (los datos previos se descartan) =="
   for t in raw.host.windows norm.events det.alerts dlq.normalize dlq.detect; do
     docker exec redpanda rpk topic delete "$t" >/dev/null 2>&1 || true
   done
   sleep 2
-  docker exec redpanda rpk topic create raw.host.windows -p 3
-  docker exec redpanda rpk topic create norm.events      -p 6
-  docker exec redpanda rpk topic create det.alerts       -p 3
-  docker exec redpanda rpk topic create dlq.normalize    -p 1
-  docker exec redpanda rpk topic create dlq.detect       -p 1
+  docker exec redpanda rpk topic create raw.host.windows -p 3 "${RETENCION[@]}"
+  docker exec redpanda rpk topic create norm.events      -p 6 "${RETENCION[@]}"
+  docker exec redpanda rpk topic create det.alerts       -p 3 "${RETENCION[@]}"
+  docker exec redpanda rpk topic create dlq.normalize    -p 1 "${RETENCION[@]}"
+  docker exec redpanda rpk topic create dlq.detect       -p 1 "${RETENCION[@]}"
   echo ""
 fi
 
