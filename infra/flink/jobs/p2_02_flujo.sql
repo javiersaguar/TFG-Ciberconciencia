@@ -23,16 +23,24 @@
 -- Los literales de `tipo` van como STRING: en un UNION, 'arista' (CHAR(6)) y
 -- 'evidencia' (CHAR(9)) se unificarian a CHAR(9) y 'arista' llevaria espacios
 -- al final, con lo que `tipo = 'arista'` dejaria de cumplirse en el patron.
+-- EN ORDEN DE TIEMPO DE EVENTO (26-10): asi cada particion llega ordenada, como
+-- un flujo real, y en modo streaming ningun registro queda detras de la marca de
+-- agua. Sin esto, el 74 % del flujo llegaba "tarde" (medido con st_00_desorden.sql).
 INSERT INTO p2_flujo
-SELECT dataset, destino, t_ms, CAST('arista' AS STRING), origen, puerto, proceso,
-       confirmada, uid, CAST(NULL AS STRING), 0, 0, 0
-FROM aristas
-WHERE hacia_dc = 0
-UNION ALL
-SELECT dataset, host, t_ms, CAST('evidencia' AS STRING), CAST(NULL AS STRING),
-       CAST(NULL AS INT), CAST(NULL AS STRING), 0, alert_id, rule_title,
+SELECT dataset, destino, t_ms, tipo, origen, puerto, proceso, confirmada, id, regla,
        remota, servicio, cred
-FROM evidencias;
+FROM (
+    SELECT dataset, destino, t_ms, CAST('arista' AS STRING) AS tipo, origen, puerto, proceso,
+           confirmada, uid AS id, CAST(NULL AS STRING) AS regla, 0 AS remota, 0 AS servicio, 0 AS cred
+    FROM aristas
+    WHERE hacia_dc = 0
+    UNION ALL
+    SELECT dataset, host, t_ms, CAST('evidencia' AS STRING), CAST(NULL AS STRING),
+           CAST(NULL AS INT), CAST(NULL AS STRING), 0, alert_id, rule_title,
+           remota, servicio, cred
+    FROM evidencias
+)
+ORDER BY t_ms;
 
 -- Comprobacion: lo publicado, por dataset y tipo.
 --   aristas: 17, todas en apt29 day1 (las campanas LSASS son de un solo equipo).

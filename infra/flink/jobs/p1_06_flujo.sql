@@ -25,7 +25,12 @@ SELECT dataset, host, t_ms, alert_id, rule_title, rule_level,
        CASE WHEN tecnicas LIKE '%T1003%' AND tipo LIKE '%Launch%'      THEN 1 ELSE 0 END,
        CASE WHEN tecnicas LIKE '%T1003%' AND tipo LIKE '%File System%' THEN 1 ELSE 0 END
 FROM alertas_unicas
-WHERE tecnicas LIKE '%T1003%' OR tecnicas LIKE '%T1070%';
+WHERE tecnicas LIKE '%T1003%' OR tecnicas LIKE '%T1070%'
+-- EN ORDEN DE TIEMPO DE EVENTO (26-10): asi cada particion llega ordenada, como
+-- un flujo real, y en modo streaming ningun registro queda detras de la marca de
+-- agua. Sin esto, el 78 % de la evidencia llegaba "tarde" (medido con
+-- st_00_desorden.sql): en batch da igual, en streaming se habria descartado.
+ORDER BY t_ms;
 
 -- Comprobacion: lo publicado por dataset. filas = ids en todas (sin repetidos).
 -- Cotejar con ClickHouse:

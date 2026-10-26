@@ -454,7 +454,14 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   - El mapa IP → host y el controlador de dominio se derivan de los datos, en el propio job.
   - **Topic intermedio `det.p2_flujo`**, porque el patrón necesita un atributo de tiempo y las agregaciones lo pierden.
   - **Transición bidireccional** como P1. El orden conexión → ejecución **se mide**: 7 de 8 evidencias, retraso máximo de 1,0 s.
-- [ ] Gestión de eventos tardíos (`allowedLateness`) → `dlq.late`, y medir cuántos hay.
+- [ ] Gestión de eventos tardíos (`allowedLateness`) → `dlq.late`. **Medido el 26-10** (`st_00_desorden.sql`):
+  - en `det.alerts`, dentro de cada dataset, el peor retraso es de **293 s**. Con la marca de agua de 30 s se perderían 220
+    alertas (18 %); con 5 min, ninguna. Es desorden de la detección en paralelo, **inflado** por reproducir el corpus muy
+    por encima de la velocidad real;
+  - mezclar datasets de años distintos en las mismas particiones da retrasos de años: es un efecto de la reproducción, no
+    existe en producción.
+  - **Pendiente:** dimensionar la marca de agua de la cadena continua y llevar los tardíos a `dlq.late`. La emisión de
+    campañas en streaming necesitará un destino *upsert*, porque la ventana de sesión actualiza cada campaña.
 
 ### F3.3 🧠 — Anomalías secuenciales como refuerzo
 
@@ -469,7 +476,9 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   Prueba de generalización superada. Clave: el ancla es la familia `T1003.*`; con la
   subtécnica `T1003.001` habrían sido 6 de 7 (falla Mimikatz `logonpasswords`, porque
   Meterpreter lo ejecuta dentro de su propio proceso y no hay acceso externo a `lsass.exe`).
-  Pendiente repetir la validación sobre la versión en streaming.
+  **Revalidado en streaming el 26-10-2026** (`infra/flink/jobs/st_0*.sql`): P1 da las mismas 11 campañas (52
+  transiciones) y P2 su campaña de 17 aristas, idénticas a batch. Requisito descubierto: el flujo de entrada tiene que
+  llegar **en orden de tiempo de evento**, o la marca de agua descarta la evidencia.
 - [ ] P3/P4 contra apt29 day1/day2. *(P2 contra day1: hecho, en batch el 11-09 y en Flink el 26-10.)*
 - [ ] **Falsos positivos** sobre la porción benigna.
 - [ ] **Ratio de reducción de alertas** = 1 − (campañas / alertas individuales) ← *métrica estrella*.
