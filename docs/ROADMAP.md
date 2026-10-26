@@ -432,12 +432,16 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   `norm.events` filtrado por las señales `tfg.signal_*` ya precalculadas en los mapeadores
   (`signal_lsass_access`, `signal_dump_file`, `signal_log_cleared`, `signal_remote_thread`…)
   para las etapas de refuerzo. Decidir **con el inventario de F3.1 en la mano**, no antes.
-- [ ] **Esquema de campaña** en `det.campaigns`:
-  ```
-  campaign_id · first_seen · last_seen · duration · pattern_id
-  stages[] { order, tactic_id, technique_id, time, evidence_alert_ids[], device }
-  devices[] · users[] · confidence
-  ```
+- [x] **Esquema de campaña común (26-10-2026)**: hallazgo **OCSF 1.5.0 «Detection Finding»** (clase 2004) con
+  extensión `tfg.*`. Especificación en `docs/esquema-campana.md`.
+  - **Etapas lógicas** en `tfg.stages[]`, cada una con su evidencia. Se ordenan por el segundo de su primera evidencia y,
+    dentro del mismo segundo, por el orden lógico del patrón.
+  - **Confianza descompuesta** en `tfg.confidence_factors`.
+  - **Identidad común:** `md5(dataset|patrón|clave|inicio)`.
+  - **Destino:** P1 y P2 emiten a `det.campaigns`, sin caducidad. `pipeline/jobs/sink_campaigns.py` valida cada
+    documento, con 9 tests, y lo vuelca a `tfg.campaigns`.
+  - **Resultado:** 12 campañas, 11 de P1 y 1 de P2. P1 coincide con el oráculo en campañas, evidencias, etapas y
+    confianza.
 - [x] **Correlación jerárquica en dos niveles**, ya implementada para P1 y **no por elegancia,
   sino porque Flink no puede expresar la racha maximal en un solo patrón**: nivel 1
   (`MATCH_RECOGNIZE`) reconoce la *transición* evidencia → acceso a credenciales; nivel 2

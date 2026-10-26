@@ -9,10 +9,14 @@
 --
 -- Contenido:
 --   * norm_events  -> conexiones de red (Sysmon EID 3): las ARISTAS.
+--   * det_campaigns -> topic det.campaigns: la salida, en el esquema comun
+--                     (docs/esquema-campana.md). Lo escribe p2_04.
 --   * det_alerts   -> alertas Sigma: la EVIDENCIA de ejecucion en el destino.
 --   * p2_flujo     -> topic det.p2_flujo: aristas + evidencia por host de destino,
 --                     ya deduplicadas. Lo escribe p2_02 y lo lee el patron (p2_03).
---   * vistas: red, mapa_ip_host, controladores, aristas, alertas_unicas, evidencias.
+--   * vistas: red, mapa_ip_host, controladores, aristas, alertas_unicas, evidencias
+--     y, sobre det.p2_flujo, las del patron y las campanas (transiciones, sesiones,
+--     campanas_p2...), compartidas por p2_03 (comprobaciones) y p2_04 (emision).
 --
 -- Oraculo: detection/patterns/p2_lateral_movement.sql (vista tfg.p2_campanas).
 -- =============================================================================
@@ -247,14 +251,17 @@ GROUP BY s.dataset, s.origen, s.destino, s.ts, s.t_ms, s.puerto, s.proceso, s.ui
 -- ReplacingMergeTree; aqui hay que quitarlas a mano o una alerta contaria dos
 -- veces. alert_id es determinista (sha1 del evento + regla).
 CREATE TEMPORARY VIEW alertas_unicas AS
-SELECT dataset, host, t_ms, alert_id, rule_title, tecnicas
+SELECT dataset, host, t_ms, alert_id, rule_title, rule_level, tecnicas, tecnicas_arr, tacticas_arr
 FROM (
     SELECT tfg.dataset_id                         AS dataset,
            device.hostname                        AS host,
            `time`                                 AS t_ms,
            alert_id,
            rule_title,
+           rule_level,
            ARRAY_JOIN(attack.technique_ids, ',')  AS tecnicas,
+           attack.technique_ids                   AS tecnicas_arr,
+           attack.tactic_ids                      AS tacticas_arr,
            ROW_NUMBER() OVER (PARTITION BY alert_id ORDER BY detected_at) AS rn
     FROM det_alerts
 )
@@ -271,3 +278,178 @@ SELECT dataset, host, t_ms, alert_id, rule_title,
        CASE WHEN tecnicas LIKE '%T1003%'     THEN 1 ELSE 0 END AS cred
 FROM alertas_unicas
 WHERE tecnicas LIKE '%T1021%' OR tecnicas LIKE '%T1569.002%' OR tecnicas LIKE '%T1003%';
+
+-- -----------------------------------------------------------------------------
+-- det.campaigns: la salida, en el esquema comun (docs/esquema-campana.md)
+-- -----------------------------------------------------------------------------
+-- El documento es un hallazgo OCSF Detection Finding construido en Flink como
+-- TEXTO JSON (value.format = raw): ver p2_04_emision.sql para por que. Clave =
+-- host de destino, como el resto de topics del contrato (particion por host).
+CREATE TABLE det_campaigns (
+    clave      STRING,
+    documento  STRING
+) WITH (
+    'connector' = 'kafka',
+    'topic' = 'det.campaigns',
+    'properties.bootstrap.servers' = 'redpanda:29092',
+    'properties.group.id' = 'flink-campanas-p2',
+    'key.format' = 'raw',
+    'key.fields' = 'clave',
+    'value.format' = 'raw',
+    'value.fields-include' = 'EXCEPT_KEY',
+    'scan.startup.mode' = 'earliest-offset',
+    'scan.bounded.mode' = 'latest-offset'
+);
+
+-- =============================================================================
+-- PATRON Y CAMPANAS, sobre det.p2_flujo (escrito por p2_02_flujo.sql)
+-- =============================================================================
+-- Validado el 26-10-2026: reproduce tfg.p2_campanas exacto (ver p2_03).
+
+-- NIVEL 1 · transiciones arista <-> evidencia (MATCH_RECOGNIZE)
+-- p2_flujo es una fuente con WATERMARK: `ts` llega como atributo de tiempo, que
+-- es lo que exige el ORDER BY del patron; la subconsulta solo proyecta y lo
+-- conserva. SKIP TO NEXT ROW: las transiciones se solapan; aqui no se cuentan
+-- evidencias, solo transiciones (las evidencias se cuentan en el nivel 2).
+-- BIDIRECCIONAL como en P1 (25-10): Flink no admite alternativas en PATTERN, y
+-- exigir el orden obligaria a conocer la resolucion de cada hora.
+CREATE TEMPORARY VIEW transiciones AS
+SELECT *
+FROM (
+    SELECT dataset, destino, ts, `time` AS t_ms, tipo, origen
+    FROM p2_flujo
+)
+MATCH_RECOGNIZE (
+    PARTITION BY dataset, destino
+    ORDER BY ts
+    MEASURES
+        X.t_ms                                                           AS t_ini_ms,
+        Y.t_ms                                                           AS t_fin_ms,
+        CASE WHEN X.tipo = 'arista' THEN X.origen ELSE Y.origen END      AS origen,
+        CASE WHEN X.tipo = 'arista' THEN X.t_ms   ELSE Y.t_ms   END      AS arista_ms,
+        CASE WHEN X.tipo = 'arista' THEN 1 ELSE 0 END                    AS arista_primero
+    ONE ROW PER MATCH
+    AFTER MATCH SKIP TO NEXT ROW
+    PATTERN (X Y)
+    DEFINE
+        Y AS ((X.tipo = 'arista' AND Y.tipo = 'evidencia')
+           OR (X.tipo = 'evidencia' AND Y.tipo = 'arista'))
+         AND Y.t_ms - X.t_ms <= 300000
+) AS m;
+
+-- NIVEL 2 · campanas: aristas del mismo par separadas <= 300 s.
+-- LAG sobre epoch-ms y no sobre `ts`: LAG no acepta TIMESTAMP_LTZ (leccion de P1).
+CREATE TEMPORARY VIEW aristas_marcadas AS
+SELECT dataset, origen, destino, `time` AS t_ms, puerto, proceso, confirmada, id,
+       CASE WHEN LAG(`time`) OVER (PARTITION BY dataset, origen, destino ORDER BY `time`) IS NULL
+              OR `time` - LAG(`time`) OVER (PARTITION BY dataset, origen, destino ORDER BY `time`) > 300000
+            THEN 1 ELSE 0 END AS abre
+FROM p2_flujo
+WHERE tipo = 'arista';
+
+CREATE TEMPORARY VIEW aristas_sesion AS
+SELECT *,
+       SUM(abre) OVER (PARTITION BY dataset, origen, destino ORDER BY t_ms
+                       ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS sesion
+FROM aristas_marcadas;
+
+CREATE TEMPORARY VIEW sesiones AS
+SELECT dataset, origen, destino, sesion,
+       MIN(t_ms)               AS a_ini,
+       MAX(t_ms)               AS a_fin,
+       COUNT(*)                AS n_aristas,
+       COUNT(DISTINCT puerto)  AS n_puertos,
+       MAX(confirmada)         AS bilateral,
+       -- la abre un proceso que no es del sistema (powershell.exe, PsExec64.exe):
+       -- senal observada, no etiqueta. 'System' abre las 445 del SMB del kernel.
+       MAX(CASE WHEN LOWER(COALESCE(proceso, '')) IN ('system', '', 'svchost.exe', 'lsass.exe')
+                THEN 0 ELSE 1 END) AS proceso_interactivo
+FROM aristas_sesion
+GROUP BY dataset, origen, destino, sesion;
+
+CREATE TEMPORARY VIEW puertos_sesion AS
+SELECT dataset, origen, destino, sesion, LISTAGG(CAST(puerto AS STRING), ',') AS puertos
+FROM (SELECT DISTINCT dataset, origen, destino, sesion, puerto FROM aristas_sesion)
+GROUP BY dataset, origen, destino, sesion;
+
+-- Transiciones del nivel 1 cuya arista cae en la campana: la PUERTA del nivel 2
+-- (equivale al HAVING evidencia_p2 >= 1 del oraculo).
+CREATE TEMPORARY VIEW transiciones_sesion AS
+SELECT s.dataset, s.origen, s.destino, s.sesion, COUNT(*) AS transiciones
+FROM sesiones AS s
+JOIN transiciones AS t
+  ON t.dataset = s.dataset AND t.origen = s.origen AND t.destino = s.destino
+WHERE t.arista_ms BETWEEN s.a_ini AND s.a_fin
+GROUP BY s.dataset, s.origen, s.destino, s.sesion;
+
+-- Evidencia en el destino dentro de [primera arista - 300 s, ultima + 300 s]:
+-- la misma ventana simetrica que el oraculo. Cada evidencia una vez.
+CREATE TEMPORARY VIEW evidencia_en_sesion AS
+SELECT s.dataset, s.origen, s.destino, s.sesion,
+       e.id, e.`time` AS t_ms, e.remota, e.servicio, e.cred
+FROM sesiones AS s
+JOIN p2_flujo AS e
+  ON e.dataset = s.dataset AND e.destino = s.destino
+WHERE e.tipo = 'evidencia'
+  AND e.`time` BETWEEN s.a_ini - 300000 AND s.a_fin + 300000;
+
+-- El orden, medido: retraso desde la arista de la campana mas cercana ANTERIOR
+-- a cada evidencia (NULL si ninguna la precede dentro de la ventana).
+CREATE TEMPORARY VIEW orden_evidencia AS
+SELECT v.dataset, v.origen, v.destino, v.sesion, v.id,
+       MIN(CASE WHEN v.t_ms >= a.t_ms AND v.t_ms - a.t_ms <= 300000
+                THEN v.t_ms - a.t_ms END) AS retraso_ms
+FROM evidencia_en_sesion AS v
+JOIN aristas_sesion AS a
+  ON a.dataset = v.dataset AND a.origen = v.origen
+ AND a.destino = v.destino AND a.sesion = v.sesion
+GROUP BY v.dataset, v.origen, v.destino, v.sesion, v.id;
+
+CREATE TEMPORARY VIEW evidencia_sesion AS
+SELECT v.dataset, v.origen, v.destino, v.sesion,
+       COUNT(*)            AS evidencia_p2,
+       SUM(v.remota)       AS ev_ejecucion_remota,
+       SUM(v.servicio)     AS ev_servicio,
+       SUM(v.cred)         AS ev_credenciales,
+       MAX(v.t_ms)         AS ev_fin,
+       SUM(CASE WHEN o.retraso_ms IS NOT NULL THEN 1 ELSE 0 END) AS evidencias_tras_arista,
+       MAX(o.retraso_ms)   AS retraso_max_ms
+FROM evidencia_en_sesion AS v
+JOIN orden_evidencia AS o
+  ON o.dataset = v.dataset AND o.origen = v.origen AND o.destino = v.destino
+ AND o.sesion = v.sesion AND o.id = v.id
+GROUP BY v.dataset, v.origen, v.destino, v.sesion;
+
+-- Todas las alertas del destino en la ventana (no solo la evidencia): la
+-- metrica alertas_absorbidas del oraculo, para la reduccion de alertas.
+CREATE TEMPORARY VIEW absorbidas_sesion AS
+SELECT s.dataset, s.origen, s.destino, s.sesion, COUNT(*) AS alertas_absorbidas
+FROM sesiones AS s
+JOIN alertas_unicas AS a
+  ON a.dataset = s.dataset AND a.host = s.destino
+WHERE a.t_ms BETWEEN s.a_ini - 300000 AND s.a_fin + 300000
+GROUP BY s.dataset, s.origen, s.destino, s.sesion;
+
+-- Las campanas validas, con todo lo que se mide de ellas. campaign_id con la
+-- formula comun: md5(dataset | patron | clave | inicio en ms).
+CREATE TEMPORARY VIEW campanas_p2 AS
+SELECT
+    LOWER(MD5(CONCAT(s.dataset, '|P2|', s.origen, '->', s.destino, '|',
+                     CAST(s.a_ini AS STRING))))   AS campaign_id,
+    s.dataset, s.origen, s.destino, s.sesion,
+    s.a_ini                                       AS inicio,
+    GREATEST(s.a_fin, ev.ev_fin)                  AS fin,
+    s.n_aristas, p.puertos, s.bilateral, s.proceso_interactivo,
+    t.transiciones, ab.alertas_absorbidas,
+    ev.evidencia_p2, ev.ev_ejecucion_remota, ev.ev_servicio, ev.ev_credenciales,
+    ev.evidencias_tras_arista, ev.retraso_max_ms
+FROM sesiones AS s
+-- sin transicion del nivel 1 no hay campana
+JOIN transiciones_sesion AS t
+  ON t.dataset = s.dataset AND t.origen = s.origen AND t.destino = s.destino AND t.sesion = s.sesion
+JOIN evidencia_sesion AS ev
+  ON ev.dataset = s.dataset AND ev.origen = s.origen AND ev.destino = s.destino AND ev.sesion = s.sesion
+JOIN puertos_sesion AS p
+  ON p.dataset = s.dataset AND p.origen = s.origen AND p.destino = s.destino AND p.sesion = s.sesion
+JOIN absorbidas_sesion AS ab
+  ON ab.dataset = s.dataset AND ab.origen = s.origen AND ab.destino = s.destino AND ab.sesion = s.sesion;

@@ -1,6 +1,11 @@
 -- =============================================================================
 -- P1 · emision de campanas a det.campaigns
 -- =============================================================================
+-- SUSTITUIDO el 26-10-2026 por p1_comun.sql + p1_06_flujo.sql + p1_08_emision.sql:
+-- este fichero emitia un esquema propio (contadores trans_*, sin stages[]) y leia
+-- det.alerts CON republicaciones. Se conserva como historia de la validacion del
+-- 31-07; no volver a ejecutarlo contra det.campaigns.
+-- -----------------------------------------------------------------------------
 -- Cierra el circuito: norm.events -> det.alerts -> det.campaigns.
 --
 -- El esquema del roadmap contempla un array stages[] con los alert_id de la
