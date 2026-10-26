@@ -36,22 +36,32 @@
 --     NEWYORK). Mismas 17 aristas con las dos reglas.
 --
 --   * El par (true,false) sirve ademas para CONFIRMAR la arista desde los dos
---     extremos. Medido: la conexion 5985 se ve en SCRANTON a las 03:09:27.836 y
---     en NASHUA a las 03:09:27.837, 1 ms de diferencia en `time`.
+--     extremos. Las 17 aristas del salto estan confirmadas por NASHUA (medido
+--     en Flink el 26-10, infra/flink/jobs/p2_01_aristas.sql).
 --
---   * NO se exige orden "conexion -> proceso". El EID 3 se reporta DESPUES del
---     proceso que lo atiende (03:09:27.836 vs wsmprovhost 03:09:25.812) porque
---     apt29 day1 no trae TimeCreated y el normalizador cae a @timestamp, que es
---     la hora de RECOGIDA del WEC, no la del evento (ocsf_common.py:59-61). La
---     restriccion es de PROXIMIDAD (|dt| <= ventana), no de orden. Misma trampa
---     que obligo a la transicion bidireccional de P1.
+--   * NO se exige orden "conexion -> proceso"; la restriccion es de PROXIMIDAD
+--     (|dt| <= ventana). ACTUALIZADO el 25-10-2026: el motivo original ya no
+--     vale. Se escribio el 08-09, cuando apt29 se fechaba con la hora de
+--     RECOGIDA del WEC y la conexion salia DESPUES del proceso que la atiende.
+--     Con la hora del evento (corregida el 11-09) el orden real es conexion ->
+--     ejecucion: 7 de las 8 evidencias van de 14 ms a 1,0 s detras de su arista
+--     (la 5985 de las 03:09:23.801 precede a wsmprovhost en 116 ms). La octava
+--     (03:09:23.000) tiene hora de resolucion de SEGUNDO (Security/PowerShell) y
+--     cae en el mismo segundo que la arista, asi que tampoco lo contradice.
+--     Se mantiene la proximidad por dos razones: las horas de resolucion de
+--     segundo no permiten ordenar dentro del segundo, y la version en Flink
+--     (p2_03_campanas.sql) la reproduce con la transicion bidireccional de P1 y
+--     MIDE el orden (evidencias_tras_arista, retraso_max_ms) en vez de exigirlo.
 --
 --   * T1570 NO se usa como etapa. Las alertas con esa etiqueta son "Rundll32
 --     Execution Without Parameters": es el mapeo ATT&CK amplio de la regla, no
 --     evidencia observada de transferencia. La transferencia real es la arista
 --     SCRANTON -> NASHUA:445, y esa se ve en tfg.events, no en tfg.alerts.
 --
---   * Ventana = 300 s. El nucleo del salto (WinRM -> SMB -> servicio) ocupa
+--   * Ventana = 300 s, medida el 08-09 con horas de recogida y conservada para
+--     que Flink reproduzca este oraculo. Con la hora del evento es muy holgada
+--     para la proximidad arista <-> evidencia (la evidencia llega en < 2 s);
+--     sigue teniendo sentido como hueco entre aristas. El nucleo del salto (WinRM -> SMB -> servicio) ocupa
 --     1 min 53 s; el hueco maximo entre aristas consecutivas del salto real es
 --     3 min 17 s, asi que 300 s mantiene el salto como UNA campana sin abarcar
 --     la campana entera de 26 min (que dejaria de discriminar).
@@ -79,7 +89,13 @@ WITH
     -- =====================================================================
     -- 0) DEDUPLICACION DEFENSIVA DE tfg.events
     -- =====================================================================
-    -- tfg.events es MergeTree PLANO (infra/clickhouse/init/01_events.sql:49):
+    -- ACTUALIZADO el 25-10-2026: lo que sigue describe la tabla ANTERIOR a la
+    -- migracion del 11-09 (infra/clickhouse/migrations/2026-09-11_identidad_y_tiempo.sql).
+    -- Hoy tfg.events es ReplacingMergeTree sobre la identidad del evento y el
+    -- corpus esta una sola vez (530.401 filas con FINAL). La deduplicacion de
+    -- abajo es ya redundante pero inocua, y se conserva como defensa.
+    --
+    -- tfg.events era MergeTree PLANO (infra/clickhouse/init/01_events.sql:49):
     -- no hay ReplacingMergeTree ni clave de deduplicacion, y apt29 day1 esta
     -- cargado SEIS veces. record_number NO sirve como identidad: vale 0 en todas
     -- las filas viejas (se anadio despues) y ademas el dataset SI trae
@@ -364,13 +380,16 @@ SELECT
     c.destino                                               AS host_destino,
     min(c.arista_primera)                                   AS first_seen,
     -- El fin es el ultimo de los dos: la ultima arista o la ultima EVIDENCIA en
-    -- el destino (que puede ser posterior: PSEXESVC.exe aparece 55 s despues de
-    -- la conexion 445 que lo trajo).
+    -- el destino, que puede ser posterior. (Con horas de recogida, PSEXESVC.exe
+    -- aparecia 55 s despues de la conexion 445 que lo trajo; con la hora del
+    -- evento son 56 ms. En apt29 day1 hoy manda la ultima arista.)
     --
     -- OJO: NO vale `max(a.time)` a secas. El join arrastra TODAS las alertas del
     -- destino que caen en la ventana -115 en apt29 day1, de las que solo 8 son
     -- evidencia- y entonces la duracion la acaba fijando ruido sin relacion.
-    -- Medido: con max(a.time) salian 795 s, con el final puesto por un
+    -- Medido el 08-09 (horas de recogida; hoy la ultima arista es 03:17:59.493
+    -- y la ultima evidencia 03:14:42.672):
+    -- con max(a.time) salian 795 s, con el final puesto por un
     -- `Internet Explorer Autorun Keys Modification` a las 03:22:42, cuando la
     -- ultima arista real es a las 03:18:01 y la ultima evidencia a las 03:14:44.
     -- La extension de una campana la fija SU evidencia, no lo que pase cerca.
@@ -381,6 +400,11 @@ SELECT
 
     -- ---- Alcance ------------------------------------------------------------
     [c.origen, c.destino]                                   AS devices,
+    -- ACTUALIZADO el 25-10-2026: la deuda del mapeador que describe este
+    -- comentario YA ESTA CORREGIDA (sysmon.py:147-158 rellena actor.user en el
+    -- EID 3). Lo que sigue siendo cierto es que users[] sale solo de las alertas
+    -- del destino, y que mezcla grafias ('pbeesly' y 'DMEVALS\pbeesly').
+    -- Texto original:
     -- OJO / DEUDA CONOCIDA: los usuarios salen SOLO de las alertas del destino.
     -- map_sysmon_3 (pipeline/normalize/sysmon.py:147-153) construye actor con
     -- 'process' pero NO con 'user', asi que tfg.events.actor_user_name viene

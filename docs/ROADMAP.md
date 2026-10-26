@@ -413,6 +413,13 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   (`MATCH_RECOGNIZE`) reconoce la *transición* evidencia → acceso a credenciales; nivel 2
   (agregación por hueco) agrupa transiciones en campañas. La misma máquina servirá para el
   salto a multi-host de P2, sin re-particionar.
+- [x] **P2 en `MATCH_RECOGNIZE` (26-10-2026)**, en cuatro pasos (`infra/flink/jobs/p2_0*.sql`,
+  definiciones comunes en `p2_comun.sql`). Reproduce el oráculo **exacto**: misma campaña SCRANTON → NASHUA,
+  mismo `campaign_id`, 17 aristas, 115 alertas absorbidas, 8 evidencias y confianza 1,0.
+  - Necesita **dos fuentes**: conexiones de `norm.events` y evidencia de `det.alerts`.
+  - El mapa IP → host y el controlador de dominio se derivan de los datos, en el propio job.
+  - **Topic intermedio `det.p2_flujo`**, porque el patrón necesita un atributo de tiempo y las agregaciones lo pierden.
+  - **Transición bidireccional** como P1. El orden conexión → ejecución **se mide**: 7 de 8 evidencias, retraso máximo de 1,0 s.
 - [ ] Gestión de eventos tardíos (`allowedLateness`) → `dlq.late`, y medir cuántos hay.
 
 ### F3.3 🧠 — Anomalías secuenciales como refuerzo
@@ -429,7 +436,7 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   subtécnica `T1003.001` habrían sido 6 de 7 (falla Mimikatz `logonpasswords`, porque
   Meterpreter lo ejecuta dentro de su propio proceso y no hay acceso externo a `lsass.exe`).
   Pendiente repetir la validación sobre la versión en streaming.
-- [ ] P2/P3/P4 contra apt29 day1/day2.
+- [ ] P3/P4 contra apt29 day1/day2. *(P2 contra day1: hecho, en batch el 11-09 y en Flink el 26-10.)*
 - [ ] **Falsos positivos** sobre la porción benigna.
 - [ ] **Ratio de reducción de alertas** = 1 − (campañas / alertas individuales) ← *métrica estrella*.
 - [ ] **Latencia de detección**: del último evento de la secuencia a la emisión.
