@@ -169,6 +169,33 @@ es otra fase. Para P2 la ventana se mide sobre el núcleo, no sobre la campaña 
 
 ---
 
+### Consecuencias de diseño para P3  *(medidas el 26-10-2026)*
+
+Inventario y detalle en `detection/patterns/p3_00_inventario.sql` y `p3_01_detalle.sql`; versión batch en
+`p3_discovery_escalation.sql`.
+
+- **El orden real es escalada → descubrimiento → persistencia**, el del plan (3.B → 4.x → 5.B), no el del
+  roadmap. P3 lo **mide** y no lo exige, igual que P1 y P2. En SCRANTON sale exacto:
+  - *bypass* de UAC (T1548.002) a las 02:58:30;
+  - descubrimiento en PowerShell a partir de las 03:01;
+  - carpeta de inicio (T1547.001) a las 03:04:23.
+- **Sigma no ve el descubrimiento del atacante.** Las dos únicas alertas de `discovery` del día son del agente de
+  Azure, a las 03:19. El descubrimiento está en los bloques de PowerShell: `get-process` (03:01), `Invoke-Discovery`
+  (03:04:03, paso 4.C) y `Invoke-Command -ComputerName NASHUA { Get-Process }` (03:09:23, reconocimiento previo al
+  salto). Por eso P3 es **híbrido**: alertas + PowerShell de `tfg.events`.
+- **Hay mucho reconocimiento legítimo:**
+  - el agente de Azure lanza `route`, `ipconfig` y `arp` unas 20 veces cada uno, de 03:19 a 03:20, y reconfigura su
+    servicio con `sc.exe`;
+  - NEWYORK ejecuta un script de monitorización con `Get-ADDomain`/`Win32_OperatingSystem` cada 15 min.
+  - Ninguna de las dos cosas dispara P3, porque no hay escalada en esos hosts. **La secuencia filtra lo que la señal
+    sola no puede.**
+- **La táctica de una alerta engaña.** `Internet Explorer Autorun Keys Modification` (T1547.001) cuenta como
+  escalada y como persistencia, y la escribe `Explorer.EXE` al iniciar sesión. Las etapas se definen **por técnica**,
+  y esa regla de Explorer está en la lista de exclusiones medida.
+- **Persistencia de `spoolsv.exe` a las 03:19:48** (16 alertas `CurrentControlSet Autorun Keys Modification`):
+  probablemente benigna (servicio de impresión). Queda fuera de la ventana de la campaña y está pendiente para el paso
+  de falsos positivos.
+
 ## 4. Ventanas temporales observadas
 
 Medidas sobre las alertas reales de `SDWIN-200501225525` (el plan no lleva marcas de tiempo),

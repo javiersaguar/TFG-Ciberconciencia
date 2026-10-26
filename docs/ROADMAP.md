@@ -425,7 +425,10 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 - [x] **Truco de validación:** `'scan.bounded.mode' = 'latest-offset'` + `runtime-mode = batch`
   convierte la fuente Kafka en acotada. Elimina de raíz el problema del watermark que no avanza
   sobre datos históricos y da salida final en vez de *changelog*. Imprescindible para iterar.
-- [ ] **Decisión abierta a cerrar en F3.1 — fuente de las etapas.** `det.alerts` es más semántico,
+- [x] **Decisión cerrada el 26-10-2026, con el inventario de P3 delante: híbrido.** P1 y P2 viven de alertas (más
+  aristas de red en P2). P3 necesita además los bloques de PowerShell de `tfg.events`: el descubrimiento del atacante en
+  apt29 es ciego para Sigma. Texto original de la decisión:
+- **Decisión abierta a cerrar en F3.1 — fuente de las etapas.** `det.alerts` es más semántico,
   pero **deja etapas ciegas**: si ninguna regla Sigma etiqueta la escritura del `.dmp` o la
   conexión saliente, esas etapas no existen como alerta y el patrón nunca completa. Opción
   propuesta: **híbrido**, alertas Sigma como **etapas ancla** + un flujo derivado de
@@ -480,6 +483,16 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   transiciones) y P2 su campaña de 17 aristas, idénticas a batch. Requisito descubierto: el flujo de entrada tiene que
   llegar **en orden de tiempo de evento**, o la marca de agua descarta la evidencia.
 - [ ] P3/P4 contra apt29 day1/day2. *(P2 contra day1: hecho, en batch el 11-09 y en Flink el 26-10.)*
+  - **P3, versión batch (26-10-2026)**, en `detection/patterns/p3_discovery_escalation.sql`. Saca **3 campañas**:
+    - apt29 SCRANTON, con el orden del plan, escalada → descubrimiento → persistencia;
+    - LSASS_01 y LSASS_03, por el `getsystem` de Meterpreter.
+  - **Cómo está definido:**
+    - etapas por técnica, no por táctica;
+    - la escalada es el ancla;
+    - descubrimiento híbrido;
+    - una lista de exclusiones medida.
+  - Sin campaña: LSASS_02/04-07 (reconocimiento sin escalada) y NEWYORK (monitorización).
+  - **Pendiente:** P3 en Flink y su emisión; validar en day2.
 - [ ] **Falsos positivos** sobre la porción benigna.
 - [ ] **Ratio de reducción de alertas** = 1 − (campañas / alertas individuales) ← *métrica estrella*.
 - [ ] **Latencia de detección**: del último evento de la secuencia a la emisión.
