@@ -63,6 +63,7 @@
 | **F6** | **Pilar C** — priorización explicable + **scoring aprendido 🧠** | 🟠 | 2–3 sem |
 | **F7** | Evaluación cuantitativa (incluye los modelos) | 🔴 | 2–3 sem |
 | **F8** | Frontend SaaS | 🟢 | 3–4 sem |
+| **FA** | Ampliación de la cobertura de detección (Linux, más ataques, datos propios) — **condicionada** | 🟢 | 2–4 sem |
 | **F9** | Despliegue, memoria y defensa | 🔴 | 4 sem |
 
 ---
@@ -166,6 +167,35 @@ desglose de la puntuación, explorador del grafo de ataque, matriz ATT&CK e info
 - ❌ No hace respuesta automática. Solo soporte a la decisión.
 - ❌ No es un producto con SLA; es un prototipo de investigación.
 - ❌ No pretende superar a un SIEM comercial en cobertura, sino demostrar una arquitectura concreta.
+
+### 3.4 Líneas futuras del producto (fuera del alcance del TFG)
+
+Ideas para un producto real, **no** trabajo del TFG. Se recogen para el capítulo de líneas
+futuras de la memoria.
+
+- **Engaño (*deception*): señuelos gestionados por la organización** (idea de Javier,
+  26-10-2026). Tiene más valor de lo que parece y encaja con la plataforma, pero conviene
+  enfocarlo así:
+  - **Empezar por *honeytokens*, no por *honeypots*.** Credenciales, cuentas, ficheros y
+    entradas DNS falsas sembradas en la red **real**. Ningún usuario legítimo debería
+    tocarlos, así que cualquier uso es una alerta con casi cero falsos positivos. Además
+    encajan con P1: una credencial señuelo usada tras un volcado de LSASS es la prueba de que
+    el robo de credenciales ha tenido éxito. Son baratos y no exponen nada.
+  - **Honeypots de baja interacción** (servicios simulados, sin sistema real detrás) como
+    segunda fase. Su telemetría entra en el mismo pipeline normalizada a OCSF, como una
+    fuente más de alta señal.
+  - **Lo que un honeypot NO dice.** Un señuelo expuesto a Internet atrae sobre todo a
+    atacantes oportunistas y escáneres. Enseña qué técnicas circulan, no cómo atacarían
+    **las instalaciones de esa organización**. Para eso la herramienta es el **análisis de
+    rutas de ataque** que ya hace F5: Datalog sobre el grafo de activos, vulnerabilidades y
+    conectividad, sin tocar nada real. Le complementa la **simulación de ataques controlada**
+    (*Breach and Attack Simulation*).
+  - **«Sin poner nada en riesgo» nunca es absoluto.** Un honeypot de alta interacción
+    comprometido puede usarse para atacar a terceros. Exige aislamiento estricto de la red
+    de producción, control del tráfico saliente y revisión legal: retención de datos de
+    terceros y responsabilidad si el señuelo se usa contra otros.
+  - Choca con §3.3 («no genera telemetría») solo en apariencia: sería un **módulo aparte**
+    que alimenta la plataforma, no un cambio de su naturaleza.
 
 ---
 
@@ -741,6 +771,50 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
 
 ---
 
+## FA — Ampliación de la cobertura de detección 🟢 (condicionada)
+
+> **Propuesta de Javier (26-10-2026).** Cuando el núcleo esté asentado, extender la detección a
+> más tipos de ataque y a fuentes que no sean Windows (Linux, red), y generar datos propios
+> con simulaciones si los públicos no bastan.
+>
+> **Condición de entrada:** el punto de control del **28-02-2027** cumplido (F3 cerrada y F5
+> simbólico, el núcleo defendible) **o** ir claramente adelantado al calendario. Es lo
+> primero que se recorta si aprieta el tiempo (R9, R14): se planifica ahora para que, si
+> llega, no improvise el diseño.
+>
+> **Valor para la memoria:** demuestra que la arquitectura **generaliza**. Una fuente nueva
+> solo exige un mapeador a OCSF, reglas Sigma de su plataforma y, si acaso, un patrón: el bus,
+> la detección, el CEP, el grafo y la priorización no cambian. Es el argumento a favor de
+> haber elegido OCSF como esquema canónico.
+
+Orden por coste/beneficio (de menos a más esfuerzo):
+
+- [ ] **FA.1 Red con Zeek** (ya pendiente en F3.1). Los logs vienen **dados** en el dataset
+  (`day1/zeek/`, `day2/zeek/`): mapeador a OCSF (Network Activity, DNS, HTTP, SMB) y topic
+  `raw.net.zeek`. Primer paso multi-fuente real, sin datos nuevos.
+- [ ] **FA.2 apt29 day2** (ya pendiente en F3.1): más ataque y más tráfico benigno sobre la
+  misma infraestructura; útil para los falsos positivos.
+- [ ] **FA.3 Linux.** Mapeadores a OCSF para `auditd`, **Sysmon for Linux** y `journald`
+  (Process, File System, Network, Authentication Activity), reglas Sigma de la categoría
+  `linux` en la misma pipeline pySigma, y **1–2 patrones** propios de Linux: p. ej.
+  acceso SSH → escalada (`sudo`/SUID) → persistencia (cron/systemd), o descarga →
+  ejecución desde `/tmp` → conexión de mando y control.
+- [ ] **FA.4 Más familias de ataque** sobre las fuentes que ya hay: impacto/ransomware
+  (T1486, T1490 — borrado de instantáneas), exfiltración (P4), persistencia (T1547, ya hay
+  capturas en `emulation/`).
+- [ ] **FA.5 Datos.** Primero **datasets públicos etiquetados** (OTRF Security-Datasets y
+  otros); verificar antes cuánta cobertura Linux tienen de verdad. Si no bastan,
+  **simulaciones propias** en el laboratorio aislado con Atomic Red Team o CALDERA, con el
+  mismo método que `emulation/` (captura limpia + manifiesto de verdad conocida con
+  `label_dataset.py`). Toda simulación, en laboratorio aislado y sin datos de terceros.
+
+### ✅ DoD
+1. ≥1 fuente no-Windows normalizada a OCSF **sin tocar** el bus, la detección ni el CEP.
+2. ≥1 patrón nuevo validado contra verdad conocida (dataset público o simulación propia).
+3. Falsos positivos medidos sobre la porción benigna de la fuente nueva.
+
+---
+
 ## F9 — Despliegue, memoria y defensa 🔴
 
 **Estimación:** 4 semanas (más la escritura continua desde F1)
@@ -855,6 +929,7 @@ Ciberseguridad y protección de datos · Marco ético y legal · HCoV
 | **R11** | 🧠 **El ML canibaliza el núcleo** | **Alta** | 🔴 | **Regla de contención §2.5**: orden de recorte definido de antemano |
 | **R12** | 🧠 Datos insuficientes para entrenar | Media | 🟠 | Modelos pequeños; transferencia desde preentrenados; **reportar el resultado negativo si ocurre** |
 | **R13** | 🧠 Los modelos rompen la explicabilidad | Media | 🟠 | Modelos interpretables + SHAP; **la capa simbólica siempre verifica y justifica** |
+| **R14** | La ampliación (FA) o las ideas de producto desplazan el núcleo | Media | 🔴 | FA solo tras el punto de control del 28-02-2027; las ideas de producto quedan en §3.4 como líneas futuras, sin desarrollo |
 
 ---
 
