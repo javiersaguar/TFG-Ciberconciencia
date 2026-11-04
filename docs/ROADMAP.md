@@ -173,6 +173,18 @@ desglose de la puntuación, explorador del grafo de ataque, matriz ATT&CK e info
 Ideas para un producto real, **no** trabajo del TFG. Se recogen para el capítulo de líneas
 futuras de la memoria.
 
+- **Más plataformas y fuentes** (04-11-2026). Fuera incluso de la fase FA; se citan como
+  trabajo relacionado o futuro:
+  - **macOS:** captura de evasión de Gatekeeper con osquery (`T1553.001`), como piloto
+    pequeño una vez resuelto Linux;
+  - **IoT:** IoT-23, flujos de Zeek etiquetados de botnets y tráfico benigno. Visibilidad
+    solo de red;
+  - **DARPA Transparent Computing:** grafos de **procedencia** (procesos, ficheros,
+    conexiones). No es el grafo de ataque de F5, que es de alcanzabilidad estilo MulVAL, y
+    exige un adaptador propio: como mucho, un fragmento.
+
+  GoldenSAML (identidad híbrida: Windows, Azure AD y Microsoft 365) ya está en el clon de OTRF
+  y en el conjunto de evaluación de F7.
 - **Engaño (*deception*): señuelos gestionados por la organización** (idea de Javier,
   26-10-2026). Tiene más valor de lo que parece y encaja con la plataforma, pero conviene
   enfocarlo así:
@@ -821,31 +833,126 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
 > la detección, el CEP, el grafo y la priorización no cambian. Es el argumento a favor de
 > haber elegido OCSF como esquema canónico.
 
-Orden por coste/beneficio (de menos a más esfuerzo):
+Orden por coste/beneficio (de menos a más esfuerzo). Revisado el 04-11-2026 con la
+propuesta de datasets y de DoS/DDoS. Los conjuntos externos se descargan con el inventario de
+`data/external/MANIFEST.md` (procedencia, licencia, tamaño y SHA-256) y **se verifican antes de
+usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
 
-- [ ] **FA.1 Red con Zeek** (ya pendiente en F3.1). Los logs vienen **dados** en el dataset
-  (`day1/zeek/`, `day2/zeek/`): mapeador a OCSF (Network Activity, DNS, HTTP, SMB) y topic
-  `raw.net.zeek`. Primer paso multi-fuente real, sin datos nuevos.
+> **Tramo mínimo realista** (las prácticas van de febrero a mayo): FA.1, FA.2, una muestra de
+> FA.3 y el escenario 1 de CAM-LDS de FA.4 como prueba de generalización de P3. El resto queda
+> como trabajo futuro en la memoria si no da tiempo.
+
+- [ ] **FA.0 Prerrequisito: versionar el laboratorio.** Los guiones corregidos
+  (`run-lab.ps1`, `export-events-clean.ps1`, `label_dataset.py` con los tres filtros de
+  contaminación) solo existen dentro de la VM. Copiarlos a `emulation/` antes de ampliar el
+  laboratorio.
+- [ ] **FA.1 Red con Zeek** (ya pendiente en F3.1). `conn.log` y `dns.log` de APT29 vienen
+  en JSON en el clon de OTRF, para los dos días: mapeador a OCSF (Network Activity, DNS) y
+  topic `raw.net.zeek`. **Primer uso: cruzar la conexión de Zeek con la arista de host que ya
+  usa P2.** Primer paso multi-fuente real, sin datos nuevos.
 - [ ] **FA.2 apt29 day2** (ya pendiente en F3.1): más ataque y más tráfico benigno sobre la
-  misma infraestructura; útil para los falsos positivos.
-- [ ] **FA.3 Linux.** Mapeadores a OCSF para `auditd`, **Sysmon for Linux** y `journald`
-  (Process, File System, Network, Authentication Activity), reglas Sigma de la categoría
-  `linux` en la misma pipeline pySigma, y **1–2 patrones** propios de Linux: p. ej.
-  acceso SSH → escalada (`sudo`/SUID) → persistencia (cron/systemd), o descarga →
-  ejecución desde `/tmp` → conexión de mando y control.
-- [ ] **FA.4 Más familias de ataque** sobre las fuentes que ya hay: impacto/ransomware
+  misma infraestructura. No pide mapeadores nuevos; útil para los falsos positivos.
+- [ ] **FA.3 Validación externa en Windows: COMISET** (Universidad Pontificia Comillas,
+  CC BY 4.0). Un laboratorio con ataques etiquetados ATT&CK (~4,9 GB) y una red universitaria
+  con actividad normal (~31,7 GB). Prueba el pipeline actual **sin mapeadores nuevos** con datos
+  de fuera y da fondo benigno para medir falsas alarmas. Usar una **muestra acotada**.
+- [ ] **FA.4 Linux.**
+  - **Mapeadores** a OCSF para `auditd` (agrupando antes los registros `SYSCALL`/`PATH`/…
+    de un mismo evento), **Sysmon for Linux** y `journald` (sshd, sudo).
+  - **Reglas Sigma** de la categoría `linux` en la misma pipeline pySigma.
+  - **Patrones.** P3 tal cual: su ancla incluye `T1548`, y el abuso de sudo es `T1548.003`.
+    Si reconoce una campaña Linux sin tocar el patrón, es la prueba de que los patrones por
+    técnica generalizan entre sistemas. Variante Linux de P1 (`/etc/shadow`, no LSASS).
+  - **Datos, por orden:**
+    1. **CAM-LDS v2** (Austrian Institute of Technology, CC BY 4.0): auditoría,
+       autenticación, syslog, flujos y manifiesto de pasos con tiempos y técnicas.
+       `scenario_1_sudo_sshkey` (explotación web → sudo → clave SSH) para desarrollar y
+       `scenario_3_ssh_apt` **reservado** para evaluar sin reajustar reglas. No simula
+       usuarios normales: sirve para reconstruir etapas, no para falsos positivos.
+    2. **Pruebas pequeñas por técnica:** Splunk Attack Data (auditd de T1053.003, edición de
+       cron) para verificar mapeo y regla; AttackMate Evaluation Data (escalada y movimiento
+       lateral por SSH generados con AttackMate, CALDERA y Atomic Red Team) para comprobar si
+       se detecta el comportamiento cuando cambia la herramienta.
+    3. **Log4Shell** del clon de OTRF (Auditd/AUOMS en JSON de syslog, más PCAP) como prueba
+       de formato. Está además en el conjunto de evaluación de F7.
+    4. **Fondo benigno: AIT Log Data Set v2** (`russellmitchell`, ~7,1 GB; extraer solo los
+       canales necesarios). Licencia **CC BY-NC-SA 4.0**: válida para el TFG, pero «NC» choca
+       con un producto y «SA» obliga a publicar derivados con la misma licencia. Sus etiquetas
+       por línea salen de reglas: contrastar las etapas decisivas con el plan. Incluye una
+       exfiltración por DNS (P4). El **AIT Alert Data Set** derivado permite probar el
+       correlador directamente con alertas, como experimento aparte de Sigma.
+- [ ] **FA.5 Disponibilidad: DoS y DDoS (piloto).** Hoy ninguna alerta del corpus es de
+  `T1498`/`T1499`. No es un patrón de secuencia como P1-P3, sino un **detector por ventanas**,
+  y amplía la cobertura al impacto sobre la disponibilidad.
+  - **Casos:**
+    - inundación de red (`T1498`): paquetes o bytes sostenidos hacia un destino, protocolo
+      dominante, conexiones TCP sin completar, número de orígenes y peso de cada uno;
+    - agotamiento de un servicio web (`T1499.002`): peticiones o conexiones concurrentes
+      anómalas junto a latencia, errores o *timeouts*, más una **sonda** independiente que
+      compruebe si un usuario normal aún accede.
+  - **En el pipeline:** Flink SQL agrupa por destino, servicio y protocolo en ventanas cortas
+    de tiempo de evento (10 s de partida) y compara con la línea base del servicio. Varias
+    ventanas seguidas con el mismo problema emiten **un hallazgo OCSF por episodio**,
+    reutilizando el esquema común de campaña. El hallazgo separa:
+    - el patrón de tráfico;
+    - si parece concentrado o distribuido;
+    - si el impacto se **observó** o quedó **sin confirmar**.
+
+    Muchas IP hacia un destino son una pista, no una prueba: puede ser un pico legítimo, y
+    las IP pueden ser *proxies*, reflectores o falsificadas. Umbrales explicables, no un
+    modelo opaco.
+  - **Tiempo real:** `conn.log` de Zeek llega al cerrar la conexión o al vencer su
+    *timeout*. Vale como evidencia y para la reproducción, pero para alertar durante la
+    inundación hacen falta contadores periódicos del sensor (y, en HTTP, registros del proxy
+    y la sonda). Medir el retraso desde el inicio del episodio. Ojo con la reproducción
+    acelerada, que distorsiona las ventanas (ya visto en F3).
+  - **Datos:**
+    - **Orion 2026** (CC BY 4.0): dos días solo benignos, DoS uno a uno y DDoS muchos a uno y
+      muchos a muchos, en PCAP y CSV. Empezar por un fragmento de muchos a uno y **reservar un
+      día de ataque completo** para evaluar con los umbrales ya fijados.
+    - **CICDDoS2019:** una variante de reflexión o amplificación. Reconstruir las señales por
+      ventana desde los paquetes: usar el total de un flujo antes de que termine falsearía la
+      latencia.
+    - **Laboratorio:** servicio HTTP aislado y carga acotada con k6, en cuatro pasadas
+      (normal, pico legítimo, sobrecarga desde uno, sobrecarga desde varios con volumen total
+      parecido). Guardar tráfico, métricas del servicio y marcas de inicio, degradación y
+      recuperación. **Solo contra el servicio propio del laboratorio aislado.**
+  - **Criterio de éxito:**
+    - detectar el episodio **mientras ocurre**;
+    - explicar qué servicio se degradó;
+    - medir cuántas veces se confunde un pico legítimo con un ataque.
+
+    En el portal: conexiones que convergen en un servicio, con la gráfica de tráfico y
+    disponibilidad.
+- [ ] **FA.6 Más familias de ataque** sobre las fuentes que ya hay: impacto/ransomware
   (T1486, T1490 — borrado de instantáneas), exfiltración (P4), persistencia (T1547, ya hay
   capturas en `emulation/`).
-- [ ] **FA.5 Datos.** Primero **datasets públicos etiquetados** (OTRF Security-Datasets y
-  otros); verificar antes cuánta cobertura Linux tienen de verdad. Si no bastan,
-  **simulaciones propias** en el laboratorio aislado con Atomic Red Team o CALDERA, con el
-  mismo método que `emulation/` (captura limpia + manifiesto de verdad conocida con
-  `label_dataset.py`). Toda simulación, en laboratorio aislado y sin datos de terceros.
+- [ ] **FA.7 Datos propios en el laboratorio aislado.** Solo si los públicos no bastan.
+  - **Entorno:** VM Ubuntu con `auditd` (procesos y ficheros), sshd y sudo vía `journald`, y
+    Zeek (conexiones y DNS). Una segunda VM cuando toque el salto entre equipos.
+  - **Generación:** Atomic Red Team para etapas sueltas y un guion **versionado** que las
+    encadene; CALDERA cuando compense automatizar variantes.
+  - **Controles negativos**, lo más valioso:
+    - un administrador legítimo usando SSH, sudo y cron en mantenimiento;
+    - un intento bloqueado y una cadena incompleta;
+    - para P4, una copia de seguridad legítima frente a una exfiltración ficticia a un
+      receptor interno.
+  - **Verdad conocida por paso**, no por ventana temporal: host, sesión, usuario, proceso,
+    hora UTC, técnica y resultado. Así un evento legítimo simultáneo no hereda la etiqueta
+    de ataque (las tres contaminaciones de F2 vinieron de etiquetar por ventana).
+  - **Evaluación con el pipeline real:** Redpanda → OCSF → Sigma → Flink, reglas filtradas
+    por plataforma y fuente, y una captura completa reservada. Medir etapas recuperadas,
+    campañas correctas, falsos positivos por host y hora, latencia y eventos tardíos. Los
+    eventos OCSF fabricados a mano quedan solo para pruebas de duplicados, desorden y
+    reinicios.
 
 ### ✅ DoD
 1. ≥1 fuente no-Windows normalizada a OCSF **sin tocar** el bus, la detección ni el CEP.
-2. ≥1 patrón nuevo validado contra verdad conocida (dataset público o simulación propia).
+2. ≥1 patrón nuevo validado contra verdad conocida (dataset público o simulación propia), con
+   una captura reservada que no se usó para ajustar.
 3. Falsos positivos medidos sobre la porción benigna de la fuente nueva.
+4. Si se hace FA.5: episodio detectado durante el ataque, retraso medido y tasa de picos
+   legítimos confundidos con ataque.
 
 ---
 
