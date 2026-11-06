@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Levanta la infraestructura del TFG segun el perfil indicado.
-# Uso: ./scripts/up.sh [core|stream|store|obs|graph|all]   (por defecto: all)
+# Uso: ./scripts/up.sh [core|stream|store|obs|graph|cti|all]   (por defecto: all)
 set -euo pipefail
 
 cd "$(dirname "$0")/../infra"
@@ -13,8 +13,9 @@ case "$PROFILE" in
   store)  PROFILES=(--profile core --profile stream --profile store) ;;
   obs)    PROFILES=(--profile core --profile observability) ;;
   graph)  PROFILES=(--profile graph) ;;
+  cti)    PROFILES=(--profile cti) ;;
   all)    PROFILES=(--profile core --profile stream --profile store --profile observability) ;;
-  *) echo "Perfil desconocido: $PROFILE (usa core|stream|store|obs|graph|all)"; exit 1 ;;
+  *) echo "Perfil desconocido: $PROFILE (usa core|stream|store|obs|graph|cti|all)"; exit 1 ;;
 esac
 
 echo "Levantando infraestructura (perfil: $PROFILE)..."
@@ -32,6 +33,8 @@ echo "  Redpanda Console : http://localhost:8080"
   echo "  Flink Dashboard  : http://localhost:8081"
 [[ "$PROFILE" == "store"  || "$PROFILE" == "all" ]] && \
   echo "  ClickHouse HTTP  : http://localhost:8123"
+[[ "$PROFILE" == "cti" ]] && \
+  echo "  OpenCTI          : http://localhost:8082  (usuario y clave en infra/.env)"
 [[ "$PROFILE" == "graph" ]] && \
   echo "  Neo4j            : http://localhost:7474  (neo4j / tfg-neo4j)"
 [[ "$PROFILE" == "obs"    || "$PROFILE" == "all" ]] && {

@@ -179,6 +179,222 @@ services:
       retries: 10
       start_period: 60s
 
+  # ---------------------------------------------------------------------------
+  # OpenCTI (F4.2): plataforma CTI para compararla con la carga directa a Neo4j (plan B).
+  # Version fijada (7.261023.1, edicion Community, Apache 2.0) y dependencias con version fija.
+  # NO usar las etiquetas -lts: son la edicion LTS de Filigran y exigen una licencia propia.
+  # Secretos en infra/.env (ignorado por git; plantilla en infra/.env.example).
+  # Solo la interfaz se publica: http://localhost:8082. El resto vive en la red interna
+  # (MinIO NO publica el 9000, que es de ClickHouse).
+  # ATT&CK: el conector de MITRE apunta a la MISMA v19.2 que el plan B; Mobile, ICS y
+  # CAPEC desactivados. Solo funciones de la edicion Community.
+  # ---------------------------------------------------------------------------
+  opencti-redis:
+    image: redis:8.10.1
+    container_name: opencti-redis
+    profiles: ["cti"]
+    volumes:
+      - opencti_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  opencti-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.21
+    container_name: opencti-elasticsearch
+    profiles: ["cti"]
+    environment:
+      - discovery.type=single-node
+      - xpack.ml.enabled=false
+      - xpack.security.enabled=false
+      - thread_pool.search.queue_size=5000
+      - logger.org.elasticsearch.discovery=ERROR
+      - "ES_JAVA_OPTS=-Xms4g -Xmx4g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opencti_es:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health?wait_for_status=yellow >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 50
+
+  opencti-minio:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+    container_name: opencti-minio
+    profiles: ["cti"]
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+    volumes:
+      - opencti_s3:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  opencti-rabbitmq:
+    image: rabbitmq:4.3.5-management
+    container_name: opencti-rabbitmq
+    profiles: ["cti"]
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-}
+      - RABBITMQ_NODENAME=rabbit01@localhost
+    volumes:
+      - ./opencti/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - opencti_amqp:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  opencti:
+    image: opencti/platform:7.261023.1
+    container_name: opencti
+    profiles: ["cti"]
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=6144
+      - APP__PORT=8080
+      - APP__BASE_URL=http://localhost:8082
+      - APP__ADMIN__EMAIL=${OPENCTI_ADMIN_EMAIL:-}
+      - APP__ADMIN__PASSWORD=${OPENCTI_ADMIN_PASSWORD:-}
+      - APP__ADMIN__TOKEN=${OPENCTI_ADMIN_TOKEN:-}
+      - APP__ENCRYPTION_KEY=${OPENCTI_ENCRYPTION_KEY:-}
+      - APP__HEALTH_ACCESS_KEY=${OPENCTI_HEALTHCHECK_ACCESS_KEY:-}
+      - APP__TELEMETRY__FILIGRAN__ENABLED=false
+      - REDIS__HOSTNAME=opencti-redis
+      - REDIS__PORT=6379
+      - ELASTICSEARCH__URL=http://opencti-elasticsearch:9200
+      - ELASTICSEARCH__NUMBER_OF_REPLICAS=0
+      - MINIO__ENDPOINT=opencti-minio
+      - MINIO__PORT=9000
+      - MINIO__USE_SSL=false
+      - MINIO__ACCESS_KEY=${MINIO_ROOT_USER:-}
+      - MINIO__SECRET_KEY=${MINIO_ROOT_PASSWORD:-}
+      - RABBITMQ__HOSTNAME=opencti-rabbitmq
+      - RABBITMQ__PORT=5672
+      - RABBITMQ__PORT_MANAGEMENT=15672
+      - RABBITMQ__MANAGEMENT_SSL=false
+      - RABBITMQ__USERNAME=${RABBITMQ_DEFAULT_USER:-}
+      - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS:-}
+      - SMTP__HOSTNAME=localhost
+      - SMTP__PORT=25
+      - PROVIDERS__LOCAL__STRATEGY=LocalStrategy
+    ports:
+      - "127.0.0.1:8082:8080"
+    depends_on:
+      opencti-redis:
+        condition: service_healthy
+      opencti-elasticsearch:
+        condition: service_healthy
+      opencti-minio:
+        condition: service_healthy
+      opencti-rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health?health_access_key=${OPENCTI_HEALTHCHECK_ACCESS_KEY:-}"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+  opencti-worker:
+    image: opencti/worker:7.261023.1
+    profiles: ["cti"]
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN:-}
+    depends_on:
+      opencti:
+        condition: service_healthy
+    deploy:
+      mode: replicated
+      replicas: 2
+
+  opencti-connector-mitre:
+    image: opencti/connector-mitre:7.261023.1
+    container_name: opencti-connector-mitre
+    profiles: ["cti"]
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN:-}
+      - CONNECTOR_ID=${CONNECTOR_MITRE_ID:-}
+      - "CONNECTOR_NAME=MITRE ATT&CK"
+      - CONNECTOR_SCOPE=tool,report,malware,identity,campaign,intrusion-set,attack-pattern,course-of-action,x-mitre-data-source,x-mitre-data-component,x-mitre-matrix,x-mitre-tactic,x-mitre-collection
+      - CONNECTOR_LOG_LEVEL=info
+      - MITRE_ENTERPRISE_FILE_URL=https://raw.githubusercontent.com/mitre-attack/attack-stix-data/v19.2/enterprise-attack/enterprise-attack-19.2.json
+      - MITRE_MOBILE_ATTACK_FILE_URL=false
+      - MITRE_ICS_ATTACK_FILE_URL=false
+      - MITRE_CAPEC_FILE_URL=false
+      - MITRE_INTERVAL=365
+    depends_on:
+      opencti:
+        condition: service_healthy
+
+  opencti-connector-export-stix:
+    image: opencti/connector-export-file-stix:7.261023.1
+    container_name: opencti-connector-export-stix
+    profiles: ["cti"]
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN:-}
+      - CONNECTOR_ID=${CONNECTOR_EXPORT_FILE_STIX_ID:-}
+      - CONNECTOR_TYPE=INTERNAL_EXPORT_FILE
+      - CONNECTOR_NAME=ExportFileStix2
+      - CONNECTOR_SCOPE=application/json
+    depends_on:
+      opencti:
+        condition: service_healthy
+
+  opencti-connector-import-stix:
+    image: opencti/connector-import-file-stix:7.261023.1
+    container_name: opencti-connector-import-stix
+    profiles: ["cti"]
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN:-}
+      - CONNECTOR_ID=${CONNECTOR_IMPORT_FILE_STIX_ID:-}
+      - CONNECTOR_TYPE=INTERNAL_IMPORT_FILE
+      - CONNECTOR_NAME=ImportFileStix
+      - CONNECTOR_VALIDATE_BEFORE_IMPORT=false
+      - CONNECTOR_SCOPE=application/json,text/xml
+      - CONNECTOR_AUTO=true
+    depends_on:
+      opencti:
+        condition: service_healthy
+
+  # Linea base de diccionario de ML-2 (F4.3, LB-a): extrae entidades y tecnicas de un documento.
+  opencti-connector-import-document:
+    image: opencti/connector-import-document:7.261023.1
+    container_name: opencti-connector-import-document
+    profiles: ["cti"]
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN:-}
+      - CONNECTOR_ID=${CONNECTOR_IMPORT_DOCUMENT_ID:-}
+      - CONNECTOR_TYPE=INTERNAL_IMPORT_FILE
+      - CONNECTOR_NAME=ImportDocument
+      - CONNECTOR_VALIDATE_BEFORE_IMPORT=true
+      - CONNECTOR_SCOPE=application/pdf,text/plain,text/html,text/markdown
+      - CONNECTOR_AUTO=false
+      - CONNECTOR_ONLY_CONTEXTUAL=false
+      - IMPORT_DOCUMENT_CREATE_INDICATOR=false
+    depends_on:
+      opencti:
+        condition: service_healthy
+
   # Portal web (F8): la SPA compilada servida por Caddy (frontend/Dockerfile). Hoy no habla con ningún otro servicio
   # (los datos van dentro de la compilación); cuando exista la API de F6.3, Caddy le reenviará /api.
   portal:
@@ -208,3 +424,7 @@ volumes:
   neo4j_data:
   neo4j_logs:
   neo4j_plugins:
+  opencti_redis:
+  opencti_es:
+  opencti_s3:
+  opencti_amqp:

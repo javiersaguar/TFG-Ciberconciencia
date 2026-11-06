@@ -665,11 +665,23 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ### F4.2 — OpenCTI y comparativa con el plan B
 
-- [ ] **OpenCTI en el compose** (perfil `cti`), con OpenSearch limitado a 4 GB y 1–2 workers, y la
+- [x] **OpenCTI en el compose** (perfil `cti`), con OpenSearch limitado a 4 GB y 1–2 workers, y la
   versión fijada.
-- [ ] Conector de **MITRE ATT&CK** con **la misma versión** que F4.1 y **el mismo feed** de abuse.ch.
-- [ ] **Exportar de OpenCTI a STIX y pasarlo por el mismo cargador** a una base Neo4j aparte. Con el
-  mismo cargador, la comparación es limpia.
+  - *(06-11-2026)* **7.261023.1, edición Community** (Apache 2.0), con Elasticsearch 8.19.21 de 4 GB y 2
+    workers. Todas las dependencias tienen versión fija.
+  - **Trampa:** las etiquetas `-lts` son la edición LTS de Filigran y piden una licencia propia
+    (`LTS_REQUIRED_ACTIVATION`), así que no se usan.
+  - Los secretos van en `infra/.env` (plantilla `infra/.env.example`, generador
+    `scripts/gen_env_opencti.py`).
+  - Solo se publica `localhost:8082`. MinIO no publica el 9000, que es de ClickHouse.
+- [x] Conector de **MITRE ATT&CK** con **la misma versión** que F4.1 (`MITRE_ENTERPRISE_FILE_URL` a la
+  v19.2; Mobile, ICS y CAPEC desactivados). **Pendiente:** el feed de abuse.ch, en una muestra de 10.000 IOCs.
+- [x] **Exportar de OpenCTI a STIX y compararlo con el original.**
+  - Exportador por la API (`toStix`): `cti/comparativa/opencti_export.py`. Comparador:
+    `cti/comparativa/fidelidad.py`.
+  - **Cambio respecto al plan:** se compara paquete contra paquete, no en una segunda base Neo4j.
+    OpenCTI reescribe los ids STIX (uuid5 propio) y guarda los de MITRE en una extensión, así que
+    cargarlo en el mismo grafo duplicaría cada objeto.
 - [ ] **Comparativa con criterios fijados antes de medir:**
 
   | Criterio | Cómo se mide |
@@ -683,6 +695,27 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 - [ ] **Conector de importación de documentos de OpenCTI como línea base adicional de ML-2.**
   Empareja nombres e identificadores de técnicas con un diccionario. **Comprobar al montarlo qué
   extrae realmente** antes de contarlo como línea base.
+- **Medido el 06-11-2026 con ATT&CK v19.2:**
+
+  | Criterio | Plan B | OpenCTI |
+  |---|---|---|
+  | Ingesta de ATT&CK | **4,7 s** | **32 min 10 s** (22.600 objetos, unos 12/s) |
+  | Memoria con datos | Neo4j 3,6 GB, con ATT&CK y 136.000 IOCs | unos 7,4 GB (Elasticsearch 6,0) solo con ATT&CK |
+  | Disco | 865 MB, con ATT&CK y ThreatFox | 270 MB, solo ATT&CK |
+  | Servicios | 1 | 11 |
+
+  **Fidelidad de OpenCTI:**
+  - **Descarta las 149 técnicas revocadas y las 157 relaciones `revoked-by`**: sin ellas no se pueden
+    traducir identificadores antiguos.
+  - **Fusiona grupos y malware que comparten alias:** Ember Bear + Saint Bear, Lotus Blossom + Thrip,
+    More_eggs + SpicyOmelette, TEXTMATE + POWERSOURCE.
+  - **No importa las estrategias de detección ni las analíticas de ATT&CK v18+** (2.457 objetos y 697
+    relaciones `detects`).
+  - Pierde la versión y la marca de obsoleta de cada técnica.
+  - Conserva `uses`, `mitigates` y `attributed-to` (19.931, todas), las tácticas y las plataformas.
+- [ ] **Pendiente (próxima sesión):** el valor añadido con una muestra de 10.000 IOCs de ThreatFox, y el
+  encaje con ML-2 pasando 2–3 informes de Microsoft por el conector de documentos (que es a la vez la
+  LB-a).
 - [ ] **Decisión documentada** con la tabla en la mano. Fija qué entra en el despliegue completo y
   qué en el mínimo (F9).
 
