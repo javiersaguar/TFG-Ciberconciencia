@@ -622,7 +622,24 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   - Tests sobre un paquete pequeño.
   - *(06-11-2026)* 9 tests. Carga de ATT&CK en 4,7 s; recargarlo da los mismos totales. Ningún
     extremo de relación se queda sin su nodo.
-- [ ] **Un feed de IOCs:** abuse.ch (ThreatFox o URLhaus), con el volumen de objetos registrado.
+- [x] **Un feed de IOCs: ThreatFox (abuse.ch)**, el 06-11-2026 (`cti/feeds/threatfox.py`, 6 tests).
+  - **Acceso.** Las descargas públicas de abuse.ch devuelven 410: ahora piden una Auth-Key gratuita,
+    que está en `.env` (ignorado por git). Los exports solo traen los últimos seis meses.
+  - **Licencia.** Es uso gratuito «under the fair use principles», no CC0; el uso comercial puede
+    requerir suscripción.
+  - **Conversión.** ThreatFox no publica STIX: se convierte el CSV.
+    - Cada IOC es un `indicator` con su patrón y cada familia un `malware`, enlazados con `indicates`.
+    - Los identificadores son uuid5, así que recargar no duplica.
+    - Se carga con el mismo cargador que ATT&CK.
+  - **Resultado.** 135.737 IOCs (SHA-256 42.588, dominios 31.864, IP y puerto 28.949, URL 20.029,
+    MD5 6.676, SHA-1 5.631) y 508 familias, sin descartes, cargados en 17 s.
+  - **Enlace con ATT&CK** (`cti/feeds/threatfox_attack.cypher`): por nombre o alias, y solo si la
+    coincidencia es única.
+    - Enlaza 92 familias. Hay 4 ambiguas descartadas: Snake casaba también con Uroburos de Turla y
+      DarkComet con PoisonIvy por el alias «Breut».
+    - **El 25,6 % de los IOCs (34.684) llega a técnicas de ATT&CK** a través de su familia.
+    - Lo que no se enlaza (ClearFake, «Unknown malware», Vidar, Mirai, AMOS…) **no está en el
+      catálogo de software de ATT&CK**: el límite es el catálogo, no el cruce.
 - [x] **Servicio de normalización de técnicas:** dado un identificador, devuelve el vigente y su
   táctica. Se aplica a:
   - las etiquetas de Sigma;
