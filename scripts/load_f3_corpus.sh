@@ -14,6 +14,8 @@
 #   ./scripts/load_f3_corpus.sh --solo-replay   # no procesa, solo publica en raw
 #   ./scripts/load_f3_corpus.sh --sin-topics    # no recrea los topics
 #   ./scripts/load_f3_corpus.sh --con-eventos   # ademas vuelca a tfg.events (ojo)
+#   ./scripts/load_f3_corpus.sh --con-atomicos  # ademas las 113 capturas atomicas de
+#                                               # host de OTRF (falsos positivos de F3)
 #   DETECT_INSTANCIAS=3 ./scripts/load_f3_corpus.sh    # detecta en paralelo
 set -euo pipefail
 
@@ -27,11 +29,13 @@ DETECT_INSTANCIAS="${DETECT_INSTANCIAS:-1}"  # norm.events tiene 6 particiones
 RECREAR_TOPICS=1
 PROCESAR=1
 CON_EVENTOS=0    # volcar norm.events a tfg.events: OFF por defecto, ver abajo
+CON_ATOMICOS=0   # anadir las capturas atomicas de OTRF (06-11-2026, cierre de F3)
 for arg in "$@"; do
   case "$arg" in
     --sin-topics)   RECREAR_TOPICS=0 ;;
     --solo-replay)  PROCESAR=0 ;;
     --con-eventos)  CON_EVENTOS=1 ;;
+    --con-atomicos) CON_ATOMICOS=1 ;;
     *) echo "Opcion desconocida: $arg"; exit 1 ;;
   esac
 done
@@ -101,6 +105,17 @@ for entrada in "${CORPUS[@]}"; do
     | tail -4
 done
 echo ""
+
+# Corpus negativo para medir falsos positivos (06-11-2026): las capturas atomicas
+# de host de OTRF, cada una con su verdad conocida en atomic/_metadata. Van al
+# mismo topic y se procesan con el resto; cada una conserva su dataset_id, asi
+# que las campanas del corpus no cambian. Verdad conocida por dataset en
+# detection/evaluation/verdad_datasets.csv.
+if [[ $CON_ATOMICOS -eq 1 ]]; then
+  echo "== Reproduciendo las capturas atomicas de OTRF hacia raw.host.windows =="
+  $PY -m pipeline.load_atomics | tail -6
+  echo ""
+fi
 
 [[ $PROCESAR -eq 0 ]] && { echo "Replay terminado (--solo-replay)."; exit 0; }
 

@@ -3,7 +3,7 @@
 **Proyecto:** Plataforma de conciencia cibersituacional — detección de ataques multi-etapa, grafo de ataque razonado y priorización explicable
 **Autor:** Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos, ETSIT-UPM
 **Horizonte:** agosto 2026 → defensa junio 2027
-**Última actualización:** 2026-07-30 · *(rev. 3 — F2 cerrada, laboratorio de emulación propio, arranque de F3)*
+**Última actualización:** 2026-11-06 · *(rev. 4 — F3 cerrada: tres patrones en Flink, reducción de alertas y falsos positivos medidos)*
 
 ---
 
@@ -57,7 +57,7 @@
 
 | Fase | Nombre | Prioridad | Estimación |
 |---|---|---|---|
-| **F3** | **Pilar A** — detección multi-etapa (CEP) + **secuencias 🧠** | 🔴 | 3–4 sem |
+| **F3** | **Pilar A** — detección multi-etapa (CEP) + **secuencias 🧠** — ✅ **cerrada el 06-11-2026** | 🔴 | 3–4 sem |
 | **F4** | Plano CTI + **extracción de TTPs con NLP 🧠** | 🟠 | 3–4 sem |
 | **F5** | **Pilar B** — grafo razonado + **GNN neurosimbólico 🧠** | 🔴 | 4–5 sem |
 | **F6** | **Pilar C** — priorización explicable + **scoring aprendido 🧠** | 🟠 | 2–3 sem |
@@ -394,16 +394,25 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ---
 
-## F3 — Pilar A: detección multi-etapa (CEP) 🔴
+## F3 — Pilar A: detección multi-etapa (CEP) 🔴 ✅ CERRADA (06-11-2026)
 
-**Estimación:** 3–4 semanas · **Prerrequisitos:** F1, F2
+**Estimación:** 3–4 semanas · **Prerrequisitos:** F1, F2 · **Cierre:** 06-11-2026
+
+> **Pendientes reubicados al cerrar la fase** (no bloquean F4/F5; se dejan aquí para no perderlos):
+> - **A F7:** latencia de detección, porque la reproducción va acelerada y no la representa; tasa de falsas
+>   alarmas sobre tráfico **benigno**, porque las capturas atómicas son todas ataques; validación en apt29 day2.
+> - **A la cadena continua (F7/F9):** tardíos a `dlq.late` y destino *upsert* para la emisión en streaming.
+> - **A FA:** red con Zeek, P4 de exfiltración y P5 de ausencia como señal. **A F3.3/F7, si hay calendario:** las
+>   anomalías secuenciales como refuerzo.
+> - **Ajuste v2** de los patrones con lo aprendido en la revisión de falsos positivos (§F3.4). Se mide aparte y
+>   se presenta como antes/después; las cifras v1 de abajo son las oficiales de la fase.
 
 ### F3.1 — Modelado de escenarios
 
 - [x] day1 extraído, normalizado y detectado (F2).
 - [ ] Extraer y cargar **day2** (`apt29_evals_day2_manual.zip`, 43 MB sin extraer;
   hosts NEWYORK, SCRANTON, UTICA-A/C/D/ONE-DRIVE).
-- [ ] **Inventario de materia prima antes de diseñar patrones** (paso 0 de la fase): qué
+- [x] **Inventario de materia prima antes de diseñar patrones** (paso 0 de la fase): qué
   `dataset_id` hay realmente en `tfg.alerts`, cuántas alertas por técnica ancla y qué claves
   trae de verdad `matched_fields`. En particular, **verificar si las 7 variantes de
   LSASS_campaign están ya normalizadas y detectadas** o solo lo están los atómicos: sin sus
@@ -414,7 +423,7 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 - [ ] Estudiar los `emulationplans/` de apt29 y reconstruir la cadena real → verdad conocida de la secuencia.
   ℹ️ El plan viene como **un único `apt29.xlsx`**, no como YAML: hay que parsearlo (o cruzarlo
   con el plan público de MITRE Evals) para sacar la secuencia paso → hora → host.
-- [ ] `docs/scenarios/apt29-day1.md`: táctica → técnica → evidencia esperada → ventana temporal.
+- [x] `docs/scenarios/apt29-day1.md`: táctica → técnica → evidencia esperada → ventana temporal.
   **De aquí salen los `WITHIN` de los patrones**, medidos sobre la campaña real; no se fijan a ojo.
 - [ ] Diseñar **3–5 patrones CEP** de valor general:
   - **P1** Robo de credenciales: proceso inusual → acceso a LSASS → volcado a disco → *(opc.)* borrado de log.
@@ -513,16 +522,54 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
     cambia mucho el contexto contado (LSASS_01: 3 alertas de descubrimiento frente a 23). Hay que decidirlo antes de medir la
     reducción de alertas en F7.
   - **Pendiente:** validar en day2.
-- [ ] **Falsos positivos** sobre la porción benigna.
-- [ ] **Ratio de reducción de alertas** = 1 − (campañas / alertas individuales) ← *métrica estrella*.
-- [ ] **Latencia de detección**: del último evento de la secuencia a la emisión.
+- [x] **Extensión de la campaña, decidida el 06-11-2026: solo su evidencia** (lo que emite Flink). Las alertas que
+  ninguna campaña recoge siguen visibles para el analista y cuentan como «sueltas». Se informan dos cifras: reducción
+  sobre la evidencia y reducción global.
+- [x] **Ratio de reducción de alertas (06-11-2026)**, ejecución `f3f`: corpus de F3 más 101 capturas atómicas de host
+  de OTRF (`pipeline/load_atomics.py`, `scripts/load_f3_corpus.sh --con-atomicos`). Consultas en
+  `detection/evaluation/f3_cierre.sql`.
 
-### ✅ DoD
-1. ≥3 patrones disparando sobre datasets reales.
-2. P1 detecta las 7 variantes de LSASS_campaign.
-3. ≥1 campaña multi-etapa detectada en apt29.
-4. Ratio de reducción de alertas medido.
-5. Falsos positivos cuantificados.
+  | grupo   | alertas | en campaña | campañas | reducción s/ evidencia | reducción global |
+  |---------|--------:|-----------:|---------:|-----------------------:|-----------------:|
+  | corpus  |   1.184 |         88 |       15 |                  0,830 |            0,062 |
+  | atómico |   1.556 |        302 |       40 |                  0,868 |            0,168 |
+  | total   |   2.740 |        390 |       55 |              **0,859** |        **0,122** |
+
+  - Por patrón, la reducción sobre la evidencia es de 0,874 en P1, 0,844 en P2 y 0,862 en P3, unas 7 alertas por
+    campaña. La línea base B1 (solo Sigma) tiene reducción 0.
+  - **Lectura:** el CEP comprime unas 7 a 1 lo que reconoce, pero solo reconoce el 14 % de las alertas.
+  - El corpus da las **mismas 15 campañas** y las mismas 1.184 alertas que antes: cargar los atómicos no lo altera.
+- [x] **Falsos positivos (06-11-2026)**, juzgando cada campaña contra la verdad conocida de su dataset
+  (`detection/evaluation/verdad_conocida.py` → `tfg.verdad_datasets`, con 110 datasets). La revisión manual de las
+  22 candidatas está en `detection/evaluation/f3_revision_fp.md`:
+  - 6 eran actividad de ataque real que el metadato no listaba, como Mimikatz ejecutándose;
+  - 10 son ataques reales leídos con el patrón equivocado, como PsExec tomado por robo de credenciales;
+  - 6 nacen de ruido del sistema operativo, sobre todo csrss/wininit abriendo lsass al arrancar y la regla
+    *Uncommon Process Access Rights*;
+  - además hay 1 campaña de ruido dentro de APT29 que la evaluación por dataset no ve.
+
+  Cifras tras la revisión, en los atómicos:
+
+  | patrón | precisión | exhaustividad | tasa de falsas alarmas |
+  |--------|----------:|--------------:|-----------------------:|
+  | P1     |      0,57 |          0,55 |                   0,11 |
+  | P2     |      1,00 |          0,17 |                   0    |
+  | P3     |      0,46 |          0,75 |                   0,08 |
+
+  - Por campaña, la precisión es de **0,69** (17 falsas de 55) y las de ruido benigno son 7 de 55.
+  - **P2** se pierde 24 capturas. En 18 de ellas las alertas caen en un solo equipo, y P2 necesita ver origen y
+    destino: es un límite del conjunto de evaluación.
+  - ⚠️ **Límite:** esto mide sobre todo confusión entre patrones sobre actividad maliciosa, no falsas alarmas sobre
+    actividad limpia. Esa tasa va a F7.
+- [ ] ↪️ **F7** — **Latencia de detección**: del último evento de la secuencia a la emisión. No se mide en F3 porque
+  la reproducción va muy por encima de la velocidad real y la cifra no significaría nada.
+
+### ✅ DoD — cumplido
+1. ✅ ≥3 patrones disparando sobre datasets reales: P1, P2 y P3 en Flink, en batch y en streaming.
+2. ✅ P1 detecta las 7 variantes de LSASS_campaign.
+3. ✅ ≥1 campaña multi-etapa detectada en apt29: P2 SCRANTON → NASHUA y P3 en SCRANTON.
+4. ✅ Ratio de reducción de alertas medido: 0,859 sobre la evidencia y 0,122 global.
+5. ✅ Falsos positivos cuantificados: 22 candidatas revisadas a mano y precisión de 0,69 por campaña.
 
 ---
 

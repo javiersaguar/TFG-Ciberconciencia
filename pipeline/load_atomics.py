@@ -3,6 +3,16 @@
 Extrae cada zip, localiza su metadato (que aporta la verdad conocida: tecnica
 ATT&CK, tactica y descripcion) y reproduce sus eventos con el identificador de
 dataset correspondiente.
+
+Puesto al dia el 06-11-2026 para el cierre de F3 (falsos positivos), con las
+mismas reglas que pipeline/replay_dataset.py:
+  - solo los zip de HOST: los de red traen PCAP y no aportan eventos;
+  - cabecera line_no con el ordinal de la linea dentro del dataset. Es la
+    identidad de reserva del normalizador para los eventos sin RecordNumber
+    (un 35 % de los atomicos, medido). Sin ella, eventos distintos con los
+    mismos campos colapsaban en uno, como paso con las campanas LSASS el 11-09;
+  - se excluye por defecto SDWIN-201018195009 (comsvcs), que ya esta en el
+    corpus de F3: cargarlo dos veces solo duplicaria mensajes.
 """
 import argparse
 import json
@@ -30,6 +40,10 @@ def parse_args():
                    help="Tacticas a cargar (por defecto, todas)")
     p.add_argument("--limit", type=int, default=0, help="Maximo de datasets (0 = todos)")
     p.add_argument("--dry-run", action="store_true", help="Solo listar, no publicar")
+    p.add_argument("--incluir-red", action="store_true",
+                   help="Recorrer tambien los zip de red (por defecto, solo host)")
+    p.add_argument("--excluir", nargs="*", default=["SDWIN-201018195009"],
+                   help="dataset_id que no se cargan (por defecto, el de comsvcs del corpus)")
     return p.parse_args()
 
 
@@ -92,6 +106,10 @@ def main():
     print(f"Metadatos indexados: {len(meta_index)}")
 
     zips = sorted(ATOMIC_BASE.rglob("*.zip"))
+    if not args.incluir_red:
+        zips = [z for z in zips if "host" in z.parts]
+    excluidos = set(args.excluir or [])
+    zips = [z for z in zips if summarize(meta_index.get(z.name))["id"] not in excluidos]
     if args.tactics:
         zips = [z for z in zips if any(t in str(z) for t in args.tactics)]
     if args.limit:
@@ -113,6 +131,8 @@ def main():
 
     total_ev = 0
     ok = 0
+    # Ordinal por dataset, continuo entre sus ficheros: identidad reproducible
+    ordinal = {}
     fallos = []
     resumen = []
 
@@ -122,7 +142,7 @@ def main():
 
         try:
             with zipfile.ZipFile(zpath) as zf:
-                names = [n for n in zf.namelist() if n.endswith(".json")]
+                names = sorted(n for n in zf.namelist() if n.endswith(".json"))
                 if not names:
                     fallos.append((zpath.name, "sin json"))
                     continue
@@ -133,6 +153,7 @@ def main():
                             line = line.strip()
                             if not line:
                                 continue
+                            ordinal[ds_id] = ordinal.get(ds_id, 0) + 1
                             try:
                                 event = json.loads(line)
                             except json.JSONDecodeError:
@@ -147,6 +168,7 @@ def main():
                                     "dataset_id": ds_id,
                                     "source": "otrf-atomic",
                                     "techniques": ",".join(meta["techniques"]),
+                                    "line_no": str(ordinal[ds_id]),
                                 },
                             )
                             enviados += 1

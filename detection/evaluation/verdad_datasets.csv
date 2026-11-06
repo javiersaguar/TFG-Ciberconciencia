@@ -1,0 +1,111 @@
+dataset_id,origen,titulo,tecnicas,tacticas,verdad,p1_esperado,p2_esperado,p3_esperado
+SDWIN-200501225525,corpus,APT29 day1 (MITRE ATT&CK Evaluations),T1003.001|T1005|T1018|T1021.002|T1021.006|T1027|T1027.002|T1033|T1036|T1041|T1056|T1057|T1059.001|T1070.004|T1074|T1078|T1082|T1083|T1105|T1106|T1112|T1113|T1115|T1119|T1140|T1204|T1543.003|T1546.015|T1547.001|T1548.002|T1552.001|T1552.004|T1560|T1569.002|T1570|T1571,TA0002|TA0003|TA0004|TA0005|TA0006|TA0007|TA0008|TA0009|TA0010|TA0011,completa,1,1,1
+LSASS_campaign_01,corpus,LSASS Memory - logonpasswords (Mimikatz),T1003.001|T1033|T1055.002|T1057|T1082|T1134.001|T1204.002|T1587.001|T1608.001,TA0002|TA0004|TA0005|TA0006|TA0007|TA0042,completa,1,0,1
+LSASS_campaign_02,corpus,LSASS Memory - Procdump,T1003.001|T1033|T1041|T1082|T1105|T1204.002|T1587.001|T1608.001,TA0002|TA0006|TA0007|TA0010|TA0011|TA0042,completa,1,0,0
+LSASS_campaign_03,corpus,LSASS Memory - comsvcs.dll,T1003.001|T1033|T1041|T1055.002|T1057|T1082|T1204.002|T1543.003|T1587.001|T1608.001,TA0002|TA0004|TA0005|TA0006|TA0007|TA0010|TA0042,completa,1,0,1
+LSASS_campaign_04,corpus,LSASS Memory - Out-Minidump.ps1,T1003.001|T1033|T1041|T1082|T1204.002|T1587.001|T1608.001,TA0002|TA0006|TA0007|TA0010|TA0042,completa,1,0,0
+LSASS_campaign_05,corpus,LSASS Memory - SharpDump,T1003.001|T1012|T1033|T1041|T1082|T1105|T1204.002|T1587.001|T1608.001,TA0002|TA0006|TA0007|TA0010|TA0011|TA0042,completa,1,0,0
+LSASS_campaign_06,corpus,LSASS Memory - Outflank Dumpert,T1003.001|T1033|T1041|T1082|T1105|T1204.002|T1587.001|T1608.001,TA0002|TA0006|TA0007|TA0010|TA0011|TA0042,completa,1,0,0
+LSASS_campaign_07,corpus,LSASS Memory - Nanodump,T1003.001|T1033|T1041|T1082|T1105|T1204.002|T1587.001|T1608.001,TA0002|TA0006|TA0007|TA0010|TA0011|TA0042,completa,1,0,0
+SDWIN-200609225055,atomico,MSF Record Mic,T1123,TA0009,completa,0,0,0
+SDWIN-230718151900,atomico,Dumping NTDS.dit using NTDSutil,T1003.003,TA0006,completa,1,0,0
+ATOMIC-cmd_dumping_ntds_dit_file_volume_shadow_,atomico,cmd_dumping_ntds_dit_file_volume_shadow_copy,T1003.003,TA0006,parcial,1,0,0
+SDWIN-201018225619,atomico,Lsass Memory Dump via Syscalls,T1003.001,TA0006,completa,1,0,0
+SDWIN-201019033054,atomico,Psexec Reg LSA Secrets Dump,T1003.004,TA0006,completa,1,0,0
+SDWIN-201019002900,atomico,SAM Copy via Esentutl VSS,T1003.002,TA0006,completa,1,0,0
+SDWIN-200805020926,atomico,Covenant DCSync,T1003.006,TA0006,completa,1,0,0
+SDWIN-190301174830,atomico,Empire DCSync,T1003.006,TA0006,completa,1,0,0
+SDWIN-190518235535,atomico,Empire Mimikatz Backup Keys,T1003,TA0006,completa,1,0,0
+SDWIN-190518230752,atomico,Empire Mimikatz Extract Kerberos Keys,T1003.004,TA0006,completa,1,0,0
+SDWIN-190518202151,atomico,Empire Mimikatz LogonPasswords,T1003.001,TA0006,completa,1,0,0
+ATOMIC-empire_mimikatz_lsadump_inject_protected,atomico,empire_mimikatz_lsadump_inject_protected_mode,T1003,TA0006,parcial,1,0,0
+SDWIN-200807103913,atomico,Empire Mimikatz Lsadump LSA Patch,T1003.001,TA0006,completa,1,0,0
+SDWIN-190625103712,atomico,Empire Mimikatz SAM Extract Hashes,T1003.002,TA0006,completa,1,0,0
+SDWIN-230720004300,atomico,Dumping NTDS.dit using NinjaCopy,T1003.003,TA0006,completa,1,0,0
+SDWIN-190319131123,atomico,Empire Over-Pass-The-Hash,T1550.002,TA0005|TA0008,completa,0,1,0
+SDWIN-200922042230,atomico,Empire Powerdump Extract Hashes,T1003.002,TA0006,completa,1,0,0
+SDWIN-190625133822,atomico,Empire Reg Dump SAM Hive,T1003.002,TA0006,completa,1,0,0
+SDWIN-200921230246,atomico,Rubeus Elevated ASKTGT CreateNetOnly,T1003.003,TA0006,completa,1,0,0
+SDWIN-190319145126,atomico,Rubeus Userland ASKTGT PTT,T1003.003,TA0006,completa,1,0,0
+SDWIN-201020013208,atomico,UI Prompt For Credentials Function,T1056.002,TA0006|TA0009,completa,0,0,0
+SDWIN-201018195009,corpus,Lsass Memory Dump via Comsvcs.dll,T1003.001,TA0006,completa,1,0,0
+SDWIN-201028191914,atomico,Windows Vault Web Credentials,T1055,TA0004|TA0005,completa,0,0,0
+SDWIN-191027055035,atomico,RDP TaskManager LSASS Dump,T1003.001,TA0006,completa,1,0,0
+SDWIN-220630130349,atomico,Disabling Windows Event Logging via Audit Policy Modification,T1562.002,TA0005,completa,0,0,0
+SDWIN-201023023651,atomico,Bitsadmin Download Malicious File,T1197,TA0003|TA0005,completa,0,0,0
+SDWIN-220708104215,atomico,Stopping Event Log Service via Modification of Start Up Type,T1562.002,TA0005,completa,0,0,0
+SDWIN-201022022144,atomico,Mshta Javascript GetObject Sct,T1218.005,TA0005,completa,0,0,0
+SDWIN-201022025808,atomico,Mshta VBScript Execute PowerShell,T1218.005,TA0005,completa,0,0,0
+SDWIN-201021001911,atomico,Netsh Open FW Proxy Ports,T1562.004,TA0005,completa,0,0,0
+ATOMIC-cmd_process_herpaderping_mimiexplorer,atomico,cmd_process_herpaderping_mimiexplorer,,TA0005,parcial,0,0,0
+SDWIN-201026235835,atomico,Process Herpaderping Mimikatz,T1055,TA0004|TA0005,completa,0,0,0
+SDWIN-220708104300,atomico,Stopping Event Log Service after Stopping Depending Services,T1562.002,TA0005,completa,0,0,0
+SDWIN-220803205800,atomico,Stopping Event Logging via Creation of MiniNt Registry Key,T1562.002,TA0005,completa,0,0,0
+SDWIN-220705170038,atomico,Modifying Security Event Log File Path via Modification of Log Configuration,T1562.002,TA0005,completa,0,0,0
+SDWIN-191027223020,atomico,Covenant ShellCmd InstallUtil,T1218.004,TA0002|TA0005,completa,0,0,0
+SDWIN-201012183248,atomico,Covenant Wuauclt CreateRemoteThread Execution,T1218,TA0005,completa,0,0,0
+SDWIN-190518221344,atomico,Empire Invoke DLLInjection,T1055.001,TA0004|TA0005,completa,0,0,0
+SDWIN-200721232741,atomico,Empire Regsvr32 Execution,T1218.010,TA0005,completa,0,0,0
+SDWIN-191225045202,atomico,Empire Invoke InternalMonologue,T1112,TA0005,completa,0,0,0
+SDWIN-190301125905,atomico,Empire Powerview Add-DomainObjectAcl,T1222.001,TA0005,completa,0,0,0
+SDWIN-190518200432,atomico,Empire PSInject,T1055.003,TA0004|TA0005,completa,0,0,0
+SDWIN-200914080546,atomico,Empire Remote WMIC Add User,T1047,TA0002|TA0008,completa,0,1,0
+SDWIN-201022015432,atomico,CMSTP Proxy Execution,T1218.003,TA0005,completa,0,0,0
+SDWIN-201022013121,atomico,Control Panel Execution,T1218.002,TA0005,completa,0,0,0
+SDWIN-201022002145,atomico,HH Execution of Local Compiled HTML Payload,T1218.001,TA0005,completa,0,0,0
+SDWIN-201019232515,atomico,Mavinject Process DLL Injection,T1055,TA0004|TA0005,completa,0,0,0
+SDWIN-201022035214,atomico,Mshta HTML Application (HTA) Execution,T1218.005,TA0005,completa,0,0,0
+SDWIN-201023020513,atomico,Register-CimProvider Execute Dll,T1218,TA0005,completa,0,0,0
+SDWIN-201023031210,atomico,PurpleSharp PE Injection CreateRemoteThread,T1055.002,TA0004|TA0005,completa,0,0,0
+SDWIN-220703123711,atomico,Disabling Process Command Line Logging via Registry Modification,T1562.002,TA0005,completa,0,0,0
+SDWIN-201017061100,atomico,WMIC Remote XSL Jscript Execution,T1220,TA0005,completa,0,0,0
+SDWIN-201021232814,atomico,Internet Explorer Version Discovery,T1518,TA0007,completa,0,0,0
+SDWIN-201102163918,atomico,Seatbelt Group User Discovery,T1012,TA0007,completa,0,0,0
+SDWIN-200806130039,atomico,Covenant GetDomainGroup Domain Admins,T1069.002,TA0007,completa,0,0,0
+SDWIN-190518224039,atomico,Empire Find Local Admin Access,T1069.001,TA0007,completa,0,0,0
+SDWIN-190519005224,atomico,Empire Remote Get Session,T1049,TA0007,completa,0,0,0
+SDWIN-190319020729,atomico,Empire Net Local Users,T1087.001,TA0007,completa,0,0,0
+SDWIN-190319020147,atomico,Empire Net Local Administrators Group,T1069.001,TA0007,completa,0,0,0
+SDWIN-190518201207,atomico,Empire Shell Net Domain Admins,T1069.002,TA0007,completa,0,0,0
+SDWIN-190319021158,atomico,Empire Net Domain Users,T1087.002,TA0007,completa,0,0,0
+SDWIN-201029202324,atomico,SharpView PCRE.NET,T1059,TA0002,completa,0,0,0
+SDWIN-190518182022,atomico,Empire VBS Execution,T1059.005,TA0002,completa,0,0,0
+SDWIN-201102041306,atomico,PowerShell HTTP Listener,T1059.001,TA0002,completa,0,0,0
+SDWIN-201029001615,atomico,Python HTTP Server,T1059,TA0002,completa,0,0,0
+SDWIN-210427020247,atomico,Export ADFS Database Configuration Remotely,T0000,TA0008,completa,0,1,0
+ATOMIC-covenant_com_wsman_automation,atomico,covenant_com_wsman_automation,T1021.006,TA0008,parcial,0,1,0
+SDWIN-200806015757,atomico,Covenant Remote File Copy,T1021.002,TA0008,completa,0,1,0
+SDWIN-200917174542,atomico,DCOM ExecuteExcel4macro,T1021.003,TA0008,completa,0,1,0
+ATOMIC-covenant_dcom_executeexcel4macro_blocked,atomico,covenant_dcom_executeexcel4macro_blocked,T1021.003,TA0008,parcial,0,1,0
+SDWIN-201009183000,atomico,Covenant Remote DCOM Iertutil DLL Hijacking,T1021.003,TA0008,completa,0,1,0
+SDWIN-200918145959,atomico,DCOM RegisterXLL,T1021.003,TA0008,completa,0,1,0
+SDWIN-200806115603,atomico,Covenant PowerShell Remoting Command,T1021.006,TA0002|TA0008,completa,0,1,0
+ATOMIC-covenant_psremoting_grunt,atomico,covenant_psremoting_grunt,T1021.006,TA0008,parcial,0,1,0
+SDWIN-200805034820,atomico,Covenant SC.exe Utility Query,T1021.002,TA0008,completa,0,1,0
+SDWIN-200806022635,atomico,Covenant SharpSC Create,T1021.002,TA0008,completa,0,1,0
+SDWIN-200806012009,atomico,Covenant SharpSC Query,T1021.002,TA0008,completa,0,1,0
+SDWIN-200806030120,atomico,Covenant SharpSC Start,T1021.002,TA0008,completa,0,1,0
+SDWIN-200806031938,atomico,Covenant SharpSC Stop Service,T1021.002,TA0008,completa,0,1,0
+SDWIN-200806035621,atomico,Covenant SharpWMI Exec,T1047,TA0002|TA0008,completa,0,1,0
+SDWIN-200724174200,atomico,Covenant Remote WMI Eventing ActiveScriptEventConsumers,T1047,TA0002|TA0008,completa,0,1,0
+SDWIN-201009173318,atomico,Covenant Remote WMI Wbemcomn DLL Hijacking,T1047,TA0002|TA0008,completa,0,1,0
+SDWIN-190518211052,atomico,Empire Invoke DCOM ShellWindows,T1021.003,TA0002|TA0008,completa,0,1,0
+SDWIN-190518213907,atomico,Empire Invoke Execute MSBuild,T1047,TA0002|TA0008,completa,0,1,0
+SDWIN-190518210652,atomico,Empire Invoke PsExec,T1021,TA0002|TA0008,completa,0,1,0
+SDWIN-190518211456,atomico,Empire Invoke PSRemoting,T1021.006,TA0002|TA0008,completa,0,1,0
+SDWIN-190403133337,atomico,IKEEXT Remote Service DLL Hijack,T1574.001,TA0003|TA0004|TA0005,completa,0,0,1
+SDWIN-190518210125,atomico,Empire Invoke SMBExec,T1021.002,TA0008,completa,0,1,0
+SDWIN-200921001437,atomico,Empire Invoke WMI,T1047,TA0002|TA0008,completa,0,1,0
+SDWIN-200916232559,atomico,Mimikatz Netlogon Unauthenticated NetrServerAuthenticate2,T1210,TA0008,completa,0,1,0
+SDWIN-201022042947,atomico,PurpleSharp Active Directory Playbook I,T1021.006|T1110.003|T1135|T1558.003,TA0006|TA0007|TA0008,completa,0,1,0
+SDWIN-201219070027,atomico,Remote Scheduled Task Creation,T1053.005,TA0002|TA0003|TA0004|TA0008,completa,0,1,1
+SDWIN-201219075059,atomico,Remote Scheduled Task Modification,T1053.005,TA0002|TA0003|TA0004|TA0008,completa,0,1,1
+SDWIN-201019224718,atomico,Logon Scripts via UserInitMprLogonScript,T1037.001,TA0003,completa,0,0,0
+SDWIN-200722001847,atomico,Empire Elevated Registry Run Keys,T1547.001,TA0003,completa,0,0,0
+SDWIN-190319023812,atomico,Empire Userland Registry Run Keys,T1547.001,TA0003,completa,0,0,0
+SDWIN-200921175806,atomico,Empire Elevated Scheduled Tasks,T1053.005,TA0003,completa,0,0,0
+SDWIN-190319024742,atomico,Empire Userland Scheduled Tasks,T1053.005,TA0003,completa,0,0,0
+SDWIN-190518184306,atomico,Empire Elevated WMI Eventing,T1546.003,TA0003|TA0004,completa,0,0,1
+SDWIN-210314014019,atomico,Exchange ProxyLogon SSRF RCE Vuln POC,T1505.003,TA0002|TA0003,completa,0,0,0
+SDWIN-201021204544,atomico,Service Modification Fax,T1543.003,TA0003|TA0004,completa,0,0,1
+SDWIN-200904032946,atomico,Invoke BypassUAC FodHelper,T1548.002,TA0004,completa,0,0,0
