@@ -550,6 +550,10 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 - [ ] **1. Corpus.** Reunir informes públicos de amenazas (≥15, incluyendo alguno de APT29
   para cerrar el círculo con los datos de F3). Valorar **AnnoCTR** (120 informes anotados,
   CC-BY-SA) como conjunto etiquetado de referencia.
+  - **Datos en disco (05-11-2026)**, sin usar todavía:
+    - **AnnoCTR** (ZIP oficial de 93,2 MB, commit `d510b69`). Trae 400 nombres de informe distintos en `all/text` y otros 190 solapados en `text`: no son 590 documentos independientes. Verificar capas, `train_ext` y particiones antes de evaluar.
+    - **15 informes públicos de Microsoft** en HTML, varios de APT29. Los de CISA dieron 403. Sin anotación de referencia: las menciones a IDs de ATT&CK no son una etiqueta por fragmento.
+    - **Pendiente:** controlar el sesgo de un único editor, el solapamiento con AnnoCTR y la limpieza del HTML.
 - [ ] **2. Línea base:** TRAM / SciBERT preentrenado, **solo inferencia**. Medir precisión,
   exhaustividad y F1 sobre el corpus anotado. *Esta es la referencia contra la que comparar.*
 - [ ] **3. Fine-tuning** de un modelo del dominio (**SecureBERT** o CyBERT) sobre el corpus
@@ -837,6 +841,30 @@ Orden por coste/beneficio (de menos a más esfuerzo). Revisado el 04-11-2026 con
 propuesta de datasets y de DoS/DDoS. Los conjuntos externos se descargan con el inventario de
 `data/external/MANIFEST.md` (procedencia, licencia, tamaño y SHA-256) y **se verifican antes de
 usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
+
+> **Datos disponibles a 05-11-2026** (detalle, sumas y licencias en `data/external/MANIFEST.md`;
+> resumen del otro agente en `data/external/RESUMEN_PARA_BITACORA_ROADMAP.md`). Que estén en
+> disco **no cierra ninguna fase**: ninguno está normalizado ni integrado.
+> - **FA.3 COMISET:**
+>   - LAB (4,91 GB) en disco;
+>   - **REAL descargado entero** (31,7 GB, MD5 correcto; su JSON ocupa 934,5 GB y no se extrajo);
+>   - piloto: 100.000 registros de dos hosts, una hora cada uno, en `comiset/real-sample-v1/`.
+>
+>   Es un prefijo, no una muestra representativa: el 99 % son Sysmon 10. Además, el JSON trae un
+>   envoltorio de Elasticsearch que el normalizador no entiende todavía.
+> - **FA.4:** CAM-LDS v2 (escenarios 1 y 3), AttackMate, Splunk cron, AIT Alert Data Set y **AIT
+>   LDS v2** (`russellmitchell.zip`, 7,13 GB, sin extraer). Las etiquetas de AIT salen de reglas,
+>   no son verdad independiente.
+> - **FA.5:**
+>   - **en disco:**
+>     - BOUN DDoS, SDN TCP-SYN, AdDDoSDN y DDoS con tráfico de fondo de 100 IP;
+>     - **CICIDS2017 corregido** (revisión DistriNet/CNS2022). Su DDoS va tras NAT, así que no
+>       prueba orígenes distintos ni indisponibilidad;
+>     - **CSE-CIC-IDS2018, día 20:** solo Benign y LOIC-HTTP. Sus horas no llevan AM/PM, así
+>       que **no sirve como verdad temporal ni para medir latencia**;
+>   - **bloqueados:** Orion 2026 y CICDDoS2019.
+> - **FA.6:** Splunk dcrypt (T1486) y shadowcopy (T1490), señales sueltas. Sus capturas son de años y
+>   hosts distintos: no se pueden unir como una campaña.
 
 > **Tramo mínimo realista** (las prácticas van de febrero a mayo): FA.1, FA.2, una muestra de
 > FA.3 y el escenario 1 de CAM-LDS de FA.4 como prueba de generalización de P3. El resto queda
