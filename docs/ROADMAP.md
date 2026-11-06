@@ -601,25 +601,50 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ### F4.1 — Plan B: ATT&CK y CTI directo a Neo4j *(primero: desbloquea F5)*
 
-- [ ] **Neo4j en el compose** (perfil `graph`, con GDS), adelantado desde F5.1. Versión fijada.
-- [ ] **ATT&CK Enterprise en STIX 2.1**, con la versión fijada y su suma registrada:
+- [x] **Neo4j en el compose** (perfil `graph`, con GDS), adelantado desde F5.1. Versión fijada.
+  *(06-11-2026: `neo4j:5.26.31-community`, GDS 2.13.13 y APOC 5.26.31; `./scripts/up.sh graph`.)*
+- [x] **ATT&CK Enterprise en STIX 2.1**, con la versión fijada y su suma registrada:
   - técnicas, subtécnicas, tácticas, grupos, software y mitigaciones;
   - relaciones `uses`, `subtechnique-of` y `mitigates`;
   - los objetos **revocados u obsoletos** se cargan con su sustituto (`revoked-by`), para traducir
     identificadores antiguos.
-- [ ] **Cargador STIX → Neo4j** propio e idempotente (`cti/stix_loader/`). Lo usan los dos caminos de
+  - *(06-11-2026)* **v19.2** (agosto de 2026) en `data/cti/attack/enterprise-attack-19.2.json`,
+    SHA-256 `dc1639caa5501d720e280cf1cbd8fbe009884a0c9b3e6e9ed9d0c25166c3d8f4`.
+    - Se descartó la v20, publicada el día anterior con un parche el mismo día. Subir de versión es
+      un paso aparte que se medirá.
+    - En el grafo: 4.823 nodos y 22.352 relaciones, de ellas 1.090 técnica–táctica; 858 técnicas,
+      149 de ellas revocadas.
+    - APT29 (G0016) usa 66 técnicas vigentes.
+- [x] **Cargador STIX → Neo4j** propio e idempotente (`cti/stix_loader/`). Lo usan los dos caminos de
   F4.2 y la salida de ML-2.
   - Identidad por el `id` STIX.
   - Recargar el mismo paquete no duplica.
   - Tests sobre un paquete pequeño.
+  - *(06-11-2026)* 9 tests. Carga de ATT&CK en 4,7 s; recargarlo da los mismos totales. Ningún
+    extremo de relación se queda sin su nodo.
 - [ ] **Un feed de IOCs:** abuse.ch (ThreatFox o URLhaus), con el volumen de objetos registrado.
-- [ ] **Servicio de normalización de técnicas:** dado un identificador, devuelve el vigente y su
+- [x] **Servicio de normalización de técnicas:** dado un identificador, devuelve el vigente y su
   táctica. Se aplica a:
   - las etiquetas de Sigma;
   - la verdad conocida de F3 (`verdad_conocida.py`, sustituyendo la lista manual de APT29);
   - la salida de ML-2.
 
   Se mide cuántas etiquetas de las alertas de F3 estaban obsoletas.
+  - *(06-11-2026)* `cti/attack_ids.py`, con 10 tests y sin depender de Neo4j:
+    - sigue las cadenas `revoked-by`;
+    - marca las técnicas obsoletas sin sustituto;
+    - sube de subtécnica a técnica padre;
+    - traduce las etiquetas de Sigma.
+  - **Medido contra la v19.2:**
+    - las alertas y las campañas de F3 están **100 % vigentes** (104 y 39 identificadores);
+    - en la verdad conocida, 2 técnicas están revocadas (`T1562.002` → `T1685.001` y `T1562.004` →
+      `T1686`) y una es desconocida (`T0000`, que es un relleno de una ficha). Ninguna afecta a
+      P1–P3;
+    - en AnnoCTR, el 98,6 % de las menciones está vigente: `T1562` → `T1685` en 29 menciones, y 5
+      identificadores son de ATT&CK **Mobile** (`T1631.001`…), que se excluyen.
+    - **Lectura:** la deriva de versión es pequeña en estos datos. La traducción del plan de APT29
+      (`T1086`, `T1088`…) ahora es automática.
+  - **Pendiente:** sustituir la lista manual de `verdad_conocida.py` por este servicio.
 
 ### F4.2 — OpenCTI y comparativa con el plan B
 
@@ -656,6 +681,29 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
     - Trae 400 nombres de informe distintos en `all/text` y otros 190 solapados en `text`: **no
       son 590 documentos independientes**.
     - Las particiones de entrenamiento y evaluación se hacen **por informe**, nunca por frase.
+    - **Inspeccionado el 06-11-2026** (solo lectura, sin extraer ni ejecutar nada del ZIP):
+      - De los 400 informes, **solo 120 están anotados**: 70 de entrenamiento, 16 de desarrollo y
+        34 de prueba. Los 280 restantes (`ext`) son texto sin anotar, útiles a lo sumo para adaptar el
+        modelo al dominio.
+      - **La anotación es por mención:** un fragmento de texto enlazado a una entidad de ATT&CK
+        (`linking_mitre_only`, formato KILT, con su frase y su contexto). Tipos: técnica, táctica,
+        malware, grupo y herramienta.
+      - **3.375 menciones de técnica, 145 técnicas distintas, casi todas de nivel padre** (solo 14
+        subtécnicas). Para comparar con Sigma y con F3 hay que llevar todo a la técnica padre.
+      - **Dos tercios de las menciones son implícitas** (`CI`, 2.290, describen la técnica sin
+        nombrarla) y un tercio explícitas (`CE`, 1.085). El diccionario de LB-a solo puede acertar
+        las explícitas: se medirá por separado.
+      - **Distribución muy sesgada:** T1566, T1059 y T1486 suman el 37 %. Hay 80 técnicas con ≥5
+        menciones y 33 con ≥20.
+      - **Hay negativos:** `ner_json` trae todas las frases (7.570 en entrenamiento) con etiquetas
+        BIO, así que las frases sin técnica se pueden usar como ejemplos negativos.
+      - **APT29 aparece en 9 informes anotados** (6 de entrenamiento, 2 de desarrollo, 1 de prueba;
+        varios sobre SolarWinds). Es una fuga leve hacia la evaluación extrínseca: se declara y se
+        mide también sin esos informes.
+      - **Tarea propuesta:** clasificación multietiqueta **frase → técnica padre**, limitada a las
+        técnicas con ejemplos suficientes y con una clase «ninguna». Se evalúa **por mención o frase y
+        por informe** (conjunto de técnicas del informe); la segunda es la que encaja con los perfiles
+        del paso 5.
   - **15 informes públicos de Microsoft** en HTML, varios de APT29, sin anotación de referencia.
     Pendiente:
     - limpiar el HTML;

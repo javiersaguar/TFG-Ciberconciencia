@@ -151,6 +151,34 @@ services:
       --backend-store-uri sqlite:////mlflow/mlflow.db
       --default-artifact-root /mlflow/artifacts
 
+  # Grafo de conocimiento (F4.1, adelantado desde F5.1): ATT&CK y CTI en STIX, y despues el Pilar B.
+  # Version 5.26 LTS fijada. GDS y APOC se descargan al arrancar en la version compatible con esta
+  # imagen (plugins de la edicion Community). Interfaz: http://localhost:7474  (neo4j / tfg-neo4j)
+  neo4j:
+    image: neo4j:5.26.31-community
+    container_name: neo4j
+    profiles: ["graph"]
+    ports:
+      - "127.0.0.1:7474:7474"   # navegador web
+      - "127.0.0.1:7687:7687"   # Bolt (drivers)
+    environment:
+      NEO4J_AUTH: neo4j/tfg-neo4j
+      NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+      NEO4J_server_memory_heap_initial__size: 2G
+      NEO4J_server_memory_heap_max__size: 2G
+      NEO4J_server_memory_pagecache_size: 1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p tfg-neo4j 'RETURN 1' > /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
   # Portal web (F8): la SPA compilada servida por Caddy (frontend/Dockerfile). Hoy no habla con ningún otro servicio
   # (los datos van dentro de la compilación); cuando exista la API de F6.3, Caddy le reenviará /api.
   portal:
@@ -177,3 +205,6 @@ volumes:
   prometheus_data:
   grafana_data:
   mlflow_data:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_plugins:
