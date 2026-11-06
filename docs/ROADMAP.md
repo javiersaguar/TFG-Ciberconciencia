@@ -3,7 +3,7 @@
 **Proyecto:** Plataforma de conciencia cibersituacional — detección de ataques multi-etapa, grafo de ataque razonado y priorización explicable
 **Autor:** Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos, ETSIT-UPM
 **Horizonte:** agosto 2026 → defensa junio 2027
-**Última actualización:** 2026-11-06 · *(rev. 4 — F3 cerrada: tres patrones en Flink, reducción de alertas y falsos positivos medidos)*
+**Última actualización:** 2026-11-06 · *(rev. 5 — F3 cerrada; F4 replanificada: ATT&CK como referencia común, OpenCTI frente a plan B y evaluación de ML-2 sobre el corpus)*
 
 ---
 
@@ -58,7 +58,7 @@
 | Fase | Nombre | Prioridad | Estimación |
 |---|---|---|---|
 | **F3** | **Pilar A** — detección multi-etapa (CEP) + **secuencias 🧠** — ✅ **cerrada el 06-11-2026** | 🔴 | 3–4 sem |
-| **F4** | Plano CTI + **extracción de TTPs con NLP 🧠** | 🟠 | 3–4 sem |
+| **F4** | Plano CTI + **extracción de TTPs con NLP 🧠** — plan revisado el 06-11-2026 | 🟠 | 4–5 sem |
 | **F5** | **Pilar B** — grafo razonado + **GNN neurosimbólico 🧠** | 🔴 | 4–5 sem |
 | **F6** | **Pilar C** — priorización explicable + **scoring aprendido 🧠** | 🟠 | 2–3 sem |
 | **F7** | Evaluación cuantitativa (incluye los modelos) | 🔴 | 2–3 sem |
@@ -575,58 +575,161 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 
 ## F4 — Plano CTI + extracción de TTPs 🟠
 
-**Estimación:** 3–4 semanas · **Prerrequisitos:** F1
+**Estimación:** 4–5 semanas (una más que el plan original, por la comparativa de F4.2) ·
+**Prerrequisitos:** F1 · **Plan revisado el 06-11-2026**
 
-> 🟠 OpenCTI es pesado (~8–10 GB). El **plan B ligero** (STIX/ATT&CK directo a Neo4j) da el
-> 80 % del valor. **Pero ML-2 se hace en cualquiera de los dos casos**: es el componente con
-> mejor encaje con la línea de la tutora.
+> **Qué cambió el 06-11-2026 y por qué.** La fase deja de ser un bloque aislado (una plataforma CTI
+> de decorado más un modelo medido solo contra textos) y se conecta con el resto del proyecto
+> **por el vocabulario común: los identificadores de ATT&CK**. Las alertas de Sigma, las campañas de
+> F3 y lo que extraiga ML-2 hablan todos en técnicas `T1xxx`.
+> 1. **ATT&CK oficial y versionado como referencia única** de todo el sistema. Resuelve de raíz los
+>    identificadores obsoletos que en F3 obligaron a traducir a mano el plan de APT29.
+> 2. **OpenCTI frente a la carga directa a Neo4j:** se hacen las dos y se comparan con criterios
+>    fijados antes de medir. El plan B no compite con OpenCTI, es un subconjunto suyo: OpenCTI no
+>    usa Neo4j (usa OpenSearch, Redis, RabbitMQ y MinIO) y el Pilar B lo necesita para la analítica
+>    de grafos y el Datalog, así que el cargador STIX → Neo4j hace falta en ambos casos.
+> 3. **La salida de ML-2 es un perfil de técnicas por informe y por actor**, en STIX y cargado en el
+>    grafo, no solo una tabla de métricas. Lo consumen F5 (la siguiente etapa probable) y F6 (el
+>    factor `w5·confianza_CTI`).
+> 4. **Dos evaluaciones complementarias:** la intrínseca (F1 por técnica sobre AnnoCTR), que
+>    demuestra que el modelo generaliza; y la extrínseca sobre el corpus del proyecto, que demuestra
+>    que lo extraído sirve para algo.
+>
+> Recursos comprobados el 06-11: 44 GB de RAM para WSL, 24 núcleos y 731 GB libres. El stack actual
+> usa unos 6 GB, así que OpenCTI (8–10 GB) cabe sin recortar nada. **Solo funciones de la edición
+> Community** (Apache 2.0); las de IA de la edición Enterprise quedan fuera.
 
-### F4.1 — Plataforma CTI
+### F4.1 — Plan B: ATT&CK y CTI directo a Neo4j *(primero: desbloquea F5)*
 
-- [ ] Stack OpenCTI en el compose (perfil `cti`), con OpenSearch limitado a 4 GB y 1–2 workers.
-- [ ] Conector de **MITRE ATT&CK** → importa el framework al grafo.
-- [ ] 1–2 conectores de IOCs (abuse.ch / OTX). Registrar volumen de objetos STIX.
-- [ ] Explorar el modelo de datos por la API GraphQL.
-- [ ] 🅱️ **Plan B:** cargar `enterprise-attack.json` de MITRE + IOCs de abuse.ch directamente en Neo4j.
+- [ ] **Neo4j en el compose** (perfil `graph`, con GDS), adelantado desde F5.1. Versión fijada.
+- [ ] **ATT&CK Enterprise en STIX 2.1**, con la versión fijada y su suma registrada:
+  - técnicas, subtécnicas, tácticas, grupos, software y mitigaciones;
+  - relaciones `uses`, `subtechnique-of` y `mitigates`;
+  - los objetos **revocados u obsoletos** se cargan con su sustituto (`revoked-by`), para traducir
+    identificadores antiguos.
+- [ ] **Cargador STIX → Neo4j** propio e idempotente (`cti/stix_loader/`). Lo usan los dos caminos de
+  F4.2 y la salida de ML-2.
+  - Identidad por el `id` STIX.
+  - Recargar el mismo paquete no duplica.
+  - Tests sobre un paquete pequeño.
+- [ ] **Un feed de IOCs:** abuse.ch (ThreatFox o URLhaus), con el volumen de objetos registrado.
+- [ ] **Servicio de normalización de técnicas:** dado un identificador, devuelve el vigente y su
+  táctica. Se aplica a:
+  - las etiquetas de Sigma;
+  - la verdad conocida de F3 (`verdad_conocida.py`, sustituyendo la lista manual de APT29);
+  - la salida de ML-2.
 
-### F4.2 🧠 — ML-2: extracción de TTPs de informes
+  Se mide cuántas etiquetas de las alertas de F3 estaban obsoletas.
+
+### F4.2 — OpenCTI y comparativa con el plan B
+
+- [ ] **OpenCTI en el compose** (perfil `cti`), con OpenSearch limitado a 4 GB y 1–2 workers, y la
+  versión fijada.
+- [ ] Conector de **MITRE ATT&CK** con **la misma versión** que F4.1 y **el mismo feed** de abuse.ch.
+- [ ] **Exportar de OpenCTI a STIX y pasarlo por el mismo cargador** a una base Neo4j aparte. Con el
+  mismo cargador, la comparación es limpia.
+- [ ] **Comparativa con criterios fijados antes de medir:**
+
+  | Criterio | Cómo se mide |
+  |---|---|
+  | Coste | RAM en reposo y en carga, disco, tiempo de arranque, número de servicios |
+  | Ingesta | Tiempo hasta tener ATT&CK y el feed consultables en el grafo |
+  | Fidelidad | Diferencia de objetos y relaciones que llegan a Neo4j por cada camino |
+  | Valor añadido | Deduplicación, confianza y caducidad de indicadores, catálogo de conectores, interfaz para el analista |
+  | Encaje con ML-2 | Si los perfiles extraídos entran como informes consultables y enlazados |
+
+- [ ] **Conector de importación de documentos de OpenCTI como línea base adicional de ML-2.**
+  Empareja nombres e identificadores de técnicas con un diccionario. **Comprobar al montarlo qué
+  extrae realmente** antes de contarlo como línea base.
+- [ ] **Decisión documentada** con la tabla en la mano. Fija qué entra en el despliegue completo y
+  qué en el mínimo (F9).
+
+### F4.3 🧠 — ML-2: extracción de TTPs de informes
 
 **Este es el componente más alineado con la línea de investigación de la tutora (NER sobre
 informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 
-- [ ] **1. Corpus.** Reunir informes públicos de amenazas (≥15, incluyendo alguno de APT29
-  para cerrar el círculo con los datos de F3). Valorar **AnnoCTR** (120 informes anotados,
-  CC-BY-SA) como conjunto etiquetado de referencia.
-  - **Datos en disco (05-11-2026)**, sin usar todavía:
-    - **AnnoCTR** (ZIP oficial de 93,2 MB, commit `d510b69`). Trae 400 nombres de informe distintos en `all/text` y otros 190 solapados en `text`: no son 590 documentos independientes. Verificar capas, `train_ext` y particiones antes de evaluar.
-    - **15 informes públicos de Microsoft** en HTML, varios de APT29. Los de CISA dieron 403. Sin anotación de referencia: las menciones a IDs de ATT&CK no son una etiqueta por fragmento.
-    - **Pendiente:** controlar el sesgo de un único editor, el solapamiento con AnnoCTR y la limpieza del HTML.
-- [ ] **2. Línea base:** TRAM / SciBERT preentrenado, **solo inferencia**. Medir precisión,
-  exhaustividad y F1 sobre el corpus anotado. *Esta es la referencia contra la que comparar.*
-- [ ] **3. Fine-tuning** de un modelo del dominio (**SecureBERT** o CyBERT) sobre el corpus
-  anotado, para la tarea de clasificación multi-etiqueta frase → técnica ATT&CK.
+- [ ] **1. Corpus** (los datos ya están en disco desde el 05-11-2026):
+  - **AnnoCTR** (ZIP oficial de 93,2 MB, commit `d510b69`).
+    - **Primero, inspeccionarlo:** qué capas trae, si las técnicas se anotan por frase o por
+      mención, y qué son `train_ext` y las particiones.
+    - Trae 400 nombres de informe distintos en `all/text` y otros 190 solapados en `text`: **no
+      son 590 documentos independientes**.
+    - Las particiones de entrenamiento y evaluación se hacen **por informe**, nunca por frase.
+  - **15 informes públicos de Microsoft** en HTML, varios de APT29, sin anotación de referencia.
+    Pendiente:
+    - limpiar el HTML;
+    - controlar el solapamiento con AnnoCTR y el sesgo de un único editor;
+    - tener en cuenta que las menciones a IDs de ATT&CK no son una etiqueta por fragmento.
+- [ ] **2. Líneas base, solo inferencia:**
+  - **LB-a:** emparejamiento por diccionario (el conector de OpenCTI de F4.2 o un equivalente propio
+    sobre los nombres y alias de ATT&CK);
+  - **LB-b:** TRAM o SciBERT preentrenado.
+- [ ] **3. Fine-tuning** de un modelo del dominio (**SecureBERT** o CyBERT) para la clasificación
+  multietiqueta frase → técnica ATT&CK.
   - Cabe holgadamente en la RTX 5070 (~110M parámetros).
-  - Registrar en MLflow: hiperparámetros, curvas, métricas por técnica.
-- [ ] **4. Comparativa rigurosa:** modelo base vs. afinado, por técnica y agregado. Analizar
-  qué técnicas mejoran y cuáles no, y por qué (frecuencia en el corpus, ambigüedad léxica).
-- [ ] **5.** 🟢 **NER de entidades de seguridad** (actores, malware, herramientas, IOCs) para
-  enriquecer el grafo más allá de las técnicas.
-- [ ] **6.** 🟢 **Aumento de datos con LLM** para las técnicas con pocos ejemplos
-  (enfoque tipo SynthCTI), midiendo si mejora el desbalanceo.
-- [ ] **7. Salida a STIX** y carga en el grafo. **Cierra el ciclo:** informe en lenguaje
-  natural → conocimiento consultable.
-- [ ] **8. Análisis de errores:** casos en que el modelo falla y por qué. Vale tanto como los aciertos.
+  - Se registra en MLflow: hiperparámetros, curvas y métricas por técnica.
+- [ ] **4. Evaluación intrínseca:** precisión, exhaustividad y F1 por técnica y agregadas, en AnnoCTR,
+  comparando LB-a, LB-b y el modelo afinado. Analizar qué técnicas mejoran, cuáles no y por qué
+  (frecuencia en el corpus, ambigüedad léxica).
+- [ ] **5. Perfil por informe y por actor.**
+  - Se agregan las técnicas extraídas de cada informe con su confianza, y por actor si el informe
+    lo nombra.
+  - Salida en STIX: `report` → `attack-pattern` e `intrusion-set` → `uses` → `attack-pattern`, con
+    `confidence`.
+  - Se carga con el cargador de F4.1, y en OpenCTI si sigue en el despliegue.
+- [ ] **6. Evaluación extrínseca sobre el corpus del proyecto** (no requiere anotar nada):
+  - **6a. Perfil de APT29 frente a ATT&CK.** Qué parte de la lista revisada de técnicas de G0016
+    recupera el perfil extraído de los informes de APT29, comparando las líneas base con el afinado.
+  - **6b. Perfil frente a lo detectado.** Cuántas técnicas de las alertas y campañas de APT29 (día 1,
+    y día 2 cuando se cargue) aparecen en el perfil extraído, y cuáles de las detectadas no
+    menciona ningún informe.
+  - **6c. Parecido entre campaña y actor.** Ordenar los grupos de ATT&CK por parecido de técnicas
+    con las campañas de APT29: ¿sale G0016 arriba?
+    - Se usan **todos los grupos como candidatos**; con uno solo, cualquier perfil «gana».
+    - Se presenta como parecido a un perfil conocido, **no como atribución**.
+  - ⚠️ **Circularidad, a declarar en la memoria:** la lista de ATT&CK para APT29 y el plan de
+    emulación de MITRE salen en parte de esos mismos informes públicos. Coincidir con ellos es
+    esperable y **no prueba que el modelo generalice**; eso lo prueba la evaluación intrínseca.
+- [ ] **7. Análisis de errores:** casos en que el modelo falla y por qué. Vale tanto como los aciertos.
+- [ ] **8.** 🟢 **Etiquetar las reglas Sigma sin técnica.** Ataca el punto ciego de F3: el 27,1 % de las
+  alertas no lleva técnica y el CEP no las ve.
+  - Se clasifica el título y la descripción de cada regla.
+  - Se evalúa con las reglas que **sí** tienen etiqueta, ocultándosela al modelo.
+  - Se reejecuta F3 para ver qué campañas aparecen, y si alguna es falsa.
+  - Las técnicas propuestas entran con menos confianza o revisadas, nunca como verdad.
+  - Es el experimento con más riesgo: una descripción de regla no se parece a un informe.
+- [ ] **9.** 🟢 **NER de entidades de seguridad** (actores, malware, herramientas, IOCs) para enriquecer
+  el grafo más allá de las técnicas.
+- [ ] **10.** 🟢 **Aumento de datos con LLM** para las técnicas con pocos ejemplos (enfoque tipo
+  SynthCTI), midiendo si mejora el desbalanceo.
 
 ### 📦 Entregables F4
-Perfil `cti` · `cti/extract/` (corpus, entrenamiento, evaluación) · comparativa base vs.
-afinado · exportador STIX → Neo4j · experimentos en MLflow
+- Perfiles `graph` y `cti`.
+- `cti/stix_loader/`, con sus tests.
+- Servicio de normalización de técnicas.
+- Comparativa entre OpenCTI y el plan B, con su decisión.
+- `cti/extract/`: corpus, entrenamiento, evaluación intrínseca y extrínseca.
+- Perfiles STIX cargados en el grafo.
+- Experimentos en MLflow.
 
 ### ✅ DoD
-1. ATT&CK completo cargado y consultable.
+1. ATT&CK completo, versionado y consultable en Neo4j. Técnicas obsoletas resueltas a su sustituto.
 2. ≥1 feed de IOCs sincronizado.
-3. **Modelo afinado, evaluado y comparado con la línea base**, con métricas por técnica.
-4. ≥10 informes procesados y sus técnicas cargadas en el grafo.
-5. Análisis de errores documentado.
+3. **Comparativa entre OpenCTI y el plan B** medida con los criterios fijados y decisión documentada.
+4. **Modelo afinado, evaluado y comparado con las dos líneas base**, con métricas por técnica.
+5. ≥10 informes procesados y sus perfiles cargados en el grafo.
+6. **Evaluación sobre el corpus:** cobertura del perfil de APT29 frente a ATT&CK y frente a lo detectado
+   (6a y 6b).
+7. Análisis de errores documentado.
+
+### ⚠️ Riesgos
+| Riesgo | Mitigación |
+|---|---|
+| La comparativa se alarga y se come la extracción | Tiempo acotado a una semana. Si OpenCTI no levanta estable en 2 días, la comparativa se cierra con lo medido y se documenta |
+| AnnoCTR no anota técnicas por frase | Inspeccionarlo lo primero y reformular la tarea (por mención o por párrafo) antes de entrenar |
+| La evaluación extrínseca sale buena «por construcción» | Declarar la circularidad. La prueba de generalización es la intrínseca, separada por informe |
+| Pocos ejemplos para muchas técnicas | Informar por frecuencia, agregar a nivel de técnica padre si hace falta y, opcionalmente, aumento de datos (paso 10) |
 
 ---
 
@@ -636,7 +739,7 @@ afinado · exportador STIX → Neo4j · experimentos en MLflow
 
 ### F5.1 — Neo4j y modelo de datos
 
-- [ ] Neo4j en el compose (perfil `graph`) con GDS. Heap 2 GB + pagecache 1–2 GB.
+- [ ] Neo4j en el compose (perfil `graph`) con GDS. Heap 2 GB + pagecache 1–2 GB. *(Adelantado a F4.1 el 06-11-2026.)*
 - [ ] **Modelo de grafo** en `graph/model.md`:
   ```
   NODOS: Host, User, Service, Vulnerability, Asset, Technique, Actor,
@@ -648,7 +751,8 @@ afinado · exportador STIX → Neo4j · experimentos en MLflow
 - [ ] **Poblar el inventario del laboratorio** desde los propios datasets (hosts de apt29)
   + escenario sintético documentado (DMZ / interna / activo crítico).
 - [ ] Cargar vulnerabilidades (CVE + CVSS + EPSS) plausibles para los servicios.
-- [ ] Cargar el subgrafo de ATT&CK y CTI (salida de F4).
+- [ ] Cargar el subgrafo de ATT&CK y CTI (salida de F4), con los **perfiles de actor de ML-2** (F4.3 paso 5),
+  que son la base de la predicción de la siguiente etapa probable.
 - [ ] Ingerir `det.alerts` como nodos `(:Alert)` en micro-batch vía Dagster.
 
 ### F5.2 — Analítica de grafos (GDS)
@@ -732,7 +836,7 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
         + w2·severidad_táctica      (posición en la kill chain)
         + w3·criticidad_activo      (valor de negocio + centralidad GDS)
         + w4·proximidad_ruta        (1 / saltos hasta el activo crítico)
-        + w5·confianza_CTI          (coincidencia con IOC/actor conocido)
+        + w5·confianza_CTI          (coincidencia con IOC/actor conocido; perfiles de F4.3)
         + w6·explotabilidad         (EPSS/CVSS)
         + w7·anomalía 🧠            (puntuación del detector de F2)
   ```
@@ -791,8 +895,9 @@ Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.
 
 - [ ] **ML-1 anomalías:** AUC-ROC y AUC-PR; ¿detecta lo que las reglas ven? ¿algo que no ven?
   tasa de falsos positivos; comparación Isolation Forest vs. autoencoder vs. secuencial.
-- [ ] **ML-2 extracción:** precisión/recall/F1 por técnica, base vs. afinado; matriz de
-  confusión entre técnicas; análisis de errores.
+- [ ] **ML-2 extracción:** precisión/recall/F1 por técnica, líneas base (diccionario y preentrenado) frente
+  al afinado; matriz de confusión entre técnicas; análisis de errores; evaluación sobre el corpus
+  (cobertura del perfil de APT29 frente a ATT&CK y frente a lo detectado; parecido campaña–actor).
 - [ ] **ML-3 grafo:** AUC y precision@K en predicción de enlaces; nº de rutas nuevas
   descubiertas y proporción verificada como plausible por el razonador.
 - [ ] **ML-4 scoring:** mejora en el ranking frente a pesos fijos; estabilidad; análisis SHAP.
@@ -1037,7 +1142,7 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
 
 ### F9.1 Despliegue
 - [ ] minikube/kind + manifiestos en `infra/k8s/` (o chart de Helm).
-- [ ] Desplegar el núcleo; justificar qué queda fuera (OpenCTI por peso).
+- [ ] Desplegar el núcleo; justificar qué queda fuera con la comparativa de F4.2 (OpenCTI frente al plan B).
 - [ ] `docs/deployment.md`: de repo clonado a sistema funcionando.
 - [ ] `make demo` que levante todo y lance el replay.
 
@@ -1136,7 +1241,7 @@ Ciberseguridad y protección de datos · Marco ético y legal · HCoV
 |---|---|---|---|---|
 | R1 | No conseguir tutor a tiempo | Media | 🔴 | Escribir en agosto, a varios profesores |
 | R2 | Las Prácticas absorben marzo–mayo | **Alta** | 🔴 | Núcleo cerrado en febrero |
-| R3 | OpenCTI inviable por recursos | Media | 🟠 | Plan B: STIX/ATT&CK directo a Neo4j |
+| R3 | OpenCTI inviable por recursos | Baja | 🟠 | Recursos comprobados el 06-11-2026 (44 GB de RAM). El plan B se construye primero y es el respaldo: STIX/ATT&CK directo a Neo4j |
 | R4 | Datalog más difícil de lo previsto | Media | 🟠 | Empezar con 5 reglas; si se atasca, MulVAL tal cual |
 | R5 | El frontend devora el tiempo de memoria | **Alta** | 🟠 | MVF con fecha límite dura |
 | R6 | Los patrones CEP no generalizan | Media | 🟠 | Validar con las 7 variantes LSASS |
