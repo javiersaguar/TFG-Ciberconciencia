@@ -1,0 +1,14 @@
+# Entorno de ML-2 (F4.3): afinado de SecureBERT 2.0 y ModernBERT-base en la GPU (RTX 5070, Blackwell).
+# Entorno aparte (.venv-ml, Python 3.12) para no mezclar CUDA con el .venv del pipeline.
+#
+#   python3.12 -m venv .venv-ml
+#   .venv-ml/bin/pip install --index-url https://download.pytorch.org/whl/cu128 torch==2.11.0
+#   .venv-ml/bin/pip install -r ml/requirements-ml2.txt
+#
+# torch 2.11.0+cu128: la RTX 5070 (sm_120) necesita CUDA >= 12.8; las ruedas cu128 piden un
+# driver NVIDIA >= 570 en Windows (las cu130 de torch 2.14 pedirian >= 580).
+# mlflow fijado a la version del servidor del compose (v2.19.0) para no mezclar API 2 y 3.
+transformers==5.20.2
+safetensors==0.8.0
+numpy==2.5.4
+mlflow==2.19.0

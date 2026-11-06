@@ -724,7 +724,7 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 **Este es el componente más alineado con la línea de investigación de la tutora (NER sobre
 informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 
-- [ ] **1. Corpus** (los datos ya están en disco desde el 05-11-2026):
+- [x] **1. Corpus** (los datos ya están en disco desde el 05-11-2026):
   - **AnnoCTR** (ZIP oficial de 93,2 MB, commit `d510b69`).
     - **Primero, inspeccionarlo:** qué capas trae, si las técnicas se anotan por frase o por
       mención, y qué son `train_ext` y las particiones.
@@ -759,12 +759,49 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
     - limpiar el HTML;
     - controlar el solapamiento con AnnoCTR y el sesgo de un único editor;
     - tener en cuenta que las menciones a IDs de ATT&CK no son una etiqueta por fragmento.
+- [x] **0. Conjunto de datos (07-11-2026)** con `cti/extract/annoctr.py`, que lee el ZIP sin extraerlo.
+  Salida en `data/ml2/annoctr/`.
+  - **Construcción:** cada mención marcada en una frase se empareja con su enlace a ATT&CK del mismo
+    informe. Casan 3.374 de 3.375 menciones.
+  - **Normalización** a la técnica padre de v19.2: 30 identificadores revocados traducidos y 18 de
+    Mobile o desconocidos descartados.
+  - **Particiones publicadas, por informe:**
+
+    | Partición | Informes | Frases | Con técnica |
+    |---|---:|---:|---:|
+    | Entrenamiento | 70 | 7.570 | 1.499 |
+    | Desarrollo | 16 | 1.550 | 335 |
+    | Prueba | 34 | 3.059 | 754 |
+
+  - **Espacio de etiquetas:** 59 técnicas con al menos 5 frases de entrenamiento, que cubren el 85 % de
+    las menciones de prueba.
+  - **Métricas comunes** (`cti/extract/metricas.py`), en tres niveles: por frase (micro y macro), por
+    mención (explícita frente a implícita) y por informe.
 - [ ] **2. Líneas base, solo inferencia:**
   - **LB-a:** emparejamiento por diccionario (el conector de OpenCTI de F4.2 o un equivalente propio
     sobre los nombres y alias de ATT&CK);
+    - *(07-11-2026, hecha)* `cti/extract/diccionario.py`: 1.581 términos de ATT&CK v19.2, entre ellos
+      nombres antiguos de técnicas revocadas.
+    - **Poda decidida solo con desarrollo:** quita 9 términos genéricos de subtécnica («Malware»,
+      «At», «Server», «DNS», «Tool»…).
+    - **Resultado en prueba con el diccionario podado:**
+      - por frase: P=0,72, R=0,21, F1=0,33;
+      - por informe: P=0,81, R=0,35, F1=0,49;
+      - **exhaustividad por mención: explícitas 0,35, implícitas 0,15.**
+    - Sin poda, el F1 por frase cae a 0,21.
   - **LB-b:** TRAM o SciBERT preentrenado.
 - [ ] **3. Fine-tuning** de un modelo del dominio (**SecureBERT** o CyBERT) para la clasificación
   multietiqueta frase → técnica ATT&CK.
+  - *(07-11-2026, script listo, sin ejecutar)* `cti/extract/entrenar.py`.
+    - **Cambio de modelo:** se usa **SecureBERT 2.0** (`cisco-ai/SecureBERT2.0-base`, Apache 2.0)
+      frente a **ModernBERT-base**, que es su modelo de partida. Así la única diferencia es el
+      preentrenamiento en ciberseguridad.
+    - El SecureBERT original solo publica pesos en pickle (`pytorch_model.bin`), que pueden ejecutar
+      código al cargarse: no se usa. Solo se cargan pesos en safetensors y con revisión fijada.
+    - **Protocolo:** la época y el umbral se eligen en desarrollo; prueba se evalúa una sola vez; varias
+      semillas; registro en MLflow.
+    - **Entorno:** `.venv-ml` con Python 3.12, torch 2.11.0+cu128 y `ml/requirements-ml2.txt`.
+    - **Bloqueo:** la GPU no responde dentro de WSL (`nvidia-smi`: «Failed to initialize NVML»).
   - Cabe holgadamente en la RTX 5070 (~110M parámetros).
   - Se registra en MLflow: hiperparámetros, curvas y métricas por técnica.
 - [ ] **4. Evaluación intrínseca:** precisión, exhaustividad y F1 por técnica y agregadas, en AnnoCTR,
@@ -1107,12 +1144,17 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
 >   no son verdad independiente.
 > - **FA.5:**
 >   - **en disco:**
+>     - **Orion 2026, CSV de flujos (06-11-2026, conjunto principal de FA.5).**
+>       - ZIP oficial de 2,98 GB; el SHA-256 del editor coincide.
+>       - Cinco días en CSV comprimido con zstd (unos 11 GB descomprimido): 25,6 millones de flujos
+>         etiquetados, 95 columnas.
+>       - Se lee en streaming sin extraer. El PCAP no se ha adquirido.
 >     - BOUN DDoS, SDN TCP-SYN, AdDDoSDN y DDoS con tráfico de fondo de 100 IP;
 >     - **CICIDS2017 corregido** (revisión DistriNet/CNS2022). Su DDoS va tras NAT, así que no
 >       prueba orígenes distintos ni indisponibilidad;
 >     - **CSE-CIC-IDS2018, día 20:** solo Benign y LOIC-HTTP. Sus horas no llevan AM/PM, así
 >       que **no sirve como verdad temporal ni para medir latencia**;
->   - **bloqueados:** Orion 2026 y CICDDoS2019.
+>   - **bloqueado:** CICDDoS2019.
 > - **FA.6:** Splunk dcrypt (T1486) y shadowcopy (T1490), señales sueltas. Sus capturas son de años y
 >   hosts distintos: no se pueden unir como una campaña.
 
@@ -1185,9 +1227,38 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
     y la sonda). Medir el retraso desde el inicio del episodio. Ojo con la reproducción
     acelerada, que distorsiona las ventanas (ya visto en F3).
   - **Datos:**
-    - **Orion 2026** (CC BY 4.0): dos días solo benignos, DoS uno a uno y DDoS muchos a uno y
-      muchos a muchos, en PCAP y CSV. Empezar por un fragmento de muchos a uno y **reservar un
-      día de ataque completo** para evaluar con los umbrales ya fijados.
+    - **Orion 2026** (CC BY 4.0; citar doi:10.1109/ACCESS.2026.3738009). **Descargado el
+      06-11-2026** (CSV de flujos, verificado; detalle en `data/external/MANIFEST.md`).
+      - **Estructura:**
+        - un CSV por día, con 95 columnas de flujo: 5-tupla, paquetes y bytes por sentido,
+          tiempos entre llegadas, banderas TCP y etiquetas `str_label`/`bin_label`;
+        - días 1–2 benignos; día 3 DoS 1→1 (10.0.0.4); día 4 DDoS N→1 (10.0.0.4–7); día 5
+          DDoS N→N;
+        - **8 ataques por día** (PSH, UDP, ICMP, SYN, URG, RST, ACK, FIN) de **30 minutos cada 3
+          horas**, contra 10.0.0.1:80, 10.0.0.2:8080 y 10.0.0.3:9090 (UDP).
+      - **Recuentos verificados:** los del README coinciden flujo a flujo
+        (`data/external/orion-2026/RECUENTO.json`).
+      - **Hallazgo: en el CSV, todo el ataque de los días 4 y 5 sale de 10.0.0.4.** El README dice
+        10.0.0.[4-7], pero las otras tres máquinas solo generan tráfico benigno.
+        - Por número de orígenes, el DDoS N→1 parece un DoS 1→1. El rasgo «concentrado frente a
+          distribuido» **no se puede validar con Orion**: se valida con el laboratorio o con
+          CICDDoS2019.
+        - Falta confirmar en el artículo si es suplantación de IP o un artefacto de la captura.
+      - **Trampa:** los ataques ICMP son solo 15–45 *flujos* con millones de paquetes. Un umbral
+        por número de flujos no los ve; las señales tienen que ser paquetes y bytes por ventana.
+      - **Reparto propuesto, fijado antes de mirar resultados:**
+        - **calibrar** los umbrales con el día 2 (benigno) y el día 3 (DoS 1→1);
+        - **evaluar** con los días 4 y 5 completos (DDoS), sin retocar umbrales;
+        - medir **falsas alarmas** en el día 1 (benigno), que no se usa para calibrar.
+      - **Ingesta:**
+        - un normalizador de flujos a OCSF *Network Activity* (4001) en un topic nuevo
+          `raw.net.flows`;
+        - reproducción por la hora de inicio del flujo.
+
+        El CSV da el flujo ya cerrado: la latencia medida será optimista frente a un sensor real,
+        y se declara.
+      - **Pendiente:** confirmar en el artículo la zona horaria de `timestamp` y la unidad de
+        `flw_duration`.
     - **CICDDoS2019:** una variante de reflexión o amplificación. Reconstruir las señales por
       ventana desde los paquetes: usar el total de un flujo antes de que termine falsearía la
       latencia.
