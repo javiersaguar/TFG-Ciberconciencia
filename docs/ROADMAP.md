@@ -1389,7 +1389,23 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
     to Hide Schedule Task») y 0 campañas. **El piloto solo cubre 6 min 13 s**, así que la tasa no es
     representativa.
   - Host 2: los 251 registros son de canales sin mapeador.
-  - **Siguiente paso: la v2** (1–2 M de registros, estratificada por host, día y hora), con aprobación.
+  - **v2 (07-11-2026), hecha:**
+    - **censo completo del ZIP** (`fa_comiset_v2_extract.py --solo-censo`, 933 GB en 59 min): 202,3 M de registros,
+      16 equipos y 14 días (27-06 a 20-07-2022); el 99,98 % es Sysmon;
+    - selección (`fa_comiset_v2_select.py`): 8 horas por equipo repartidas por toda su actividad, con un tope de
+      20.000 registros por hora; 110 horas, 1,75 M de registros y 13 días. Cada hora es un dataset;
+    - normalización sin servicios al 99,91 % (el 97 % son Sysmon 10). Carga en 4 lotes aislados; **F3 intacto en
+      los 4**.
+    - **Hallazgo:** un equipo, `desktop-mh88805`, tiene **Atomic Red Team instalado y ejecutando pruebas**
+      (`C:\AtomicRedTeam\…`): no es actividad normal. Se separa como `fa_art`. Ahí el pipeline da 1.183 alertas
+      (251 altas) y **4 campañas** (P1 ×2, P3 ×2): detección correcta de actividad ofensiva no etiquetada.
+    - **Falsas alarmas en los 15 equipos normales** (106 horas, 1,67 M de eventos, 50,6 h observadas):
+      **48 alertas (0,95 por host-hora), 3 de nivel alto (0,06 por host-hora) y 0 campañas** (cota superior
+      del 95 %: 0,06 campañas por host-hora, regla del tres). Las reglas son mantenimiento de Windows (limpieza de
+      tareas programadas por `svchost`, `bcdedit`, CrashControl). La estimación del piloto (≈29 alertas por
+      host-hora en 6 minutos) no era representativa.
+    - Para cargar el lote 4 hubo que subir el límite de ficheros abiertos de Redpanda (compose: `ulimits nofile`
+      65536): con 1024 solo cabían ~204 particiones.
   - Texto original de la tarea: (Universidad Pontificia Comillas,
   CC BY 4.0). Un laboratorio con ataques etiquetados ATT&CK (~4,9 GB) y una red universitaria
   con actividad normal (~31,7 GB). Prueba el pipeline actual **sin mapeadores nuevos** con datos

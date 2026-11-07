@@ -256,8 +256,9 @@ def validacion():
                "sin alterar F3 (la foto antes y después de cada carga coincide). **APT29 day2**: validación de los patrones "
                "con otra jornada de ataque. **Zeek**: red de APT29; sus logs son de *otra ejecución* de la emulación (25–51 h "
                "antes y sin puertos en común), así que sirven para topología, no para confirmar aristas de P2. "
-               "**COMISET**: actividad normal de una red universitaria para medir falsas alarmas; el piloto solo cubre "
-               "~6 minutos de un host.", 0, 0, 24, 3)]
+               "**COMISET v2**: actividad normal de una red universitaria (106 horas de 15 equipos, elegidas con el censo "
+               "de los 202 M de registros) para medir falsas alarmas. Un equipo (`desktop-mh88805`) tenía **Atomic Red Team** "
+               "ejecutando pruebas: se separa como `fa_art` y no cuenta como actividad normal.", 0, 0, 24, 3)]
     p.append(fila("Resumen por origen", 4))
     p += [tabla("Volumen y resultados por origen del dataset",
                 "SELECT v.origen, count() AS datasets, sum(e.eventos) AS eventos, sum(a.alertas) AS alertas, sum(c.campanas) AS campanas "
@@ -284,6 +285,10 @@ def validacion():
                "/ (SELECT sum(h) FROM (SELECT dateDiff('second', min(time), max(time)) / 3600 AS h FROM tfg.events FINAL "
                "WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_benigno') GROUP BY dataset_id))",
                8, 13, decimales=1, desc="Denominador: horas realmente observadas por host. Con el piloto (~6 min) no es representativo."),
+          stat("Equipo con Atomic Red Team: alertas / campañas",
+               "SELECT concat(toString((SELECT count() FROM tfg.alerts FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_art'))), ' / ', "
+               "toString((SELECT count() FROM tfg.campaigns FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_art'))))",
+               0, 17, 12, 4, desc="desktop-mh88805, dentro de COMISET REAL, con Atomic Red Team ejecutando pruebas. El pipeline lo marca con campañas P1 y P3."),
           tabla("Reglas que disparan sobre actividad normal",
                 "SELECT dataset_id AS dataset, rule_title AS regla, rule_level AS nivel, count() AS alertas, "
                 "arrayStringConcat(groupUniqArray(5)(actor_process_name), ', ') AS procesos FROM tfg.alerts FINAL "

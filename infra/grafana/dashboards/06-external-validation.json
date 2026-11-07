@@ -77,7 +77,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Ampliación del corpus (FA, 07-11-2026).** Tres conjuntos externos recorren F1–F3 con sus propios topics, sin alterar F3 (la foto antes y después de cada carga coincide). **APT29 day2**: validación de los patrones con otra jornada de ataque. **Zeek**: red de APT29; sus logs son de *otra ejecución* de la emulación (25–51 h antes y sin puertos en común), así que sirven para topología, no para confirmar aristas de P2. **COMISET**: actividad normal de una red universitaria para medir falsas alarmas; el piloto solo cubre ~6 minutos de un host."
+        "content": "**Ampliación del corpus (FA, 07-11-2026).** Tres conjuntos externos recorren F1–F3 con sus propios topics, sin alterar F3 (la foto antes y después de cada carga coincide). **APT29 day2**: validación de los patrones con otra jornada de ataque. **Zeek**: red de APT29; sus logs son de *otra ejecución* de la emulación (25–51 h antes y sin puertos en común), así que sirven para topología, no para confirmar aristas de P2. **COMISET v2**: actividad normal de una red universitaria (106 horas de 15 equipos, elegidas con el censo de los 202 M de registros) para medir falsas alarmas. Un equipo (`desktop-mh88805`) tenía **Atomic Red Team** ejecutando pruebas: se separa como `fa_art` y no cuenta como actividad normal."
       }
     },
     {
@@ -349,6 +349,63 @@
             ]
           },
           "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Equipo con Atomic Red Team: alertas / campañas",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT concat(toString((SELECT count() FROM tfg.alerts FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_art'))), ' / ', toString((SELECT count() FROM tfg.campaigns FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_art'))))",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "description": "desktop-mh88805, dentro de COMISET REAL, con Atomic Red Team ejecutando pruebas. El pipeline lo marca con campañas P1 y P3.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       }
