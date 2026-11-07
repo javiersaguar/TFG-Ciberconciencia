@@ -407,6 +407,50 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 > - **Ajuste v2** de los patrones con lo aprendido en la revisión de falsos positivos (§F3.4). Se mide aparte y
 >   se presenta como antes/después; las cifras v1 de abajo son las oficiales de la fase.
 
+### F3.5 — Ajuste v2 (07-11-2026), medido aparte
+
+Las cifras oficiales de F3 (v1) **no cambian**. El ajuste se implementa como vistas por lotes nuevas
+(`detection/patterns/v2/`) y se compara con v1 usando la MISMA vista por lotes
+(`detection/evaluation/v2_evaluacion.sql`). Límite: la vista por lotes de P2 necesita `tfg.events`, que
+solo tiene el corpus de F3 y FA; en los atómicos P2 no se puede medir así.
+
+- **P1:** se excluyen las alertas de credenciales de `csrss.exe`/`wininit.exe` (causa 1 de la revisión
+  de falsos positivos).
+- **P2:** el controlador de dominio deja de excluirse. Se le exige ejecución remota o servicio en el
+  destino, que la conexión la abra una herramienta de movimiento lateral (lista positiva: PowerShell,
+  PsExec, WMIC, winrs, cmd…) y se le da menos confianza (base 0,15 en lugar de 0,30). *La lista positiva
+  se fijó tras ver 3 campañas falsas hacia el DC en APT29: medida optimista.*
+- **Evaluador Sigma:** las palabras clave pasan a ser búsqueda de subcadena, como define Sigma
+  (`detection/evaluator.py`). `TFG_SIGMA_PALABRAS_CLAVE=v1` reproduce la semántica antigua. De 2.093
+  reglas, 11 tienen palabras clave. Releyendo los 1,9 M de eventos normalizados aparecen **1.692
+  alertas nuevas** de 2 reglas (en `tfg.alerts_kw`, aparte):
+  - «Mimikatz Use» (45): Mimikatz en bloques de PowerShell;
+  - «Relevant Anti-Virus Signature Keywords In Application Log» (1.647): detecciones del antivirus,
+    1.219 de ellas en un solo atómico.
+- **Resultado (evaluación automática por dataset, antes de revisión manual):**
+
+  | Patrón | Origen | Precisión v1 → v2 | Exhaustividad v1 → v2 | Campañas v1 → v2 |
+  |---|---|---|---|---|
+  | P1 | atómico | 0,43 → **0,56** | 0,47 → **0,74** | 22 → 28 |
+  | P1 | corpus | 1 → 1 | 1 → 1 | 11 → 10 |
+  | P2 | APT29 day2 | 1 → 1 | 1 → 1 | 1 → 2 |
+  | P3 | todos | sin cambios | sin cambios | — |
+
+  - **P1:** desaparecen 3 campañas falsas por `wininit`/`csrss` (2 atómicos y 1 de APT29 day1). Aparecen 6 en
+    capturas de Empire con Mimikatz en memoria (DCSync, claves Kerberos, SAM, LSA…), el hueco de falsos
+    negativos documentado en F3; 5 las espera la ficha, y la sexta (Over-Pass-The-Hash) es un ataque de
+    credenciales real que la ficha no lista.
+  - **APT29 day2:** la campaña falsa de UTICA desaparece como tal, y en su lugar sale una verdadera:
+    Mimikatz `kerberos::golden` (paso 20.B).
+  - **P2:** recupera el salto UTICA → NEWYORK (paso 16.C) con confianza 0,70.
+  - **Day2 queda con todas sus campañas verdaderas.**
+  - Con la clasificación de la revisión de F3, P1 en atómicos pasaría de precisión 0,57 / exhaustividad 0,55 a unos
+    0,72 / 0,77 (estimación).
+  - **Pendiente para adoptarlo:** portar los cambios a Flink, confirmar sobre datos no vistos (COMISET LAB) y
+    revisar el volumen de la regla de antivirus (fatiga de alertas).
+  - La lógica de ventanas parte a veces una misma actividad en dos campañas con el mismo inicio (ya pasaba en
+    v1 con SCRANTON).
+
 ### F3.1 — Modelado de escenarios
 
 - [x] day1 extraído, normalizado y detectado (F2).
@@ -970,6 +1014,22 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
   - Es el experimento con más riesgo: una descripción de regla no se parece a un informe.
 - [ ] **9.** 🟢 **NER de entidades de seguridad** (actores, malware, herramientas, IOCs) para enriquecer
   el grafo más allá de las técnicas.
+- [x] **10a. Aumento con ejemplos de procedimiento de ATT&CK** *(07-11-2026)*, para las técnicas centrales
+  del Pilar A que faltaban en el espacio de etiquetas: T1003 (1 frase en AnnoCTR), T1548 (2) y T1569 (0).
+  - `cti/extract/aumento_attack.py`: descripciones de las relaciones `uses` de ATT&CK v19.2, **excluyendo
+    G0016 y sus campañas** para no filtrar información hacia la evaluación de APT29. Salen 189, 74 y 80
+    frases. Desarrollo y prueba siguen siendo las de AnnoCTR. Espacio: 62 etiquetas.
+  - SecureBERT 2.0 con 3 semillas (`--datos data/ml2/annoctr_aug`):
+    - en las 59 técnicas de siempre (∪ diccionario), F1 por frase 0,598 frente a 0,589: no empeora;
+    - AnnoCTR no permite medir las tres nuevas (en prueba: 5, 0 y 1 menciones).
+  - **Sobre el corpus:**
+    - el perfil de APT29 contiene ahora T1548 (3/3 semillas), T1003 (2/3) y T1569 (1/3); antes, ninguna;
+    - F1 del perfil frente a G0016 de 0,70 (0,69 antes);
+    - **6b:** en day1, el espacio cubre ya 8 técnicas de campaña (antes 5) y el perfil acierta entre 4 y 6;
+      en day2 cubre 4 y acierta entre 3 y 4.
+    - Hay bastante variación entre semillas.
+  - Pendiente: decidir si el sistema adoptado pasa a ser el aumentado (repitiendo la validación cruzada) y
+    regenerar el perfil STIX.
 - [ ] **10.** 🟢 **Aumento de datos con LLM** para las técnicas con pocos ejemplos (enfoque tipo
   SynthCTI), midiendo si mejora el desbalanceo.
 

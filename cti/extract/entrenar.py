@@ -81,6 +81,7 @@ def mejor_umbral(filas, probs, espacio):
 
 
 def main():
+    global DATOS
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--modelo", default="cisco-ai/SecureBERT2.0-base", choices=sorted(REVISIONES))
     ap.add_argument("--semilla", type=int, default=1)
@@ -93,7 +94,10 @@ def main():
     ap.add_argument("--pos-weight", action="store_true",
                     help="Ponderar los positivos de cada etiqueta (sqrt(neg/pos)) contra el desbalanceo")
     ap.add_argument("--mlflow", default="http://localhost:5000")
+    ap.add_argument("--datos", default=str(DATOS),
+                    help="Carpeta del conjunto (por defecto AnnoCTR; data/ml2/annoctr_aug para el aumentado)")
     args = ap.parse_args()
+    DATOS = Path(args.datos)
 
     import numpy as np
     import torch
@@ -141,7 +145,8 @@ def main():
     opt = torch.optim.AdamW(modelo.parameters(), lr=args.lr, weight_decay=0.01)
     sched = get_linear_schedule_with_warmup(opt, int(0.1 * pasos), pasos)
 
-    nombre = f"{args.modelo.split('/')[-1]}-s{args.semilla}"
+    sufijo = "" if DATOS == Path("data/ml2/annoctr") else "-" + DATOS.name.removeprefix("annoctr_")
+    nombre = f"{args.modelo.split('/')[-1]}{sufijo}-s{args.semilla}"
     destino = MODELOS / nombre
     destino.mkdir(parents=True, exist_ok=True)
 

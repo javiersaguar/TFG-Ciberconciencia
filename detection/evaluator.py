@@ -58,6 +58,12 @@ def as_text_list(value):
     return [str(value)]
 
 
+# Compatibilidad: TFG_SIGMA_PALABRAS_CLAVE=v1 reproduce la semantica anterior (palabra clave anclada
+# al evento entero), con la que se produjeron las cifras oficiales de F2 y F3. Por defecto, la
+# semantica de Sigma (subcadena). Corregido el 07-11-2026 (ajuste v2).
+import os as _os
+PALABRAS_CLAVE_V1 = _os.environ.get("TFG_SIGMA_PALABRAS_CLAVE", "").lower() == "v1"
+
 # ---------------------------------------------------------------------------
 # Comparacion de valores Sigma contra valores del evento
 # ---------------------------------------------------------------------------
@@ -170,13 +176,44 @@ def eval_condition(cond, event, matched):
     if isinstance(cond, ConditionValueExpression):
         # Busqueda de palabra clave en todo el evento (sin campo asociado)
         haystack = _flatten_text(event)
-        return match_value(cond.value, [haystack])
+        if PALABRAS_CLAVE_V1:
+            return match_value(cond.value, [haystack])
+        if match_keyword(cond.value, haystack):
+            matched.setdefault("_palabras_clave", []).append(str(cond.value))
+            return True
+        return False
 
     raise UnsupportedFeature(f"condicion no soportada: {type(cond).__name__}")
 
 
+def match_keyword(sigma_value, haystack):
+    """Palabra clave de Sigma: busqueda de SUBCADENA (sin distinguir mayusculas) en el evento.
+
+    En Sigma, una palabra clave sin campo se busca en todo el registro; los backends la traducen
+    a una busqueda de texto libre (equivalente a `*valor*`). La version anterior anclaba la
+    palabra al evento aplanado entero (`^valor$`), asi que solo casaba si el evento ERA la
+    palabra y las reglas con palabras clave no disparaban casi nunca.
+    """
+    if isinstance(sigma_value, SigmaRegularExpression):
+        return match_value(sigma_value, [haystack])
+    if isinstance(sigma_value, SigmaString):
+        return _re.search(sigma_string_to_regex(sigma_value), haystack, _re.IGNORECASE | _re.DOTALL) is not None
+    if isinstance(sigma_value, SigmaNumber):
+        return str(sigma_value.number) in haystack
+    return str(sigma_value).lower() in haystack.lower()
+
+
+_ULTIMO_APLANADO = [None, ""]   # (evento, texto): se guarda el OBJETO, no su id, para que no se reutilice
+
+
 def _flatten_text(event):
-    """Aplana el evento a una cadena para busquedas sin campo."""
+    """Aplana el evento a una cadena para busquedas sin campo.
+
+    Se memoriza el ultimo evento: todas las reglas con palabras clave se evaluan seguidas sobre el
+    mismo evento, y aplanarlo una vez por regla era el coste dominante.
+    """
+    if _ULTIMO_APLANADO[0] is event:
+        return _ULTIMO_APLANADO[1]
     parts = []
 
     def walk(node):
@@ -190,7 +227,9 @@ def _flatten_text(event):
             parts.append(str(node))
 
     walk(event)
-    return " ".join(parts)
+    texto = " ".join(parts)
+    _ULTIMO_APLANADO[0], _ULTIMO_APLANADO[1] = event, texto
+    return texto
 
 
 # ---------------------------------------------------------------------------

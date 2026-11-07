@@ -203,11 +203,11 @@ class SigmaNestedTests(unittest.TestCase):
             with self.subTest(event=event):
                 self.assertEqual(compiled.evaluate(event)[0], expected)
 
-    @unittest.expectedFailure
-    def test_known_existing_keyword_limitation_in_real_wmi_rule(self):
-        # La búsqueda keyword se ancla al evento aplanado completo en el
-        # evaluador vigente: combinación campo + keyword no tiene semántica
-        # substring. Se registra expresamente, sin cambiar ni excluir la regla.
+    def test_keyword_substring_semantics_in_real_wmi_rule(self):
+        # Antes era un fallo esperado: la palabra clave se anclaba al evento
+        # aplanado entero. Corregido el 07-11-2026 (ajuste v2): Sigma la define
+        # como búsqueda de subcadena. TFG_SIGMA_PALABRAS_CLAVE=v1 conserva la
+        # semántica antigua para reproducir las cifras oficiales de F3.
         from detection.loader import load_rules
         from detection.evaluator import CompiledRule
         path = ROOT / "data/sigma/rules/windows/builtin/wmi/win_wmi_persistence.yml"

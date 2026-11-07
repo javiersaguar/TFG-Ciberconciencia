@@ -80,6 +80,12 @@ def prepare(kind, output):
                 refs[(ref["partition"], ref["partition_line"])] = ref
         paths = sorted(source_folder.glob("host-*/*/*/*.jsonl.gz"))
         input_files = [{"path": str(p.relative_to(ROOT)), "sha256": file_hash(p)} for p in paths]
+    elif kind == "comiset-v2":
+        # v2 (07-11-2026): una partición por host, día y hora UTC (fa_comiset_v2_extract.py --seleccion).
+        # Cada hora es su propio dataset, para que las tasas usen el tiempo realmente observado.
+        source_folder = ROOT / "data/external/comiset/real-sample-v2"
+        paths = sorted(source_folder.glob("host-*/*/h*.jsonl.gz"))
+        input_files = [{"path": str(p.relative_to(ROOT)), "sha256": file_hash(p)} for p in paths]
 
     def records():
         if kind == "zeek":
@@ -90,6 +96,18 @@ def prepare(kind, output):
                 source_counts[dataset] = {"source_records": total, "exact_duplicates": total - len(items)}
                 for item in items:
                     yield dataset, item
+        elif kind == "comiset-v2":
+            for path in paths:
+                host, dia, hora = path.relative_to(source_folder).parts
+                dataset = f"COMISET-REAL-v2-{host}-{dia.replace('-', '')}-{hora.split('.')[0]}"
+                with gzip.open(path, "rt", encoding="utf-8") as source:
+                    for line_no, line in enumerate(source, 1):
+                        item = json.loads(line)
+                        item["Hostname"] = host
+                        item["_tfg_input_format"] = "comiset"
+                        item["_tfg_source_ref"] = {"path": str(path.relative_to(ROOT)), "line": line_no,
+                                                    "original_host": item["_source"].get("host_name")}
+                        yield dataset, item
         else:
             for path in paths:
                 host = path.relative_to(source_folder).parts[0]
@@ -117,7 +135,7 @@ def prepare(kind, output):
                     timestamp = epoch_ms(raw.get("ts"))
                     key = raw.get("@stream")
                     supported = True
-                else:
+                else:  # comiset y comiset-v2
                     adapted = adapt_comiset(raw)
                     timestamp = parse_ts(adapted["TimeCreated"])
                     key = f'{adapted["Channel"].lower()}|{adapted["EventID"]}'
@@ -181,7 +199,7 @@ def prepare(kind, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("kind", choices=("zeek", "comiset"))
+    parser.add_argument("kind", choices=("zeek", "comiset", "comiset-v2"))
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     # absolute conserva la ruta del worktree; resolve seguiría el enlace data
