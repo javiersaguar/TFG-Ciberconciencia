@@ -1,0 +1,533 @@
+{
+  "uid": "tfg-external-validation",
+  "title": "6 · Corpus ampliado y validación externa",
+  "tags": [
+    "tfg",
+    "fa",
+    "validacion"
+  ],
+  "timezone": "utc",
+  "refresh": "1m",
+  "time": {
+    "from": "now-8y",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "templating": {
+    "list": [
+      {
+        "name": "origen",
+        "label": "Origen",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse-tfg"
+        },
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 1,
+        "sort": 1,
+        "query": "SELECT DISTINCT origen FROM tfg.verdad_datasets FINAL ORDER BY origen",
+        "definition": "SELECT DISTINCT origen FROM tfg.verdad_datasets FINAL ORDER BY origen"
+      },
+      {
+        "name": "dataset",
+        "label": "Dataset",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse-tfg"
+        },
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1,
+        "query": "SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen IN (${origen:singlequote}) ORDER BY dataset_id",
+        "definition": "SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen IN (${origen:singlequote}) ORDER BY dataset_id"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Ampliación del corpus (FA, 07-11-2026).** Tres conjuntos externos recorren F1–F3 con sus propios topics, sin alterar F3 (la foto antes y después de cada carga coincide). **APT29 day2**: validación de los patrones con otra jornada de ataque. **Zeek**: red de APT29; sus logs son de *otra ejecución* de la emulación (25–51 h antes y sin puertos en común), así que sirven para topología, no para confirmar aristas de P2. **COMISET**: actividad normal de una red universitaria para medir falsas alarmas; el piloto solo cubre ~6 minutos de un host."
+      }
+    },
+    {
+      "type": "row",
+      "title": "Resumen por origen",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Volumen y resultados por origen del dataset",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT v.origen, count() AS datasets, sum(e.eventos) AS eventos, sum(a.alertas) AS alertas, sum(c.campanas) AS campanas FROM (SELECT * FROM tfg.verdad_datasets FINAL) AS v LEFT JOIN (SELECT dataset_id, count() AS eventos FROM tfg.events FINAL GROUP BY dataset_id) AS e ON e.dataset_id = v.dataset_id LEFT JOIN (SELECT dataset_id, count() AS alertas FROM tfg.alerts FINAL GROUP BY dataset_id) AS a ON a.dataset_id = v.dataset_id LEFT JOIN (SELECT dataset_id, count() AS campanas FROM tfg.campaigns FINAL GROUP BY dataset_id) AS c ON c.dataset_id = v.dataset_id GROUP BY v.origen ORDER BY v.origen",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "table",
+      "title": "Datasets de FA",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT v.dataset_id AS dataset, v.origen, v.verdad, count(e.time) AS eventos, min(e.time) AS desde, max(e.time) AS hasta, round(dateDiff('second', min(e.time), max(e.time)) / 3600, 3) AS horas_observadas FROM (SELECT * FROM tfg.verdad_datasets FINAL WHERE startsWith(origen, 'fa')) AS v LEFT JOIN (SELECT dataset_id, time FROM tfg.events FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE startsWith(origen, 'fa'))) AS e ON e.dataset_id = v.dataset_id GROUP BY dataset, v.origen, v.verdad ORDER BY dataset SETTINGS join_use_nulls = 1",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Falsas alarmas sobre actividad normal (COMISET)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Alertas en actividad normal",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM tfg.alerts FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_benigno')",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Campañas en actividad normal",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 13,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM tfg.campaigns FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_benigno')",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "description": "Toda campaña aquí es una falsa alarma.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Alertas por host-hora observada",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 13,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT (SELECT count() FROM tfg.alerts FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_benigno')) / (SELECT sum(h) FROM (SELECT dateDiff('second', min(time), max(time)) / 3600 AS h FROM tfg.events FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_benigno') GROUP BY dataset_id))",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "description": "Denominador: horas realmente observadas por host. Con el piloto (~6 min) no es representativo.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "table",
+      "title": "Reglas que disparan sobre actividad normal",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT dataset_id AS dataset, rule_title AS regla, rule_level AS nivel, count() AS alertas, arrayStringConcat(groupUniqArray(5)(actor_process_name), ', ') AS procesos FROM tfg.alerts FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_benigno') GROUP BY dataset, regla, nivel ORDER BY alertas DESC",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Red (Zeek)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "barchart",
+      "title": "Conexiones por puerto destino (top 15)",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT toString(dst_port) AS puerto, count() AS conexiones FROM tfg.events FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_red') AND dst_port IS NOT NULL GROUP BY puerto ORDER BY conexiones DESC LIMIT 15",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        },
+        "xTickLabelRotation": 0
+      }
+    },
+    {
+      "type": "table",
+      "title": "Pares origen → destino más frecuentes",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 22,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT dataset_id AS dataset, IPv6NumToString(src_ip) AS origen, IPv6NumToString(dst_ip) AS destino, dst_port AS puerto, class_name AS clase, count() AS registros FROM tfg.events FINAL WHERE dataset_id IN (SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen = 'fa_red') GROUP BY dataset, origen, destino, puerto, clase ORDER BY registros DESC LIMIT 30",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "APT29 day2",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Campañas de day2 (revisadas: 4 verdaderas, 1 falsa por wininit/csrss → LSASS)",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT pattern_id AS patron, first_seen AS inicio, arrayStringConcat(devices, ', ') AS hosts, arrayStringConcat(stages, ' → ') AS etapas, confidence_score AS confianza, arrayStringConcat(technique_ids, ', ') AS tecnicas FROM tfg.campaigns FINAL WHERE dataset_id = 'SDWIN-200502035409' ORDER BY inicio",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,646 @@
+{
+  "uid": "tfg-campaigns",
+  "title": "5 · Campañas multi-etapa (Pilar A)",
+  "tags": [
+    "tfg",
+    "pilar-a",
+    "cep"
+  ],
+  "timezone": "utc",
+  "refresh": "1m",
+  "time": {
+    "from": "now-8y",
+    "to": "now"
+  },
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "templating": {
+    "list": [
+      {
+        "name": "origen",
+        "label": "Origen",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse-tfg"
+        },
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 1,
+        "sort": 1,
+        "query": "SELECT DISTINCT origen FROM tfg.verdad_datasets FINAL ORDER BY origen",
+        "definition": "SELECT DISTINCT origen FROM tfg.verdad_datasets FINAL ORDER BY origen"
+      },
+      {
+        "name": "dataset",
+        "label": "Dataset",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse-tfg"
+        },
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1,
+        "query": "SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen IN (${origen:singlequote}) ORDER BY dataset_id",
+        "definition": "SELECT dataset_id FROM tfg.verdad_datasets FINAL WHERE origen IN (${origen:singlequote}) ORDER BY dataset_id"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Pilar A.** Las alertas Sigma se agrupan en campañas con tres patrones en Flink (`MATCH_RECOGNIZE`): **P1** robo de credenciales, **P2** movimiento lateral y **P3** escalada con descubrimiento o persistencia. La *precisión automática* cuenta como acierto la campaña cuyo patrón espera la verdad conocida del dataset, **antes de la revisión manual**. Cifras revisadas a mano: F3 0,69 (55 campañas); APT29 day2 0,80 (5 campañas)."
+      }
+    },
+    {
+      "type": "row",
+      "title": "Resumen (filtros: origen y dataset)",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Alertas distintas",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM tfg.alerts FINAL WHERE dataset_id IN (${dataset:singlequote})",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Campañas",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT count() FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote})",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Reducción global (alertas → campañas)",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT 1 - (SELECT count() FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote})) / greatest((SELECT count() FROM tfg.alerts FINAL WHERE dataset_id IN (${dataset:singlequote})), 1)",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "description": "1 − campañas / alertas. La reducción sobre la evidencia de campaña (0,859 en F3) se mide en f3_cierre.sql.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Precisión automática",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT avg(multiIf(c.pattern_id = 'P1', v.p1_esperado, c.pattern_id = 'P2', v.p2_esperado, c.pattern_id = 'P3', v.p3_esperado, 0)) FROM tfg.campaigns AS c FINAL LEFT JOIN (SELECT * FROM tfg.verdad_datasets FINAL) AS v ON v.dataset_id = c.dataset_id WHERE c.dataset_id IN (${dataset:singlequote})",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 2
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Datasets con alguna campaña",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT uniqExact(dataset_id) FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote})",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Confianza media",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 4,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT avg(confidence_score) FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote})",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Esperado frente a detectado",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Por dataset: campañas esperadas (verdad) y detectadas",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT v.dataset_id AS dataset, v.origen, v.p1_esperado AS P1_esp, countIf(c.pattern_id = 'P1') AS P1_det, v.p2_esperado AS P2_esp, countIf(c.pattern_id = 'P2') AS P2_det, v.p3_esperado AS P3_esp, countIf(c.pattern_id = 'P3') AS P3_det, multiIf((v.p1_esperado AND countIf(c.pattern_id = 'P1') = 0) OR (v.p2_esperado AND countIf(c.pattern_id = 'P2') = 0) OR (v.p3_esperado AND countIf(c.pattern_id = 'P3') = 0), 'falta alguna', (NOT v.p1_esperado AND countIf(c.pattern_id = 'P1') > 0) OR (NOT v.p2_esperado AND countIf(c.pattern_id = 'P2') > 0) OR (NOT v.p3_esperado AND countIf(c.pattern_id = 'P3') > 0), 'sobra alguna', 'cuadra') AS lectura FROM (SELECT * FROM tfg.verdad_datasets FINAL WHERE dataset_id IN (${dataset:singlequote})) AS v LEFT JOIN (SELECT * FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote})) AS c ON c.dataset_id = v.dataset_id GROUP BY v.dataset_id, v.origen, v.p1_esperado, v.p2_esperado, v.p3_esperado HAVING P1_esp + P2_esp + P3_esp + P1_det + P2_det + P3_det > 0 ORDER BY lectura = 'cuadra', lectura, dataset",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "description": "«sobra alguna» son candidatas a falso positivo; «falta alguna», a falso negativo. Hay que revisarlas a mano: en F3, parte de las «sobrantes» eran ataques reales que la ficha del dataset no listaba.",
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Campañas",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "barchart",
+      "title": "Campañas por patrón",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT pattern_id AS patron, count() AS campanas FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote}) GROUP BY patron ORDER BY patron",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "orientation": "vertical",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        },
+        "xTickLabelRotation": 0
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Confianza de las campañas",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 20,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT concat(pattern_id, ' · ', toString(confidence_score)) AS patron_confianza, count() AS campanas FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote}) GROUP BY pattern_id, confidence_score ORDER BY pattern_id, confidence_score",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        },
+        "xTickLabelRotation": 0
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Técnicas en campañas",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 20,
+        "w": 10,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT t AS tecnica, count() AS campanas FROM tfg.campaigns FINAL ARRAY JOIN technique_ids AS t WHERE dataset_id IN (${dataset:singlequote}) GROUP BY t ORDER BY campanas DESC LIMIT 15",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        },
+        "xTickLabelRotation": 0
+      }
+    },
+    {
+      "type": "table",
+      "title": "Detalle de campañas",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT dataset_id AS dataset, pattern_id AS patron, first_seen AS inicio, round(duration_ms / 1000, 1) AS duracion_s, arrayStringConcat(devices, ', ') AS hosts, arrayStringConcat(stages, ' → ') AS etapas, confidence_score AS confianza, related_events_count AS evidencias, arrayStringConcat(technique_ids, ', ') AS tecnicas, title AS titulo FROM tfg.campaigns FINAL WHERE dataset_id IN (${dataset:singlequote}) ORDER BY dataset, inicio",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
