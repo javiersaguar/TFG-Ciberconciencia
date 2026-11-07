@@ -876,7 +876,15 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
       frase [+0,016, +0,056].
     - La validación cruzada mide el sistema con una sola semilla y sin elegir la época por bloque:
       sus cifras absolutas son algo más bajas que las de la partición publicada.
-- [ ] **5. Perfil por informe y por actor.**
+- [x] **5. Perfil por informe y por actor.** *(07-11-2026: APT29; falta cargarlo en Neo4j)*
+  - `cti/extract/perfil_stix.py` saca el perfil del sistema decidido (media de las 3 semillas, umbral
+    0,20, ∪ diccionario) sobre las 683 frases de análisis. Resultado en `data/ml2/stix/apt29-perfil.json`:
+    1 identity, 6 `report` y **22 relaciones G0016 –uses→ técnica** (10 del modelo, 9 del diccionario
+    y 3 de los dos), con `confidence`, número de frases e informes, método y frase de evidencia.
+  - `confidence`: la probabilidad máxima del modelo × 100; para lo que solo saca el diccionario, 61, que
+    es su precisión en la validación cruzada.
+  - El cargador de F4.1 convierte ahora los `object_refs` de un `report` en aristas `REFERS_TO`
+    (test nuevo en `cti/stix_loader/test_transform.py`).
   - Se agregan las técnicas extraídas de cada informe con su confianza, y por actor si el informe
     lo nombra.
   - Salida en STIX: `report` → `attack-pattern` e `intrusion-set` → `uses` → `attack-pattern`, con
@@ -906,14 +914,51 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
   - **6b. Perfil frente a lo detectado.** Cuántas técnicas de las alertas y campañas de APT29 (día 1,
     y día 2 cuando se cargue) aparecen en el perfil extraído, y cuáles de las detectadas no
     menciona ningún informe.
+    - *(07-11-2026, day1)* `cti/extract/export_detecciones.sql` + `cti/extract/detectado.py`. En day1
+      se detectan 24 técnicas padre en alertas y 8 en 5 campañas. Dentro del espacio de 59 etiquetas:
+
+      | Day1, en espacio | Técnicas | Las cubre el perfil de ML-2 | Las cubre la ficha G0016 |
+      |---|---:|---:|---:|
+      | Alertas | 16 | 8 | 12 |
+      | Campañas | 5 | **4** | **4** |
+      | Verdad del plan | 23 | 10 | 14 |
+
+    - **Sobre las campañas, el perfil extraído de 6 informes cubre lo mismo que la ficha oficial.**
+      La única técnica de campaña que ningún informe menciona es T1070 (Indicator Removal).
+    - **Laguna:** **T1003 (OS Credential Dumping), núcleo de P1, no está entre las 59 etiquetas.**
+      Tampoco T1548 ni T1569. El espacio sale de la frecuencia en AnnoCTR, no de lo que detecta el
+      corpus. Mejora candidata: añadir técnicas por diccionario o con aumento de datos (paso 10).
   - **6c. Parecido entre campaña y actor.** Ordenar los grupos de ATT&CK por parecido de técnicas
     con las campañas de APT29: ¿sale G0016 arriba?
     - Se usan **todos los grupos como candidatos**; con uno solo, cualquier perfil «gana».
     - Se presenta como parecido a un perfil conocido, **no como atribución**.
+    - *(07-11-2026, day1)* 174 candidatos: 173 grupos y el perfil de ML-2.
+    - **G0016 no sale arriba con ninguna medida fijada antes de medir:**
+      - unión de las campañas (8 técnicas): Jaccard 85.º y coseno IDF 39.º;
+      - todas las alertas (24 técnicas): 47.º y 54.º;
+      - ni con la verdad del plan como consulta (cota superior): 57.º y 67.º.
+    - Con la cobertura, un diagnóstico añadido después de ver lo anterior, G0016 queda 8.º–14.º. El
+      perfil de ML-2 queda por delante de G0016 con Jaccard y coseno (10.º–32.º) porque es más
+      pequeño y concreto.
+    - **Lectura:** las campañas tienen pocas técnicas (1–4 cada una) y genéricas, que usan muchos
+      grupos. Además, la ficha actual de G0016 solo contiene 20 de las 33 técnicas del plan de 2020.
+      **Comparar solo conjuntos de técnicas no identifica al actor.** Se presenta como resultado
+      negativo, en línea con la cautela sobre atribución. Para F5 queda la pregunta de si la secuencia,
+      el software o la infraestructura (ThreatFox) discriminan mejor.
   - ⚠️ **Circularidad, a declarar en la memoria:** la lista de ATT&CK para APT29 y el plan de
     emulación de MITRE salen en parte de esos mismos informes públicos. Coincidir con ellos es
     esperable y **no prueba que el modelo generalice**; eso lo prueba la evaluación intrínseca.
-- [ ] **7. Análisis de errores:** casos en que el modelo falla y por qué. Vale tanto como los aciertos.
+- [x] **7. Análisis de errores:** casos en que el modelo falla y por qué. Vale tanto como los aciertos.
+  *(07-11-2026)* Por técnica y confusiones: ver paso 4. **Revisión manual de una muestra de 60 de los 270
+  falsos positivos** (`cti/extract/revision_fp.md`, clasificación de Claude Code pendiente de validar
+  por Javier):
+  - **42 % son huecos de anotación** (IC 95 % 30–54 %): filas de tablas ATT&CK y técnicas nombradas
+    en listas, descargas de herramientas, macros activadas por el usuario, PowerShell y `rundll32`
+    literales. Otro 17 % son dudosos y el 42 % restante, errores;
+  - precisión por frase corregida: **0,61 medida → ~0,77 estimada** (0,73–0,82);
+  - errores del modelo: tomar discusión general por comportamiento del adversario, técnicas vecinas y
+    menciones de otro malware. Errores del diccionario: nombres genéricos de subtécnica que
+    sobrevivieron a la poda.
 - [ ] **8.** 🟢 **Etiquetar las reglas Sigma sin técnica.** Ataca el punto ciego de F3: el 27,1 % de las
   alertas no lleva técnica y el CEP no las ve.
   - Se clasifica el título y la descripción de cada regla.

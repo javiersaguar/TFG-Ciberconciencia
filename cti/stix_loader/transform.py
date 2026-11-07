@@ -9,6 +9,10 @@ Un paquete STIX se convierte en tres listas:
   tacticas   las fases de kill chain de cada tecnica, que STIX lleva DENTRO del objeto y
              no como relacion: se convierten en aristas (:Technique)-[:IN_TACTIC]->(:Tactic).
 
+Los `object_refs` de un `report` (lo que el informe contiene) tambien van DENTRO del objeto:
+se convierten en aristas (:Report)-[:REFERS_TO]->(objeto), con id determinista
+`<informe>|<objeto>`, de modo que recargar el informe no las duplica.
+
 La identidad es el `id` STIX: cargar dos veces el mismo paquete no duplica nada. Sirve
 igual para ATT&CK, para un feed de IOCs y para los perfiles que genere ML-2.
 """
@@ -120,6 +124,9 @@ def transformar(bundle):
             descartes["sin_etiqueta"] += 1
             continue
         nodos.append({"id": obj["id"], "labels": labels, "props": propiedades(obj)})
+        if tipo == "report":
+            relaciones.extend({"id": f"{obj['id']}|{ref}", "tipo": "REFERS_TO", "origen": obj["id"],
+                               "destino": ref, "props": {}} for ref in obj.get("object_refs") or [])
         if tipo == "attack-pattern":
             tacticas.extend({"tecnica": obj["id"], "tactica": f} for f in fases(obj))
     return nodos, relaciones, tacticas, descartes

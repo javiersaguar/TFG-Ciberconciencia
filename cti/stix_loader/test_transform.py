@@ -97,5 +97,18 @@ class TestNombres(unittest.TestCase):
         self.assertEqual(set(p), {"id", "name"})
 
 
+
+class TestInforme(unittest.TestCase):
+    def test_object_refs_del_informe_son_aristas(self):
+        b = {"type": "bundle", "id": "bundle--2", "objects": [
+            {"type": "report", "id": "report--1", "name": "Informe", "published": "2024-01-25T00:00:00Z",
+             "object_refs": ["attack-pattern--t1003", "intrusion-set--apt29"]}]}
+        nodos, rels, _, _ = transformar(b)
+        self.assertEqual([n["labels"] for n in nodos], [["Report"]])
+        self.assertNotIn("object_refs", nodos[0]["props"])
+        self.assertEqual(sorted((r["tipo"], r["destino"]) for r in rels),
+                         [("REFERS_TO", "attack-pattern--t1003"), ("REFERS_TO", "intrusion-set--apt29")])
+        self.assertEqual(rels[0]["id"], "report--1|attack-pattern--t1003")
+
 if __name__ == "__main__":
     unittest.main()

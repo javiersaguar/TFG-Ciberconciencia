@@ -44,7 +44,8 @@ Todo alineado con **MITRE ATT&CK** y con inteligencia de amenazas en formato **S
             └──────────────┘            └─────────┬──────────┘   └──────────────────┘
                                                   ▲
                                       ┌───────────┴───────────┐
-                                      │  OpenCTI (STIX 2.1)   │◄── ATT&CK, MISP, feeds
+                                      │   CTI en STIX 2.1     │◄── ATT&CK 19.2, ThreatFox,
+                                      │ (OpenCTI en contraste)│    perfiles de ML-2
                                       └───────────────────────┘
                                                   │
                             scoring explicable → FastAPI → frontend
@@ -54,24 +55,35 @@ Todo alineado con **MITRE ATT&CK** y con inteligencia de amenazas en formato **S
 
 ## Estado actual
 
+*Actualizado el 07-11-2026.*
+
 | Fase | Descripción | Estado |
 |---|---|---|
 | **F0** | Entorno, repositorio e infraestructura base | ✅ Completada |
 | **F1** | Ingesta, normalización OCSF, persistencia y observabilidad | ✅ Completada |
-| **F2** | Detección base con reglas Sigma | 🔵 En curso |
-| **F3** | Pilar A — detección multi-etapa (CEP) | ⏳ Pendiente |
-| **F4** | Plano CTI (OpenCTI + ATT&CK + extracción de TTPs) | ⏳ Pendiente |
-| **F5** | Pilar B — grafo de ataque y razonamiento Datalog | ⏳ Pendiente |
-| **F6** | Pilar C — priorización explicable + API | ⏳ Pendiente |
+| **F2** | Detección base con reglas Sigma y anomalías (ML-1) | ✅ Cerrada el 30-07-2026 |
+| **F3** | Pilar A: detección multi-etapa (CEP en Flink) | ✅ Cerrada el 06-11-2026 |
+| **F4** | Plano CTI: ATT&CK en el grafo, OpenCTI frente a carga directa y extracción de TTPs (ML-2) | 🔵 **En curso** |
+| **F5** | Pilar B: grafo de ataque y razonamiento Datalog | ⏳ Pendiente |
+| **F6** | Pilar C: priorización explicable y API | ⏳ Pendiente |
 | **F7** | Evaluación cuantitativa | ⏳ Pendiente |
-| **F8** | Frontend | ⏳ Pendiente |
+| **F8** | Frontend | 🔵 Base adelantada con datos simulados |
 | **F9** | Despliegue, memoria y defensa | ⏳ Pendiente |
+| **FA** | Ampliación de cobertura (red, Linux, DoS, datos externos) | ⏳ Condicionada al punto de control del 28-02-2027 |
+
+**Dónde está F4:**
+- **F4.1 ✅** ATT&CK v19.2 y el feed ThreatFox cargados en Neo4j con un cargador STIX idempotente, y un servicio que normaliza identificadores de técnica antiguos.
+- **F4.2 🔵** OpenCTI medido frente a la carga directa (coste, ingesta y fidelidad); falta la decisión documentada.
+- **F4.3 🔵** ML-2 entrenado y decidido. Quedan pendientes la carga del perfil en el grafo y la redacción.
 
 **Hitos alcanzados:**
 
-- Normalización a OCSF con **100 % de cobertura** sobre el dataset de referencia (184/184 eventos, 0 rechazos), validada en batch y en *streaming*.
-- Observabilidad completa: Prometheus sobre todos los componentes del *pipeline* y tres cuadros de mando de Grafana aprovisionados de forma declarativa.
-- **Pipeline propia de traducción Sigma → OCSF**, que corrige tres desviaciones semánticas detectadas en la pipeline oficial de la comunidad. Primera detección validada: la regla de volcado de LSASS (T1003.001) dispara exactamente la alerta esperada sobre datos reales.
+- **F1.** Normalización a OCSF con **100 % de cobertura** sobre el dataset de referencia, validada en batch y en *streaming*. Prometheus sobre todo el *pipeline* y tres cuadros de mando de Grafana declarativos.
+- **F2.** **Pipeline propia de traducción Sigma → OCSF**, que corrige tres desviaciones semánticas de la oficial. Detección validada sobre APT29 (MITRE ATT&CK Evaluations).
+- **F3.** Tres patrones de campaña multi-etapa en Flink SQL (`MATCH_RECOGNIZE`). Agrupar en campañas **reduce un 85,9 % las alertas de la evidencia de campaña** (un 12,2 % sobre todas las alertas), con una precisión por campaña de 0,69. Los falsos positivos se revisaron a mano.
+- **F4.**
+  - ATT&CK y 136.000 IOCs de ThreatFox en Neo4j en segundos. OpenCTI, para los mismos datos, tarda horas y ocupa unas cuatro veces más memoria.
+  - **ML-2**, extracción de técnicas de informes de amenazas. SecureBERT 2.0 afinado y combinado con un diccionario de ATT&CK, elegido por validación cruzada. Sobre AnnoCTR, **F1 de 0,59 por frase y 0,71 por informe**, frente a 0,33 y 0,49 del diccionario solo.
 
 Plan detallado en [`docs/ROADMAP.md`](docs/ROADMAP.md) · La memoria y el registro de decisiones se mantienen en un repositorio aparte (`tfg-memoria`, privado).
 
@@ -83,7 +95,10 @@ Plan detallado en [`docs/ROADMAP.md`](docs/ROADMAP.md) · La memoria y el regist
 `Redpanda` (bus de eventos) · `Apache Flink 2.2.1` (streaming + CEP) · `ClickHouse` (OLAP) · `Dagster` (orquestación) · `FastAPI` · `MinIO` · `Prometheus` + `Grafana` · `Docker` / `Kubernetes`
 
 **Ciberseguridad**
-`MITRE ATT&CK` · `OCSF` (esquema canónico) · `Sigma` + `pySigma` (reglas de detección, con pipeline OCSF propia) · `STIX 2.1` / `OpenCTI` / `MISP` · `TRAM` (extracción de TTPs) · `Atomic Red Team` / `CALDERA` (emulación de adversario)
+`MITRE ATT&CK` · `OCSF` (esquema canónico) · `Sigma` + `pySigma` (reglas de detección, con pipeline OCSF propia) · `STIX 2.1` / `OpenCTI` · `ThreatFox` (IOCs) · `Atomic Red Team` / `CALDERA` (emulación de adversario)
+
+**Aprendizaje automático**
+`PyTorch` + `Transformers` (SecureBERT 2.0 y ModernBERT para la extracción de TTPs) · `scikit-learn` (anomalías) · `MLflow` (registro de experimentos)
 
 **Razonamiento**
 `Neo4j` + `Graph Data Science` · `Soufflé` (Datalog, enfoque MulVAL)
@@ -99,15 +114,15 @@ Plan detallado en [`docs/ROADMAP.md`](docs/ROADMAP.md) · La memoria y el regist
 ├── detection/      Pipeline Sigma→OCSF y reglas de detección seleccionadas
 ├── infra/          docker-compose (perfiles por fase), Flink, Grafana, Kubernetes
 ├── scripts/        Arranque y parada de la infraestructura
-├── cti/            Extracción de TTPs, conectores STIX
+├── cti/            Cargador STIX, normalización ATT&CK, feeds, comparativa OpenCTI y ML-2 (extract/)
 ├── graph/          Modelo Neo4j, reglas Datalog, analítica de grafos
 ├── scoring/        Priorización explicable de incidentes
 ├── eval/           Protocolo de evaluación, métricas y resultados
 ├── emulation/      Escenarios de emulación de adversario
+├── ml/             Anomalías (ML-1) y requisitos del entorno de ML-2
 ├── frontend/       Portal web (F8): base con datos simulados, ver frontend/README.md
 ├── docs/           Documentación técnica y roadmap
-├── Memoria/        Memoria del TFG (LaTeX)
-└── data/           Datasets y reglas (no versionado)
+└── data/           Datasets, reglas y modelos (no versionado)
 ```
 
 ---
@@ -164,8 +179,8 @@ python -m pipeline.normalize.coverage --file data/samples/<dataset>.json
 # Convertir una regla Sigma al esquema OCSF del proyecto
 sigma convert -t clickhouse -p detection/pipelines/ocsf-tfg.yml <regla.yml>
 
-# Compilar la memoria
-cd Memoria && make pdf
+# Cargar un paquete STIX 2.1 (ATT&CK, feeds, perfiles de ML-2) en Neo4j
+python -m cti.stix_loader.load <paquete.json> --source <nombre>
 ```
 
 ---
@@ -196,15 +211,16 @@ Los servicios se organizan en perfiles de Docker Compose para no levantar todo s
 | `stream` | Flink (JobManager + TaskManager) | Desarrollo de detección |
 | `store` | ClickHouse | Consulta analítica y evaluación |
 | `obs` | Prometheus + Grafana | Monitorización |
-| `graph` | Neo4j | Trabajo sobre el Pilar B *(F5)* |
-| `cti` | OpenCTI y dependencias | Ingesta de inteligencia *(F4)* |
+| `graph` | Neo4j + GDS + APOC (`localhost:7474`) | Grafo de ATT&CK, CTI y ataque *(F4–F5)* |
+| `cti` | OpenCTI y dependencias (`localhost:8082`) | Comparativa de plataformas CTI *(F4.2)* |
+| `mlops` | MLflow (`localhost:5000`) | Registro de experimentos de ML |
 | `portal` | Portal web (Caddy, imagen `tfg/portal:local`) en `localhost:8090` | Demo del frontend *(F8)* |
 
 ---
 
 ## Datos y licencias
 
-Los datasets utilizados son públicos y están etiquetados con MITRE ATT&CK ([OTRF Security-Datasets](https://github.com/OTRF/Security-Datasets)), y las reglas de detección proceden del repositorio comunitario [SigmaHQ](https://github.com/SigmaHQ/sigma). Toda la emulación de adversario se realiza en un **entorno de laboratorio aislado**. Este repositorio no contiene datos personales ni telemetría de sistemas reales de terceros.
+Los datasets utilizados son públicos y están etiquetados con MITRE ATT&CK ([OTRF Security-Datasets](https://github.com/OTRF/Security-Datasets)), y las reglas de detección proceden del repositorio comunitario [SigmaHQ](https://github.com/SigmaHQ/sigma). Para la CTI y ML-2 se usan [MITRE ATT&CK](https://attack.mitre.org/) v19.2, el feed [ThreatFox](https://threatfox.abuse.ch/) de abuse.ch (uso gratuito según sus términos de *fair use*), el corpus [AnnoCTR](https://github.com/boschresearch/anno-ctr-lrec-coling-2024) (CC BY-SA 4.0) e informes públicos de Microsoft (solo para investigación local, no se redistribuyen). La procedencia, la licencia y la suma SHA-256 de cada fuente están en `data/external/MANIFEST.md`. Toda la emulación de adversario se realiza en un **entorno de laboratorio aislado**. Este repositorio no contiene datos personales ni telemetría de sistemas reales de terceros.
 
 ---
 
