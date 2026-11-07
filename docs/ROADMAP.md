@@ -701,8 +701,8 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   |---|---|---|
   | Ingesta de ATT&CK | **4,7 s** | **32 min 10 s** (22.600 objetos, unos 12/s) |
   | Ingesta de ThreatFox (07-11) | **17 s** | **3 h 28 min** (272.853 objetos, 21,9/s de media) |
-  | Memoria con datos | Neo4j 3,6 GB, con ATT&CK y 136.000 IOCs | unos 7,4 GB (Elasticsearch 6,0) solo con ATT&CK |
-  | Disco | 865 MB, con ATT&CK y ThreatFox | 270 MB, solo ATT&CK |
+  | Memoria con datos | Neo4j 3,6 GB, con ATT&CK y 136.000 IOCs | unos 7,4 GB (Elasticsearch 6,0) solo con ATT&CK; **13,7 GB (Elasticsearch 11,5) con ATT&CK y ThreatFox** |
+  | Disco | 865 MB, con ATT&CK y ThreatFox | 270 MB solo con ATT&CK; **1,9 GB con ATT&CK y ThreatFox** (Elasticsearch 1,37 GB, Redis 369 MB) |
   | Servicios | 1 | 11 |
 
   **Fidelidad de OpenCTI:**
@@ -717,8 +717,8 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 - **ThreatFox completo en OpenCTI (07-11-2026):** 7 trozos subidos a las 23:44 UTC; los 7 works
   terminaron a las 03:12 UTC, con 272.853 de 272.853 objetos procesados. El ritmo no fue constante:
   unos 3/s en los primeros minutos, unos 9/s a los 16 minutos y unos 23/s el resto. La estimación de
-  22 h hecha con los primeros minutos era errónea. Queda por comprobar que lo procesado está creado
-  (recuento de indicadores en la plataforma) y medir RAM y disco con el feed cargado.
+  22 h hecha con los primeros minutos era errónea. RAM y disco con el feed, en la tabla. Queda
+  por comprobar que lo procesado está creado (recuento de indicadores en la plataforma).
 - [ ] **Pendiente (próxima sesión):** el valor añadido sobre el feed completo de ThreatFox (ya cargado), y el
   encaje con ML-2 pasando 2–3 informes de Microsoft por el conector de documentos (que es a la vez la
   LB-a).
