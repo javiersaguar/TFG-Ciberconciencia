@@ -211,7 +211,10 @@ def main():
                              f"{part}_informe_f1": r["informe_micro"]["f1"],
                              f"{part}_mencion_r_explicita": r["mencion_exhaustividad"]["explicita"] or 0,
                              f"{part}_mencion_r_implicita": r["mencion_exhaustividad"]["implicita"] or 0})
-        mlf.log_artifact(str(destino / "resultados.json"))
+        try:
+            mlf.log_artifact(str(destino / "resultados.json"))
+        except Exception as e:  # el servidor del compose guarda artefactos en una ruta local suya
+            print(f"Artefacto no subido a MLflow ({e}); queda en {destino}")
         mlf.end_run()
     print(f"Resultados en {destino}")
 

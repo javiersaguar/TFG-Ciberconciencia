@@ -796,9 +796,9 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
       - **exhaustividad por mención: explícitas 0,35, implícitas 0,15.**
     - Sin poda, el F1 por frase cae a 0,21.
   - **LB-b:** TRAM o SciBERT preentrenado.
-- [ ] **3. Fine-tuning** de un modelo del dominio (**SecureBERT** o CyBERT) para la clasificación
-  multietiqueta frase → técnica ATT&CK.
-  - *(07-11-2026, script listo, sin ejecutar)* `cti/extract/entrenar.py`.
+- [x] **3. Fine-tuning** de un modelo del dominio (**SecureBERT** o CyBERT) para la clasificación
+  multietiqueta frase → técnica ATT&CK. *(07-11-2026, 3 semillas por modelo)*
+  - Script: `cti/extract/entrenar.py`; tabla: `cti/extract/resumen.py`.
     - **Cambio de modelo:** se usa **SecureBERT 2.0** (`cisco-ai/SecureBERT2.0-base`, Apache 2.0)
       frente a **ModernBERT-base**, que es su modelo de partida. Así la única diferencia es el
       preentrenamiento en ciberseguridad.
@@ -807,9 +807,30 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
     - **Protocolo:** la época y el umbral se eligen en desarrollo; prueba se evalúa una sola vez; varias
       semillas; registro en MLflow.
     - **Entorno:** `.venv-ml` con Python 3.12, torch 2.11.0+cu128 y `ml/requirements-ml2.txt`.
-    - **Bloqueo:** la GPU no responde dentro de WSL (`nvidia-smi`: «Failed to initialize NVML»).
-  - Cabe holgadamente en la RTX 5070 (~110M parámetros).
-  - Se registra en MLflow: hiperparámetros, curvas y métricas por técnica.
+    - La GPU no respondía en WSL porque la RTX 5070 del portátil estaba apagada (modo de gráficos
+      de MSI). Resuelto el 07-11.
+  - **Resultados en prueba** (media ± desviación de 3 semillas; unos 5,5 min por entrenamiento en la
+    RTX 5070 Laptop de 8 GB):
+
+    | Modelo | F1 frase | P frase | R frase | F1 macro | R explícitas | R implícitas | F1 informe |
+    |---|---:|---:|---:|---:|---:|---:|---:|
+    | LB-a diccionario (podado) | 0,330 | 0,720 | 0,214 | 0,349 | 0,355 | 0,151 | 0,490 |
+    | ModernBERT-base | 0,519 ± 0,010 | 0,568 | 0,480 | 0,262 ± 0,043 | 0,670 | 0,411 | 0,620 ± 0,041 |
+    | **SecureBERT 2.0** | **0,553 ± 0,019** | 0,612 | 0,506 | 0,301 ± 0,031 | 0,721 | 0,424 | **0,670 ± 0,026** |
+
+    - **Los dos modelos superan al diccionario** en F1 por frase (+0,22) y por informe (+0,18), y casi
+      triplican la exhaustividad en menciones implícitas (0,42 frente a 0,15).
+    - **SecureBERT 2.0 gana a ModernBERT en las 3 semillas emparejadas:** +0,023 a +0,049 de F1 por
+      frase y +0,023 a +0,068 por informe. La ventaja está sobre todo en las menciones explícitas
+      (0,72 frente a 0,67); en las implícitas casi empatan (0,42 frente a 0,41). Con 3 semillas la
+      diferencia es pequeña aunque consistente: falta una prueba por remuestreo de informes.
+    - **El diccionario tiene mejor F1 macro (0,35) que los modelos (0,26–0,30):** acierta más en las
+      técnicas poco frecuentes cuando se nombran. Es un punto para el análisis de errores y una razón
+      para probar la combinación de modelo y diccionario.
+    - Las épocas elegidas en desarrollo van de 4 a 7 y los umbrales de 0,10 a 0,25.
+    - MLflow guarda parámetros, curvas y métricas; el fichero de resultados no se sube porque el
+      servidor del compose guarda los artefactos en una ruta local suya (`/mlflow`). Queda en
+      `data/ml2/modelos/<modelo>-s<semilla>/` con el modelo y las predicciones de prueba.
 - [ ] **4. Evaluación intrínseca:** precisión, exhaustividad y F1 por técnica y agregadas, en AnnoCTR,
   comparando LB-a, LB-b y el modelo afinado. Analizar qué técnicas mejoran, cuáles no y por qué
   (frecuencia en el corpus, ambigüedad léxica).
