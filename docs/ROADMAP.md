@@ -410,8 +410,8 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
 ### F3.1 — Modelado de escenarios
 
 - [x] day1 extraído, normalizado y detectado (F2).
-- [ ] Extraer y cargar **day2** (`apt29_evals_day2_manual.zip`, 43 MB sin extraer;
-  hosts NEWYORK, SCRANTON, UTICA-A/C/D/ONE-DRIVE).
+- [x] Extraer y cargar **day2** (`apt29_evals_day2_manual.zip`, 43 MB sin extraer;
+  hosts NEWYORK, SCRANTON, UTICA-A/C/D/ONE-DRIVE). *(07-11-2026: ver FA.2.)*
 - [x] **Inventario de materia prima antes de diseñar patrones** (paso 0 de la fase): qué
   `dataset_id` hay realmente en `tfg.alerts`, cuántas alertas por técnica ancla y qué claves
   trae de verdad `matched_fields`. En particular, **verificar si las 7 variantes de
@@ -923,6 +923,8 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
       | Campañas | 5 | **4** | **4** |
       | Verdad del plan | 23 | 10 | 14 |
 
+    - *(07-11-2026, day2)* Dentro del espacio: el perfil cubre las **2/2** técnicas de campaña (la ficha,
+      2/2), 11/16 de las alertas (la ficha, 12/16) y 11/21 de la verdad de day2 (la ficha, 16/21).
     - **Sobre las campañas, el perfil extraído de 6 informes cubre lo mismo que la ficha oficial.**
       La única técnica de campaña que ningún informe menciona es T1070 (Indicator Removal).
     - **Laguna:** **T1003 (OS Credential Dumping), núcleo de P1, no está entre las 59 etiquetas.**
@@ -1298,13 +1300,37 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
   (`run-lab.ps1`, `export-events-clean.ps1`, `label_dataset.py` con los tres filtros de
   contaminación) solo existen dentro de la VM. Copiarlos a `emulation/` antes de ampliar el
   laboratorio.
-- [ ] **FA.1 Red con Zeek** (ya pendiente en F3.1). `conn.log` y `dns.log` de APT29 vienen
+- [~] **FA.1 Red con Zeek** (ya pendiente en F3.1). *(07-11-2026, agente de FA; rama `fa-datasets`.)*
+  - Mapeador `pipeline/normalize/zeek.py` (conn → 4001, dns → 4003), con tests. Se usan los logs
+    individuales, sin el combinado: 666 eventos de day1 y 1.422 de day2, todos normalizados.
+  - **Cruce con P2: ninguna arista confirmada.** Las 17 de day1 y las 8 de day2 coinciden en topología
+    (IP y puerto destino), pero ninguna en los cuatro valores, ni siquiera sin mirar la hora. Los
+    registros de Zeek son 51 h y 25 h anteriores a los de Windows. **Los logs de Zeek de OTRF son de
+    otra ejecución de la emulación**: valen para topología, no para confirmar aristas.
+  - Sigma solo carga reglas de Windows, así que Zeek da 0 alertas por construcción. Faltan las reglas de red.
+  - Texto original de la tarea: `conn.log` y `dns.log` de APT29 vienen
   en JSON en el clon de OTRF, para los dos días: mapeador a OCSF (Network Activity, DNS) y
   topic `raw.net.zeek`. **Primer uso: cruzar la conexión de Zeek con la arista de host que ya
   usa P2.** Primer paso multi-fuente real, sin datos nuevos.
-- [ ] **FA.2 apt29 day2** (ya pendiente en F3.1): más ataque y más tráfico benigno sobre la
+- [x] **FA.2 apt29 day2** *(07-11-2026, agente de FA + coordinador; rama `fa-datasets`)*:
+  - 587.286 registros: 585.479 normalizados (99,7 %) y 1.807 a la DLQ con motivo. 290 alertas distintas y 5 campañas.
+  - **Verdad parcial** (40 técnicas, del plan XLSX y del escenario 2), añadida al CSV sin tocar las 110
+    filas existentes. **Pendiente de revisión por Javier.**
+  - Campañas: P1 tres (dos verdaderas con Mimikatz y **una falsa por `wininit`/`csrss` → LSASS**, el
+    mismo ruido de la revisión de F3), P2 una (UTICA → SCRANTON, paso 20.B) y P3 una (elusión de
+    UAC, 14.A). **Precisión por campaña 4/5 = 0,80.** El salto a NEWYORK no se detecta por diseño,
+    porque en day2 es el controlador de dominio.
+  - **F3 invariante:** la foto antes y después coincide en los 110 datasets originales. Se informa aparte; las cifras oficiales de F3 no cambian.
+  - Texto original de la tarea: más ataque y más tráfico benigno sobre la
   misma infraestructura. No pide mapeadores nuevos; útil para los falsos positivos.
-- [ ] **FA.3 Validación externa en Windows: COMISET** (Universidad Pontificia Comillas,
+- [~] **FA.3 Validación externa en Windows: COMISET** *(07-11-2026: piloto v1 cargado)*.
+  - Adaptador `pipeline/normalize/comiset.py` para el envoltorio de Elasticsearch, con auditoría de 44 pares evento/campo sin discrepancias.
+  - Host 1: 99.749 eventos, **3 alertas, todas candidatas a falsa alarma** («Removal Of SD/Index Value
+    to Hide Schedule Task») y 0 campañas. **El piloto solo cubre 6 min 13 s**, así que la tasa no es
+    representativa.
+  - Host 2: los 251 registros son de canales sin mapeador.
+  - **Siguiente paso: la v2** (1–2 M de registros, estratificada por host, día y hora), con aprobación.
+  - Texto original de la tarea: (Universidad Pontificia Comillas,
   CC BY 4.0). Un laboratorio con ataques etiquetados ATT&CK (~4,9 GB) y una red universitaria
   con actividad normal (~31,7 GB). Prueba el pipeline actual **sin mapeadores nuevos** con datos
   de fuera y da fondo benigno para medir falsas alarmas. Usar una **muestra acotada**.
