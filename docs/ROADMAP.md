@@ -834,6 +834,48 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 - [ ] **4. Evaluación intrínseca:** precisión, exhaustividad y F1 por técnica y agregadas, en AnnoCTR,
   comparando LB-a, LB-b y el modelo afinado. Analizar qué técnicas mejoran, cuáles no y por qué
   (frecuencia en el corpus, ambigüedad léxica).
+  - *(07-11-2026, en curso)* `cti/extract/predecir.py` (probabilidades de dev y prueba de los modelos
+    guardados) y `cti/extract/analisis.py` (salida en `data/ml2/resultados/analisis.{md,json}`).
+  - **Significación** (remuestreo emparejado por informe de prueba, B = 10.000):
+    - SecureBERT 2.0 − ModernBERT: **+0,034 de F1 por frase, IC 95 % [+0,011, +0,058]**; por informe
+      +0,050 [+0,027, +0,073]. **El preentrenamiento en ciberseguridad aporta y es significativo.**
+    - SecureBERT 2.0 − diccionario: +0,22 por frase [+0,13, +0,33]; +0,18 por informe [+0,07, +0,32].
+  - **Frecuencia:** Spearman 0,61 entre log(frases de entrenamiento) y F1 por técnica. El diccionario
+    gana en las técnicas raras (5–19 frases: F1 0,35–0,47 frente a 0,12–0,25 del modelo) y el modelo
+    en las frecuentes (≥ 20 frases: 0,47–0,56 frente a 0,22–0,29).
+  - **Confusiones típicas:** T1059 (intérprete) con T1566 (phishing), T1132 (codificación) con
+    T1027/T1573 (ofuscación, canal cifrado), T1204 (ejecución por el usuario) con T1566. Son técnicas
+    vecinas en la cadena de un mismo párrafo.
+  - **Falsos positivos que parecen huecos de anotación** (p. ej. «lures the user to enable the macros»
+    → T1204; «uses WinSCP to exfiltrate» → exfiltración). Pendiente de revisión manual, como en F3.
+  - **Combinación con el diccionario:** elegida en desarrollo, gana el **modelo solo** (la unión baja
+    0,011 en desarrollo). En prueba la unión subiría +0,037 por frase [+0,016, +0,056] y el F1 macro de
+    0,30 a 0,46. **Las dos particiones no se parecen para el diccionario:** en desarrollo hay menos
+    menciones explícitas (24 % frente a 34 %) y el diccionario saca F1 0,12 frente a 0,33 en prueba.
+    Con 16 informes de desarrollo no se puede decidir bien, así que se decide con validación cruzada.
+  - **Validación cruzada por informe** (`cti/extract/validacion_cruzada.py`, 07-11-2026). Reglas fijadas
+    antes de ejecutarla:
+    - 5 bloques sobre los 86 informes de entrenamiento + desarrollo; SecureBERT 2.0 con la época y el
+      umbral medianos (7 y 0,20);
+    - la poda del diccionario y la frecuencia de «técnica rara» salen solo de los bloques de
+      entrenamiento de cada vuelta;
+    - se adopta la combinación solo si mejora y el remuestreo da < 5 % de diferencias ≤ 0.
+
+    | Fuera de bloque (86 informes) | F1 frase | F1 macro | R explícitas | R implícitas | F1 informe |
+    |---|---:|---:|---:|---:|---:|
+    | Diccionario | 0,249 | 0,278 | 0,327 | 0,096 | 0,479 |
+    | Modelo | 0,481 | 0,206 | 0,600 | 0,360 | 0,620 |
+    | **Modelo ∪ diccionario** | **0,520** | **0,382** | **0,771** | 0,387 | **0,695** |
+
+    - Unión − modelo: **+0,040 por frase, IC 95 % [+0,020, +0,060]**; +0,076 por informe
+      [+0,042, +0,109]. Gana en 4 de los 5 bloques.
+    - **Decisión: el sistema de ML-2 es SecureBERT 2.0 ∪ diccionario podado.** Restringir el
+      diccionario a las técnicas raras ayuda menos que la unión completa.
+    - **Resultado oficial en prueba** (34 informes, 3 semillas): F1 por frase **0,590**, F1 macro **0,464**,
+      exhaustividad en implícitas 0,488, F1 por informe **0,713**. Frente al modelo solo: +0,037 por
+      frase [+0,016, +0,056].
+    - La validación cruzada mide el sistema con una sola semilla y sin elegir la época por bloque:
+      sus cifras absolutas son algo más bajas que las de la partición publicada.
 - [ ] **5. Perfil por informe y por actor.**
   - Se agregan las técnicas extraídas de cada informe con su confianza, y por actor si el informe
     lo nombra.
@@ -843,6 +885,24 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 - [ ] **6. Evaluación extrínseca sobre el corpus del proyecto** (no requiere anotar nada):
   - **6a. Perfil de APT29 frente a ATT&CK.** Qué parte de la lista revisada de técnicas de G0016
     recupera el perfil extraído de los informes de APT29, comparando las líneas base con el afinado.
+    - *(07-11-2026, hecha)* `cti/extract/informes.py` limpia los 6 informes de Microsoft sobre
+      APT29. Fuera quedan las secciones de defensa y producto, y aparte las tablas «MITRE ATT&CK
+      techniques observed». Resultado: 683 frases de análisis. `cti/extract/perfil_apt29.py`
+      genera el perfil y lo puntúa.
+    - **Referencia:** G0016 más sus campañas C0023 y C0024, 72 técnicas padre. **Solo 33 caben en el
+      espacio de 59 etiquetas:** las otras 39 no las puede predecir ningún modelo entrenado con
+      AnnoCTR.
+    - Perfil (técnicas con ≥ 1 frase, sin las tablas del editor), frente a las 33 alcanzables:
+
+      | Sistema | Técnicas | Precisión | Exhaustividad | F1 |
+      |---|---:|---:|---:|---:|
+      | Diccionario | 12 | 0,92 | 0,33 | 0,49 |
+      | SecureBERT 2.0 | 16 | 0,81 | 0,39 | 0,53 ± 0,09 |
+      | **SecureBERT 2.0 ∪ diccionario** | 24 | 0,83 | **0,60** | **0,69 ± 0,05** |
+
+    - El modelo no saca Supply Chain Compromise (T1195) del informe de SolarWinds, pese a sus 20 frases
+      de entrenamiento. Las técnicas que aparecen fuera de la ficha son pocas: T1041 es plausible;
+      T1055 y T1486 son errores (la segunda, por una frase sobre cifrado AES).
   - **6b. Perfil frente a lo detectado.** Cuántas técnicas de las alertas y campañas de APT29 (día 1,
     y día 2 cuando se cargue) aparecen en el perfil extraído, y cuáles de las detectadas no
     menciona ningún informe.
