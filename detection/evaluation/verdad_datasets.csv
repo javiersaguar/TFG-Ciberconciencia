@@ -224,3 +224,23 @@ COMISET-REAL-v2-host-2983e961efca-20220705-h08,fa_benigno,COMISET-REAL-v2-host-2
 COMISET-REAL-v2-host-2983e961efca-20220707-h11,fa_benigno,COMISET-REAL-v2-host-2983e961efca-20220707-h11,,,parcial,0,0,0
 COMISET-REAL-v2-host-2983e961efca-20220709-h14,fa_benigno,COMISET-REAL-v2-host-2983e961efca-20220709-h14,,,parcial,0,0,0
 COMISET-REAL-v2-host-2983e961efca-20220720-h11,fa_benigno,COMISET-REAL-v2-host-2983e961efca-20220720-h11,,,parcial,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221116-h15,fa_lab,COMISET LAB 2022-11-16 h15 (control),,,etiquetas_reglas_control,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221116-h21,fa_lab,COMISET LAB 2022-11-16 h21 (ataque),T1003|T1021|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221116-h22,fa_lab,COMISET LAB 2022-11-16 h22 (ataque),T1003|T1055|T1055.001,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221116-h23,fa_lab,COMISET LAB 2022-11-16 h23 (ataque),T1003|T1021|T1055|T1055.001,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221117-h06,fa_lab,COMISET LAB 2022-11-17 h06 (ataque),T1003|T1055|T1055.001,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221117-h09,fa_lab,COMISET LAB 2022-11-17 h09 (ataque),T1003|T1003.002|T1021|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221117-h10,fa_lab,COMISET LAB 2022-11-17 h10 (ataque),T1003|T1003.002|T1021|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221118-h07,fa_lab,COMISET LAB 2022-11-18 h07 (control),,,etiquetas_reglas_control,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221118-h12,fa_lab,COMISET LAB 2022-11-18 h12 (ataque),T1003|T1003.002|T1003.004|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221119-h12,fa_lab,COMISET LAB 2022-11-19 h12 (ataque),T1003|T1003.002|T1021|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221119-h19,fa_lab,COMISET LAB 2022-11-19 h19 (ataque),T1003|T1003.002|T1021|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221119-h20,fa_lab,COMISET LAB 2022-11-19 h20 (ataque),T1003|T1003.002|T1055|T1055.001,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221120-h00,fa_lab,COMISET LAB 2022-11-20 h00 (ataque),T1003|T1003.002|T1021|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221120-h12,fa_lab,COMISET LAB 2022-11-20 h12 (ataque),T1003|T1003.002|T1021|T1055|T1055.001|T1210,,etiquetas_reglas_ataque,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221121-h02,fa_lab,COMISET LAB 2022-11-21 h02 (control),,,etiquetas_reglas_control,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221121-h23,fa_lab,COMISET LAB 2022-11-21 h23 (control),,,etiquetas_reglas_control,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221123-h01,fa_lab,COMISET LAB 2022-11-23 h01 (control),,,etiquetas_reglas_control,0,0,0
+COMISET-LAB-host-b1febcd4288c-20221125-h00,fa_lab,COMISET LAB 2022-11-25 h00 (control),,,etiquetas_reglas_control,0,0,0
+VM-TFGCIBER-20260730-ataque,fa_vm,"Laboratorio propio F2.3 (VM Windows 11, Atomic Red Team): sesión de ataque 07:48-09:00 UTC",T1003.001|T1055|T1070|T1547.001,TA0003|TA0004|TA0005|TA0006,manifiesto_ventanas,1,0,0
+VM-TFGCIBER-20260730-base,fa_vm,Laboratorio propio F2.3 (VM Windows 11): línea base benigna 09:00-14:49 UTC,,,linea_base_benigna,0,0,0

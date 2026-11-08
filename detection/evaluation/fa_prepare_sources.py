@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 from pipeline.normalize.fa_registry import normalize
 from pipeline.normalize.zeek import epoch_ms
 from pipeline.normalize.comiset import adapt_comiset
+from pipeline.normalize.vm_lab import adapt_vm_lab
 from pipeline.normalize.ocsf_common import parse_ts
 from pipeline.normalize.registry import MAPPERS
 
@@ -58,6 +59,10 @@ def zeek_inputs(day):
     return list(entries.values()), files, input_count
 
 
+VM_CORTE_UTC = "2026-07-30T09:00:00.000000Z"
+VM_DATASETS = ("VM-TFGCIBER-20260730-ataque", "VM-TFGCIBER-20260730-base")
+
+
 def prepare(kind, output):
     started = time.monotonic()
     output.mkdir(parents=True, exist_ok=False)
@@ -80,11 +85,20 @@ def prepare(kind, output):
                 refs[(ref["partition"], ref["partition_line"])] = ref
         paths = sorted(source_folder.glob("host-*/*/*/*.jsonl.gz"))
         input_files = [{"path": str(p.relative_to(ROOT)), "sha256": file_hash(p)} for p in paths]
-    elif kind == "comiset-v2":
+    elif kind in ("comiset-v2", "comiset-lab"):
         # v2 (07-11-2026): una partición por host, día y hora UTC (fa_comiset_v2_extract.py --seleccion).
         # Cada hora es su propio dataset, para que las tasas usen el tiempo realmente observado.
-        source_folder = ROOT / "data/external/comiset/real-sample-v2"
+        source_folder = ROOT / ("data/external/comiset/real-sample-v2" if kind == "comiset-v2"
+                                else "data/external/comiset/lab-sample")
+        prefijo = "COMISET-REAL-v2" if kind == "comiset-v2" else "COMISET-LAB"
         paths = sorted(source_folder.glob("host-*/*/h*.jsonl.gz"))
+        input_files = [{"path": str(p.relative_to(ROOT)), "sha256": file_hash(p)} for p in paths]
+    elif kind == "vm-lab":
+        # Laboratorio propio de F2.3 (origen fa_vm). Dos datasets, cortados a una hora fijada antes de
+        # detectar: la sesión de ataque (todas las ventanas del manifiesto caen entre 08:06 y 08:23 UTC)
+        # y la línea base benigna desde las 09:00 UTC, 37 min después de la última ventana (los
+        # patrones correlacionan a 10 min como mucho).
+        paths = [ROOT / "data/emulation-lab/telemetry_clean_20260730_165025.json"]
         input_files = [{"path": str(p.relative_to(ROOT)), "sha256": file_hash(p)} for p in paths]
 
     def records():
@@ -96,10 +110,21 @@ def prepare(kind, output):
                 source_counts[dataset] = {"source_records": total, "exact_duplicates": total - len(items)}
                 for item in items:
                     yield dataset, item
-        elif kind == "comiset-v2":
+        elif kind == "vm-lab":
+            corte = parse_ts(VM_CORTE_UTC)
+            with paths[0].open(encoding="utf-8-sig") as source:
+                for line_no, line in enumerate(source, 1):
+                    if not line.strip():
+                        continue
+                    item = json.loads(line)
+                    item["_tfg_input_format"] = "vm_lab"
+                    item["_tfg_source_ref"] = {"path": str(paths[0].relative_to(ROOT)), "line": line_no}
+                    t = parse_ts(adapt_vm_lab(item)["TimeCreated"])
+                    yield (VM_DATASETS[0] if t < corte else VM_DATASETS[1]), item
+        elif kind in ("comiset-v2", "comiset-lab"):
             for path in paths:
                 host, dia, hora = path.relative_to(source_folder).parts
-                dataset = f"COMISET-REAL-v2-{host}-{dia.replace('-', '')}-{hora.split('.')[0]}"
+                dataset = f"{prefijo}-{host}-{dia.replace('-', '')}-{hora.split('.')[0]}"
                 with gzip.open(path, "rt", encoding="utf-8") as source:
                     for line_no, line in enumerate(source, 1):
                         item = json.loads(line)
@@ -135,8 +160,8 @@ def prepare(kind, output):
                     timestamp = epoch_ms(raw.get("ts"))
                     key = raw.get("@stream")
                     supported = True
-                else:  # comiset y comiset-v2
-                    adapted = adapt_comiset(raw)
+                else:  # comiset, comiset-v2 y vm-lab
+                    adapted = adapt_vm_lab(raw) if kind == "vm-lab" else adapt_comiset(raw)
                     timestamp = parse_ts(adapted["TimeCreated"])
                     key = f'{adapted["Channel"].lower()}|{adapted["EventID"]}'
                     supported = (adapted["Channel"].lower(), adapted["EventID"]) in MAPPERS
@@ -175,7 +200,8 @@ def prepare(kind, output):
                           "Replay incluye eventos sin mapeador, para que la DLQ viva contabilice el mismo universo.",
                           "Zeek usa solo individuales; se deduplica contenido JSON idéntico conservando referencias.",
                           "Etiqueta de captura Zeek no acredita hostname del endpoint ni ubicación geográfica.",
-                          "COMISET es actividad considerada normal, no etiqueta independiente; tasas usan tiempo observado."]}
+                          "COMISET es actividad considerada normal, no etiqueta independiente; tasas usan tiempo observado.",
+                          "VM (fa_vm): TimeCreated local Europe/Madrid convertido a UTC y validado contra UtcTime de Sysmon."]}
     for dataset in sorted(stats):
         path = output / f"{dataset}.jsonl"
         previous = None
@@ -199,7 +225,7 @@ def prepare(kind, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("kind", choices=("zeek", "comiset", "comiset-v2"))
+    parser.add_argument("kind", choices=("zeek", "comiset", "comiset-v2", "comiset-lab", "vm-lab"))
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     # absolute conserva la ruta del worktree; resolve seguiría el enlace data

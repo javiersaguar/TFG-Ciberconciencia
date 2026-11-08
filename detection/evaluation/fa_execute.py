@@ -40,11 +40,16 @@ def group_lag(group, topic):
         consumer.close()
 
 
-def detect_stage(directory, topics, run, prefix="05-detect"):
+# Un solo equipo cae en una sola partición y lo detecta un único proceso (~250 ev/s en COMISET LAB):
+# hacen falta más de tres tandas de 9 min. Cada tanda sigue desde los offsets confirmados.
+TANDAS = 8
+
+
+def detect_stage(directory, topics, run, prefix="05-detect", first_wave=0):
     group = run + "-detector"
     partitions = audit([topics["norm"]])[topics["norm"]]["partitions"]
     instances = max(1, sum(p["records"] > 0 for p in partitions))
-    for wave in range(3):
+    for wave in range(first_wave, TANDAS):
         workers = []
         for index in range(instances):
             path = directory / f"{prefix}-wave{wave}-{index}.log"
@@ -65,7 +70,7 @@ def detect_stage(directory, topics, run, prefix="05-detect"):
         if lag == 0:
             return
         # Solo se continúa el MISMO grupo desde offsets confirmados. No replay.
-    raise RuntimeError("Detección incompleta tras tres tandas; revisar antes de continuar")
+    raise RuntimeError(f"Detección incompleta tras {TANDAS} tandas; revisar antes de continuar")
 
 
 def sql(query, write=False):
@@ -178,6 +183,10 @@ def run(args):
     if counts[topics["raw"]]["records"] != counts[topics["norm"]]["records"] + counts[topics["normalize_dlq"]]["records"]:
         raise RuntimeError("Pérdida o duplicación en normalización")
     detect_stage(directory, topics, run)
+    after_detect(directory, topics, run, args)
+
+
+def after_detect(directory, topics, run, args):
     counts = audit(list(topics.values()))
     save(directory / "after-detect.json", counts)
     consumed = alerts = dlq = 0
@@ -195,8 +204,31 @@ def run(args):
         run_cep(argparse.Namespace(plan=args.cep_plan, run_directory=directory, inputs=args.inputs))
 
 
+def resume(args):
+    """Reanuda un lote cuya detección se quedó a medias (pasó el tope de tandas).
+
+    Solo continúa el MISMO grupo del detector desde sus offsets confirmados, numerando las tandas
+    a partir de las ya hechas; después aplica los mismos controles que run(). No vuelve a crear
+    topics, ni a cargar verdad, ni a hacer replay."""
+    directory = ROOT / args.output
+    state = json.loads((directory / "RUN.json").read_text())
+    if state["run_id"] != args.run_id:
+        raise ValueError("El directorio es de otro run-id")
+    if (directory / "INGEST_COMPLETE.json").exists() or (directory / "after-detect.json").exists():
+        raise ValueError("Este lote ya pasó la detección: no se reanuda")
+    topics = state["topics"]
+    counts = audit([topics["norm"], topics["raw"], topics["normalize_dlq"]])
+    if counts[topics["raw"]]["records"] != counts[topics["norm"]]["records"] + counts[topics["normalize_dlq"]]["records"]:
+        raise RuntimeError("Pérdida o duplicación en normalización")
+    hechas = len(list(directory.glob("05-detect-wave*-0.log")))
+    print(f"Reanudación de {args.run_id}: {hechas} tandas hechas, lag={group_lag(args.run_id + '-detector', topics['norm'])}", flush=True)
+    detect_stage(directory, topics, args.run_id, first_wave=hechas)
+    after_detect(directory, topics, args.run_id, args)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--resume", action="store_true", help="Reanudar la detección de un lote a medias")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--inputs", type=Path, required=True)
     parser.add_argument("--truth-csv", type=Path, action="append", default=[])
@@ -204,7 +236,8 @@ def main():
     parser.add_argument("--fa", action="store_true")
     parser.add_argument("--zeek", action="store_true")
     parser.add_argument("--cep-plan", type=Path)
-    run(parser.parse_args())
+    args = parser.parse_args()
+    resume(args) if args.resume else run(args)
 
 
 if __name__ == "__main__":

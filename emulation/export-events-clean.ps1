@@ -42,7 +42,9 @@ function Export-Log {
 Write-Host "Exportando telemetria desde $since ..." -ForegroundColor Cyan
 $total += Export-Log 'Microsoft-Windows-Sysmon/Operational' @(1,3,7,8,10,11,12,13,22) 'Microsoft-Windows-Sysmon/Operational'
 $total += Export-Log 'Security' @(4688) 'Security'
-$total += Export-Log 'Microsoft-Windows-PowerShell/Operational' @(4103,4104) 'Microsoft-Windows-PowerShell/Operational'
+# Sin 4103 (Module Logging): ~59 % del volumen y solo ruido del propio framework (F2.3).
+# Reconstruido el 08-11-2026: telemetry_clean_*.json no contiene ningun 4103.
+$total += Export-Log 'Microsoft-Windows-PowerShell/Operational' @(4104) 'Microsoft-Windows-PowerShell/Operational'
 
 $sw.Close()
 Write-Host ""

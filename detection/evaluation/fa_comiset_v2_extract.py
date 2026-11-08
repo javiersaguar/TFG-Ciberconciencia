@@ -48,6 +48,10 @@ LINEA_MAX = 1 << 20                                      # líneas de más de 1 
 RX_HOST = re.compile(rb'"host_name"\s*:\s*"([^"]{1,255})"')
 RX_LOG = re.compile(rb'"log_name"\s*:\s*"([^"]{1,255})"')
 RX_TIEMPO = re.compile(rb'"event_original_time"\s*:\s*"(\d{4}-\d{2}-\d{2})T(\d{2})')
+# Campos cuyo nombre sugiere una etiqueta (para localizar el etiquetado ATT&CK de LAB)
+RX_ETIQUETA = re.compile(rb'"([A-Za-z0-9_@.]*(?:[Mm]itre|[Tt]echnique|[Tt]actic|[Aa]ttack|[Tt]hreat|RuleName|[Ll]abel)[A-Za-z0-9_@.]*)"\s*:\s*"([^"]{0,120})"')
+RX_TID = re.compile(rb'\bT1\d{3}(?:\.\d{3})?\b')
+RX_REGLA_TID = re.compile(rb'"rule_technique_id"\s*:\s*"([^"]{1,40})"')
 
 
 def clave_host(host):
@@ -65,10 +69,14 @@ def ahora():
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument("--zip", type=Path, default=ZIP, help="ZIP de origen (por defecto, REAL)")
+    ap.add_argument("--miembro", default=MIEMBRO)
     ap.add_argument("--limite-bytes", type=int, default=0, help="Para pruebas: parar tras leer N bytes")
     ap.add_argument("--seleccion", type=Path, default=None,
                     help="Segunda pasada: copiar solo las celdas (host, día, hora) de SELECCION.json "
                          "(fa_comiset_v2_select.py), con su tope por celda")
+    ap.add_argument("--sin-campos-etiqueta", action="store_true",
+                    help="No buscar campos candidatos a etiqueta (más rápido); sí cuenta rule_technique_id por hora")
     ap.add_argument("--solo-censo", action="store_true",
                     help="Primera pasada: solo el censo (incluido el de canales soportados), sin copiar nada")
     args = ap.parse_args()
@@ -91,13 +99,17 @@ def main():
     copiadas = leidas = bytes_leidos = 0
     tope_global_alcanzado = False
     progreso = out / "PROGRESO.json"
+    etiquetas = collections.Counter()            # nombre de campo candidato -> apariciones
+    ejemplos_etq = collections.defaultdict(collections.Counter)   # campo -> valores (muestra)
+    tids = collections.Counter()                 # identificadores T1xxx vistos en cualquier parte
+    etiqueta_hora = collections.Counter()        # (hostkey, día, hora, rule_technique_id) -> eventos
     seleccion, tope_celda = None, None
     if args.seleccion:
         sel = json.loads(args.seleccion.read_text(encoding="utf-8"))
         seleccion = {(c["host"], c["dia"], c["hora_utc"]) for c in sel["celdas"]}
         tope_celda = sel["resumen"]["tope_celda"]
 
-    with zipfile.ZipFile(ZIP) as z, z.open(MIEMBRO) as fh:
+    with zipfile.ZipFile(args.zip) as z, z.open(args.miembro) as fh:
         for ordinal, linea in enumerate(fh, 1):
             leidas += 1
             bytes_leidos += len(linea)
@@ -114,6 +126,16 @@ def main():
             hk = clave_host(host)
             nombres.setdefault(hk, host)
             censo_hora[(hk, dia, hora)] += 1
+            mr = RX_REGLA_TID.search(linea)
+            if mr:
+                etiqueta_hora[(hk, dia, hora, mr.group(1).decode("utf-8", "replace"))] += 1
+            for m in ([] if args.sin_campos_etiqueta else RX_ETIQUETA.finditer(linea)):
+                k = m.group(1).decode("utf-8", "replace")
+                etiquetas[k] += 1
+                if len(ejemplos_etq[k]) < 50 or m.group(2) in ejemplos_etq[k]:
+                    ejemplos_etq[k][m.group(2).decode("utf-8", "replace")] += 1
+            for m in ([] if args.sin_campos_etiqueta else RX_TID.finditer(linea)):
+                tids[m.group(0).decode()] += 1
             censo_canal[(hk, canal)] += 1
             soportado = canal.lower() in SOPORTADOS
             if soportado:
@@ -184,11 +206,16 @@ def main():
         "por_hora": [{"host": h, "dia": d, "hora_utc": hr, "registros": n, "soportados": censo_soportado[(h, d, hr)]}
                      for (h, d, hr), n in sorted(censo_hora.items())],
         "por_canal": [{"host": h, "canal": c, "registros": n} for (h, c), n in sorted(censo_canal.items())],
+        "campos_etiqueta": {k: {"apariciones": n, "valores": dict(ejemplos_etq[k].most_common(30))}
+                            for k, n in etiquetas.most_common(40)},
+        "identificadores_tecnica": dict(tids.most_common(200)),
+        "etiquetas_por_hora": [{"host": h, "dia": d, "hora_utc": hr, "tecnica": tec, "eventos": n}
+                               for (h, d, hr, tec), n in sorted(etiqueta_hora.items())],
     }
     (out / "CENSO.json").write_text(json.dumps(censo, ensure_ascii=False), encoding="utf-8")
     manifiesto = {
         "inicio": inicio, "fin": ahora(), "segundos": round(time.time() - t0),
-        "zip": str(ZIP), "miembro": MIEMBRO, "lineas_leidas": leidas, "bytes_leidos": bytes_leidos,
+        "zip": str(args.zip), "miembro": args.miembro, "lineas_leidas": leidas, "bytes_leidos": bytes_leidos,
         "lectura_completa": not args.limite_bytes, "solo_censo": args.solo_censo,
         "seleccion": str(args.seleccion) if args.seleccion else None, "lineas_descartadas": dict(sin_campos),
         "parametros": {"canales": sorted(SOPORTADOS), "ventanas_utc": VENTANAS, "fraccion_host_dia": FRACCION_HOST_DIA,

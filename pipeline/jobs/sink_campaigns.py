@@ -118,6 +118,8 @@ def parse_args():
     p.add_argument("--ch-port", type=int, default=8123)
     p.add_argument("--from-beginning", action="store_true")
     p.add_argument("--idle-exit", type=float, default=0)
+    p.add_argument("--tabla", default="campaigns",
+                   help="Tabla de destino en ClickHouse (campaigns_v2 para el ajuste v2, medido aparte)")
     return p.parse_args()
 
 
@@ -151,7 +153,7 @@ def main():
     def volcar():
         nonlocal lote
         if lote:
-            ch.insert("campaigns", lote, column_names=COLUMNS)
+            ch.insert(args.tabla, lote, column_names=COLUMNS)
             consumer.commit(asynchronous=False)
             lote = []
 

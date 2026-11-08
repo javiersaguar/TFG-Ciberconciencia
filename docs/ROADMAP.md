@@ -365,13 +365,19 @@ TRANSVERSAL: Dagster · Prometheus/Grafana · MinIO · MLflow 🧠 · Docker →
   Tercera fuente de contaminación detectada y filtrada (`svchost.exe` escribiendo
   `InventoryApplicationFile` durante las ventanas de ataque, 16 filas).
   Limitación conocida: pico de 5.528 eventos benignos por una instalación real de Windows Update.
-- [ ] ⚠️ **Reproducibilidad — versionar el laboratorio.** Los scripts de `emulation/` en el repo
-  son la versión **previa** a las tres correcciones de contaminación, y `run-lab.ps1` solo existe
-  dentro de la VM (`C:\Lab`). Copiar desde la VM a `\\VBOXSVR\Shared` y de ahí a `emulation/`:
-  `run-lab.ps1`, `export-events-clean.ps1` (sin 4103) y `label_dataset.py` (con los filtros de
-  `whoami.exe`/`HOSTNAME.EXE` y `InventoryApplicationFile`).
+- [x] **Reproducibilidad: laboratorio versionado (08-11-2026, por reconstrucción).** La VM se
+  borró antes de copiar sus guiones finales. Los datos sí se conservan, en `data/emulation-lab/`
+  y en `C:\Users\Javier\VBoxShared`; los originales intermedios están copiados en
+  `data/emulation-lab/origen-vboxshared/`. Los dos filtros se reconstruyeron a partir de esos datos:
+  - `emulation/label_dataset.py` (andamiaje `whoami.exe`/`HOSTNAME.EXE`: 115 filas;
+    `InventoryApplicationFile`: 16) reproduce **fila a fila** `dataset_etiquetado_final.csv`
+    (opción `--comparar`);
+  - `export-events-clean.ps1` queda sin 4103, coherente con `telemetry_clean_*.json`.
+  **Perdido:** `run-lab.ps1`, el orquestador (línea base benigna de 180 min y capturas). Sus piezas
+  (`benign-activity.ps1`, `capture-*.ps1`, `capture-manifest.ps1`) sí están versionadas. Para
+  repetir el laboratorio hay que rehacer la VM y ese orquestador.
 - [ ] Ampliar cobertura: T1055 con variantes que no disparen Defender; T1003.001 con una variante que documente el bloqueo de LSA sin depender de herramientas de volcado reales. Capturar el EventID 1116 de Defender si se quiere señal explícita de "técnica prevenida por control".
-- [ ] Integrar el dataset generado como conjunto adicional de evaluación de ML-1 (además de apt29/LSASS_campaign), aprovechando el volumen benigno sostenido para atacar el problema de "volumen como artefacto" detectado el 27-07. **Requiere ruta de normalización CSV → OCSF**, que hoy no existe.
+- [ ] Integrar el dataset generado como conjunto adicional de evaluación de ML-1 (además de apt29/LSASS_campaign), aprovechando el volumen benigno sostenido para atacar el problema de "volumen como artefacto" detectado el 27-07. Ruta de normalización hecha el 08-11-2026 para la detección, sobre la telemetría JSON (ver FA.3b); para ML-1 sigue pendiente.
 
 ### 📦 Entregables F2
 `detection/{loader,evaluator}.py` · `detection/pipelines/ocsf-tfg.yml` · job de streaming ·
@@ -446,8 +452,10 @@ solo tiene el corpus de F3 y FA; en los atómicos P2 no se puede medir así.
   - **Day2 queda con todas sus campañas verdaderas.**
   - Con la clasificación de la revisión de F3, P1 en atómicos pasaría de precisión 0,57 / exhaustividad 0,55 a unos
     0,72 / 0,77 (estimación).
-  - **Pendiente para adoptarlo:** portar los cambios a Flink, confirmar sobre datos no vistos (COMISET LAB) y
-    revisar el volumen de la regla de antivirus (fatiga de alertas).
+  - **Para adoptarlo:** ~~portar los cambios a Flink~~ (hecho: `detection/evaluation/v2_flink.py`, topics
+    `det.v2.<grupo>.*` y tabla `tfg.campaigns_v2`); ~~confirmar sobre datos no vistos~~ (hecho el 08-11-2026: en
+    COMISET LAB y en el laboratorio propio, v1 y v2 dan las mismas alertas y campañas, sin falsas alarmas nuevas;
+    ver FA.3 y FA.3b). Sigue pendiente revisar el volumen de la regla de antivirus (fatiga de alertas).
   - La lógica de ventanas parte a veces una misma actividad en dos campañas con el mismo inicio (ya pasaba en
     v1 con SCRANTON).
 
@@ -1356,10 +1364,8 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
 > FA.3 y el escenario 1 de CAM-LDS de FA.4 como prueba de generalización de P3. El resto queda
 > como trabajo futuro en la memoria si no da tiempo.
 
-- [ ] **FA.0 Prerrequisito: versionar el laboratorio.** Los guiones corregidos
-  (`run-lab.ps1`, `export-events-clean.ps1`, `label_dataset.py` con los tres filtros de
-  contaminación) solo existen dentro de la VM. Copiarlos a `emulation/` antes de ampliar el
-  laboratorio.
+- [x] **FA.0 Laboratorio versionado (08-11-2026, por reconstrucción; detalle en F2.3).** El
+  etiquetado reproduce el dataset final fila a fila; `run-lab.ps1` se perdió con la VM.
 - [~] **FA.1 Red con Zeek** (ya pendiente en F3.1). *(07-11-2026, agente de FA; rama `fa-datasets`.)*
   - Mapeador `pipeline/normalize/zeek.py` (conn → 4001, dns → 4003), con tests. Se usan los logs
     individuales, sin el combinado: 666 eventos de day1 y 1.422 de day2, todos normalizados.
@@ -1383,7 +1389,7 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
   - **F3 invariante:** la foto antes y después coincide en los 110 datasets originales. Se informa aparte; las cifras oficiales de F3 no cambian.
   - Texto original de la tarea: más ataque y más tráfico benigno sobre la
   misma infraestructura. No pide mapeadores nuevos; útil para los falsos positivos.
-- [~] **FA.3 Validación externa en Windows: COMISET** *(07-11-2026: piloto v1 cargado)*.
+- [x] **FA.3 Validación externa en Windows: COMISET** *(07-11-2026: REAL v2; 08-11-2026: LAB)*.
   - Adaptador `pipeline/normalize/comiset.py` para el envoltorio de Elasticsearch, con auditoría de 44 pares evento/campo sin discrepancias.
   - Host 1: 99.749 eventos, **3 alertas, todas candidatas a falsa alarma** («Removal Of SD/Index Value
     to Hide Schedule Task») y 0 campañas. **El piloto solo cubre 6 min 13 s**, así que la tasa no es
@@ -1406,10 +1412,81 @@ usarse**: canales, cómo se etiquetaron y si encajan con el normalizador.
       host-hora en 6 minutos) no era representativa.
     - Para cargar el lote 4 hubo que subir el límite de ficheros abiertos de Redpanda (compose: `ulimits nofile`
       65536): con 1024 solo cabían ~204 particiones.
+  - **LAB (08-11-2026), validación de v1 frente a v2 en datos que ningún ajuste ha visto:**
+    - Un solo equipo (P2 no se puede observar). Se eligieron 12 horas de ataque (las de más etiquetas de las
+      técnicas de interés) y 6 de control. Resultan 600.218 eventos normalizados y F3 queda intacto. La detección
+      de un único equipo va lenta: 255 ev/s con v1 y unos 90 con v2. Hizo falta `fa_execute.py --resume` y subir
+      el tope de tandas.
+    - **v1 y v2 dan lo mismo: 85 alertas y 0 campañas.** En las 6 horas de control hay 0 alertas.
+    - **Las etiquetas del LAB son en su mayoría ruido de sus reglas:**
+      - el 95 % de las T1055.001 son `explorer.exe` abriendo `msascui.exe` o `taskmgr.exe` con 0x1410,
+        comportamiento normal de Windows;
+      - las T1003.002 son escrituras de `srtasks.exe` (Restaurar sistema);
+      - los accesos a LSASS son todos de WMI, svchost o Defender, con máscaras inocuas.
+      Elegir horas por número de etiquetas eligió horas ruidosas, no horas de ataque.
+    - **Sí hay un ataque real en la muestra:** el 16-11 a las 21:19, `RemoteMouse.exe` lanza un `cmd.exe` de 32 bits
+      como SYSTEM (explotación de Remote Mouse para elevar privilegios), seguido de `whoami`. A las 23:19 vienen
+      `ipconfig` como SYSTEM y un PowerShell interactivo como SYSTEM. El pipeline alerta justo ahí («Whoami.EXE
+      Execution From Privileged Process», alta; «Local Accounts Discovery»; «Suspicious Interactive PowerShell as
+      SYSTEM», alta), pero **no abre campaña P3**: ninguna regla Sigma cubre el paso de elevación (la explotación
+      del servicio), y P3 necesita elevación más descubrimiento. Es un falso negativo de P3 por cobertura de reglas.
+      No se ajusta sobre LAB, porque es el conjunto de validación: queda como mejora futura (por ejemplo,
+      descubrimiento como SYSTEM cuyo intérprete cuelga de una aplicación de usuario).
+    - Las otras 82 alertas son mantenimiento de Windows (tareas programadas, claves COM, autorun de IE): las mismas
+      familias que en COMISET REAL.
+    - **Conclusión:** sobre datos externos no vistos, **v2 no añade ninguna falsa alarma** respecto a v1 y conserva
+      las alertas útiles. LAB no permite medir la exhaustividad de los patrones, porque sus etiquetas no son una
+      verdad independiente.
   - Texto original de la tarea: (Universidad Pontificia Comillas,
   CC BY 4.0). Un laboratorio con ataques etiquetados ATT&CK (~4,9 GB) y una red universitaria
   con actividad normal (~31,7 GB). Prueba el pipeline actual **sin mapeadores nuevos** con datos
   de fuera y da fondo benigno para medir falsas alarmas. Usar una **muestra acotada**.
+- [x] **FA.3b Laboratorio propio en el pipeline (origen `fa_vm`)** *(08-11-2026)*.
+  - Es la única verdad **independiente de cualquier regla**: las etiquetas salen de las ventanas del manifiesto de
+    captura de F2.3. Se mete por separado y no inyectado en COMISET: con un fondo de 0,95 alertas por host-hora, la
+    inyección daría casi seguro el mismo resultado, y mezclaría dos configuraciones de Sysmon en un mismo equipo.
+  - Adaptador `pipeline/normalize/vm_lab.py`, con 5 tests:
+    - `TimeCreated` viene en hora local (Europe/Madrid) y se pasa a UTC, comprobando contra el `UtcTime` de Sysmon
+      (desfase de 120 min exactos en los 11.959 eventos);
+    - la identidad es la línea de origen, porque no hay número de registro.
+  - Preparación (`fa_prepare_sources.py vm-lab`): 15.026 eventos, normalizados al 99,5 %; solo quedan fuera los
+    81 Sysmon 22, que no tienen mapeador. Se carga la telemetría completa (lo que vería el sensor), no el CSV
+    filtrado para ML-1. Dos datasets, con el corte fijado antes de detectar a las 09:00 UTC, 37 min después de la
+    última ventana:
+    - `VM-TFGCIBER-20260730-ataque`: 7.530 eventos, de 07:48 a 09:00. T1547.001, T1070, T1055 (bloqueado por
+      Defender) y T1003.001 (comsvcs.dll). P1 esperado; P2 y P3 no, con el mismo criterio que los atómicos;
+    - `VM-TFGCIBER-20260730-base`: 7.496 eventos, de 09:00 a 14:49. Línea base benigna; no se espera nada.
+  - Run `fa-vm-lab` con v1, y v2 en Flink (`v2_flink.py --grupos vm`). Cuadre: 14.945 eventos en `tfg.events`
+    (15.026 − 81 DLQ); `f3_unchanged: true`.
+  - **Resultados: v1 y v2 idénticos** (las mismas 886 alertas, por `alert_id`, y la misma campaña).
+
+    | Dataset | Alertas (alta) | P1 | P2 | P3 |
+    |---|---|---|---|---|
+    | ataque (1 h 12 min) | 333 (36) | **1 · VP** | 0 · VN | 0 · VN |
+    | base (5 h 49 min) | 553 (14) | 0 · VN | 0 · VN | 0 · VN |
+
+    - **P1 reconoce el robo de credenciales**: 19 evidencias en tres etapas (ejecución de la herramienta,
+      limpieza y volcado a disco), confianza 85. Las evidencias centrales caen dentro de las ventanas de
+      T1003.001: procdump `-ma`/`-mm` sobre lsass y `comsvcs.dll MiniDump`. La etapa de limpieza son los dos
+      `fsutil` de T1070 (`usn deletejournal` y `setZeroData`), y el volcado a disco es la descarga de procdump
+      que hace Invoke-AtomicTest en sus prerrequisitos (08:22:05, entre dos ventanas).
+    - **Inicio adelantado**: la campaña empieza a las 08:07:49, 13 min antes del volcado. La primera evidencia es un
+      `reg export HKLM\SYSTEM\...\Session Manager` del test 17 de T1547.001 (copia de seguridad, no volcado de
+      credenciales), que dispara «Dumping of Sensitive Hives Via Reg.EXE». Es imprecisión de la regla, no del patrón.
+    - **Cobertura por técnica, con alertas específicas dentro de su ventana: 3 de 4.** T1547.001 (carpeta de inicio,
+      claves Run, papelera), T1070 (fsutil) y T1003.001 (procdump, comsvcs) sí. T1055 no: en sus ventanas solo
+      salta el andamiaje de Invoke-AtomicTest (`whoami`/`hostname`) y «Non Interactive PowerShell». Defender
+      bloqueó los tests, y lo que queda no lo cubre ninguna regla. Es otro falso negativo de cobertura, como el
+      de LAB.
+    - **Ruido de baja severidad**: 518 de las 553 alertas de la base son `whoami`/`systeminfo` del generador de
+      actividad benigna (256 de cada, 2 alertas por ejecución: Sysmon 1 y Security 4688). No abren campaña.
+    - **La base no es del todo benigna**: a las 10:50 UTC (reinicio de la VM) se ejecuta la persistencia que dejó
+      T1547.001 (`Discovery.bat` por RunOnce y `calc.exe` desde `atomictest`). Las 6 alertas altas de esa hora
+      son **verdaderos positivos** de persistencia activada, no falsas alarmas. A las 11:49 UTC, el
+      `wevtutil sl` que agranda los registros es configuración del laboratorio (alta, benigna). Ninguna de las
+      dos abre campaña.
+  - **Conclusión**: la única verdad independiente de reglas da P1 = VP y 0 campañas falsas en 7 h, igual en v1 y
+    v2. Junto con LAB (sin falsas alarmas en datos externos), respalda adoptar v2.
 - [ ] **FA.4 Linux.**
   - **Mapeadores** a OCSF para `auditd` (agrupando antes los registros `SYSCALL`/`PATH`/…
     de un mismo evento), **Sysmon for Linux** y `journald` (sshd, sudo).
