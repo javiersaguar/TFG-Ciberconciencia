@@ -67,11 +67,11 @@ def referencia(grupo="G0016"):
             "campanas": sorted(ext(por_id[c]) for c in campanas)}
 
 
-def probabilidades(textos):
+def probabilidades(textos, modelo=MODELO):
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
     out = {}
-    for carpeta in sorted(MODELOS.glob(f"{MODELO}-s*/mejor")):
+    for carpeta in sorted(MODELOS.glob(f"{modelo}-s*/mejor")):
         tok = AutoTokenizer.from_pretrained(carpeta)
         m = AutoModelForSequenceClassification.from_pretrained(carpeta, use_safetensors=True,
                                                                trust_remote_code=False).to("cuda").eval()

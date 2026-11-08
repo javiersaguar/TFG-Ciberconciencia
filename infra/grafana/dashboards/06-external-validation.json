@@ -77,7 +77,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Ampliación del corpus (FA, 07-11-2026).** Tres conjuntos externos recorren F1–F3 con sus propios topics, sin alterar F3 (la foto antes y después de cada carga coincide). **APT29 day2**: validación de los patrones con otra jornada de ataque. **Zeek**: red de APT29; sus logs son de *otra ejecución* de la emulación (25–51 h antes y sin puertos en común), así que sirven para topología, no para confirmar aristas de P2. **COMISET v2**: actividad normal de una red universitaria (106 horas de 15 equipos, elegidas con el censo de los 202 M de registros) para medir falsas alarmas. Un equipo (`desktop-mh88805`) tenía **Atomic Red Team** ejecutando pruebas: se separa como `fa_art` y no cuenta como actividad normal."
+        "content": "**Ampliación del corpus (FA, 07-11-2026).** Tres conjuntos externos recorren F1–F3 con sus propios topics, sin alterar F3 (la foto antes y después de cada carga coincide). **APT29 day2**: validación de los patrones con otra jornada de ataque. **Zeek**: red de APT29; sus logs son de *otra ejecución* de la emulación (25–51 h antes y sin puertos en común), así que sirven para topología, no para confirmar aristas de P2. **COMISET v2**: actividad normal de una red universitaria (106 horas de 15 equipos, elegidas con el censo de los 202 M de registros) para medir falsas alarmas. Un equipo (`desktop-mh88805`) tenía **Atomic Red Team** ejecutando pruebas: se separa como `fa_art` y no cuenta como actividad normal. **08-11-2026: COMISET LAB** (`fa_lab`, un equipo de laboratorio: 85 alertas y 0 campañas) y el **laboratorio propio** de F2.3 (`fa_vm`: P1 en el ataque y nada en la línea base) validan el ajuste v2 sobre datos no vistos."
       }
     },
     {
@@ -564,6 +564,97 @@
         {
           "refId": "A",
           "rawSql": "SELECT pattern_id AS patron, first_seen AS inicio, arrayStringConcat(devices, ', ') AS hosts, arrayStringConcat(stages, ' → ') AS etapas, confidence_score AS confianza, arrayStringConcat(technique_ids, ', ') AS tecnicas FROM tfg.campaigns FINAL WHERE dataset_id = 'SDWIN-200502035409' ORDER BY inicio",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Ajuste v2 frente a v1, COMISET LAB y laboratorio propio",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "type": "table",
+      "title": "Campañas v1 (tfg.campaigns) frente a v2 (tfg.campaigns_v2) por origen",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT v.origen, countIf(c.version = 'v1') AS campanas_v1, countIf(c.version = 'v2') AS campanas_v2 FROM (SELECT dataset_id, 'v1' AS version FROM tfg.campaigns FINAL UNION ALL SELECT dataset_id, 'v2' AS version FROM tfg.campaigns_v2 FINAL) AS c INNER JOIN (SELECT dataset_id, origen FROM tfg.verdad_datasets FINAL) AS v ON v.dataset_id = c.dataset_id GROUP BY v.origen ORDER BY v.origen",
+          "format": 1,
+          "queryType": "table",
+          "editorType": "sql",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-tfg"
+          }
+        }
+      ],
+      "description": "v1 son las cifras oficiales de F3; v2 es la versión actual desde el 08-11-2026 (validada en LAB y fa_vm).",
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "table",
+      "title": "Laboratorio propio y COMISET LAB: alertas y campañas por dataset",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-tfg"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 40,
+        "w": 16,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT v.dataset_id AS dataset, v.origen, v.verdad, a.alertas, a.altas, c.campanas, c.patrones FROM (SELECT * FROM tfg.verdad_datasets FINAL WHERE origen IN ('fa_vm', 'fa_lab')) AS v LEFT JOIN (SELECT dataset_id, count() AS alertas, countIf(rule_level IN ('high', 'critical')) AS altas FROM tfg.alerts FINAL GROUP BY dataset_id) AS a ON a.dataset_id = v.dataset_id LEFT JOIN (SELECT dataset_id, count() AS campanas, arrayStringConcat(groupUniqArray(pattern_id), ', ') AS patrones FROM tfg.campaigns FINAL GROUP BY dataset_id) AS c ON c.dataset_id = v.dataset_id ORDER BY v.origen DESC, dataset SETTINGS join_use_nulls = 1",
           "format": 1,
           "queryType": "table",
           "editorType": "sql",

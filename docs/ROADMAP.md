@@ -3,7 +3,7 @@
 **Proyecto:** Plataforma de conciencia cibersituacional — detección de ataques multi-etapa, grafo de ataque razonado y priorización explicable
 **Autor:** Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos, ETSIT-UPM
 **Horizonte:** agosto 2026 → defensa junio 2027
-**Última actualización:** 2026-11-06 · *(rev. 5 — F3 cerrada; F4 replanificada: ATT&CK como referencia común, OpenCTI frente a plan B y evaluación de ML-2 sobre el corpus)*
+**Última actualización:** 2026-11-08 · *(rev. 6 — ajuste v2 adoptado tras COMISET LAB y el laboratorio propio; OpenCTI decidido (plan B como capa CTI); ML-2 aumentado adoptado; DoD de F4 cumplido en el código)*
 
 ---
 
@@ -734,7 +734,7 @@ solo tiene el corpus de F3 y FA; en los atómicos P2 no se puede medir así.
   - **Cambio respecto al plan:** se compara paquete contra paquete, no en una segunda base Neo4j.
     OpenCTI reescribe los ids STIX (uuid5 propio) y guarda los de MITRE en una extensión, así que
     cargarlo en el mismo grafo duplicaría cada objeto.
-- [ ] **Comparativa con criterios fijados antes de medir:**
+- [x] **Comparativa con criterios fijados antes de medir:** *(cerrada el 08-11-2026; decisión más abajo)*
 
   | Criterio | Cómo se mide |
   |---|---|
@@ -744,9 +744,23 @@ solo tiene el corpus de F3 y FA; en los atómicos P2 no se puede medir así.
   | Valor añadido | Deduplicación, confianza y caducidad de indicadores, catálogo de conectores, interfaz para el analista |
   | Encaje con ML-2 | Si los perfiles extraídos entran como informes consultables y enlazados |
 
-- [ ] **Conector de importación de documentos de OpenCTI como línea base adicional de ML-2.**
+- [x] **Conector de importación de documentos de OpenCTI como línea base adicional de ML-2.**
   Empareja nombres e identificadores de técnicas con un diccionario. **Comprobar al montarlo qué
   extrae realmente** antes de contarlo como línea base.
+  - *(08-11-2026)* `cti/comparativa/opencti_documentos.py`. Se pasaron las mismas 683 frases de análisis de los
+    6 informes de Microsoft sobre APT29 que usa la evaluación 6a, en modo `workbench`: lo extraído queda
+    pendiente de validar y no se escribe en la plataforma. El resultado está en
+    `data/ml2/resultados/opencti-documentos.json`.
+  - **Técnicas: 0.** El conector solo reconoce técnicas por **identificador explícito**:
+    - en un control con las tablas ATT&CK del editor encontró 13 de los 14 `T1xxx`;
+    - con nombres sueltos («PowerShell», «Scheduled Task/Job», «Spearphishing Attachment») no reconoce ninguna.
+    **No sirve como línea base de extracción de TTPs**: la LB-a propia (diccionario de nombres e
+    identificadores) ya saca 12 técnicas de esas frases, con F1 de 0,51 frente a G0016.
+  - **Entidades: sí aporta**, y es la referencia natural para el paso 9 (NER):
+    - grupo APT29, campaña SolarWinds Compromise, 6 herramientas y 15 familias de malware, con falsos positivos
+      por nombres genéricos de ThreatFox («Hook», «Payload», «STOP»);
+    - observables (dominios, URL, claves de registro y correos);
+    - 5 «teléfonos» que en realidad son números de versión.
 - **Medido el 06-11-2026 con ATT&CK v19.2:**
 
   | Criterio | Plan B | OpenCTI |
@@ -771,11 +785,38 @@ solo tiene el corpus de F3 y FA; en los atómicos P2 no se puede medir así.
   unos 3/s en los primeros minutos, unos 9/s a los 16 minutos y unos 23/s el resto. La estimación de
   22 h hecha con los primeros minutos era errónea. RAM y disco con el feed, en la tabla. Queda
   por comprobar que lo procesado está creado (recuento de indicadores en la plataforma).
-- [ ] **Pendiente (próxima sesión):** el valor añadido sobre el feed completo de ThreatFox (ya cargado), y el
-  encaje con ML-2 pasando 2–3 informes de Microsoft por el conector de documentos (que es a la vez la
-  LB-a).
-- [ ] **Decisión documentada** con la tabla en la mano. Fija qué entra en el despliegue completo y
-  qué en el mínimo (F9).
+- [x] **Valor añadido sobre ThreatFox completo (08-11-2026)**. Recuento en la plataforma:
+  - **134.849 indicadores** de 135.737 subidos. OpenCTI **deduplica por patrón**: hay 888 IOCs repetidos con
+    otro `x_threatfox_id`, y el plan B los guarda por separado. Relaciones `indicates`: 135.466 (271 menos,
+    las que se vuelven iguales al fusionar).
+  - Malware: 1.145 frente a 1.241 en Neo4j (733 de ATT&CK + 508 de ThreatFox): **fusiona 96 familias por nombre
+    o alias**, sin poder revisar ninguna.
+  - **Ciclo de vida de los indicadores.** Las reglas de decaimiento de serie dan:
+    - vida de 47 días a IP y URL, 300 a dominios y 460 a ficheros;
+    - revocación por debajo de 20 puntos;
+    - una puntuación por indicador.
+    Ya hay **4.701 indicadores revocados** por caducidad (el export cubre seis meses). El plan B no tiene nada
+    parecido: es el valor añadido real de OpenCTI.
+  - Interfaz para el analista y catálogo de conectores: sí, pero no son necesarios para ningún pilar.
+- [x] **Encaje con ML-2 (08-11-2026):** ver el conector de documentos. No extrae técnicas de prosa. Los perfiles
+  de ML-2 son STIX 2.1 estándar y entrarían por ImportFileStix, el mismo camino que ThreatFox.
+- [x] **Decisión (08-11-2026), con los criterios fijados antes de medir:**
+
+  | Criterio | Gana | Por qué |
+  |---|---|---|
+  | Coste | **Plan B** | 1 servicio y 3,6 GB, frente a 11 servicios y 13,7 GB |
+  | Ingesta | **Plan B** | 4,7 s frente a 32 min (ATT&CK); 17 s frente a 3 h 28 min (ThreatFox) |
+  | Fidelidad | **Plan B** | OpenCTI pierde las técnicas revocadas y `revoked-by` (hacen falta para traducir ids), las analíticas v18+ y la versión, y fusiona grupos y malware por alias |
+  | Valor añadido | **OpenCTI** | caducidad y puntuación de indicadores, deduplicación por patrón, interfaz y conectores |
+  | Encaje con ML-2 | empate | su conector no extrae técnicas de prosa; los perfiles entran igual por STIX en los dos |
+
+  - **El plan B (STIX → Neo4j) es la capa CTI del sistema**: en el despliegue completo y en el mínimo (F9).
+    El Pilar B lo necesita igualmente para la analítica de grafos.
+  - **OpenCTI queda como perfil opcional `cti`** en el despliegue completo: interfaz de analista y gestión de
+    indicadores, **fuera del camino de los datos**. Ningún pilar depende de él.
+  - **Se lleva al plan B la idea que vale de OpenCTI:** la caducidad de los IOCs por tipo (los mismos 47, 300 y
+    460 días) como atributo `valid_until`, y la deduplicación por patrón. Es una tarea pequeña del cargador, para
+    cuando F5/F6 usen IOCs (`w5·confianza_CTI`).
 
 ### F4.3 🧠 — ML-2: extracción de TTPs de informes
 
@@ -928,7 +969,7 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
       frase [+0,016, +0,056].
     - La validación cruzada mide el sistema con una sola semilla y sin elegir la época por bloque:
       sus cifras absolutas son algo más bajas que las de la partición publicada.
-- [x] **5. Perfil por informe y por actor.** *(07-11-2026: APT29; falta cargarlo en Neo4j)*
+- [x] **5. Perfil por informe y por actor.** *(07-11-2026: APT29; 08-11-2026: regenerado con el modelo aumentado y cargado en Neo4j)*
   - `cti/extract/perfil_stix.py` saca el perfil del sistema decidido (media de las 3 semillas, umbral
     0,20, ∪ diccionario) sobre las 683 frases de análisis. Resultado en `data/ml2/stix/apt29-perfil.json`:
     1 identity, 6 `report` y **22 relaciones G0016 –uses→ técnica** (10 del modelo, 9 del diccionario
@@ -942,6 +983,32 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
   - Salida en STIX: `report` → `attack-pattern` e `intrusion-set` → `uses` → `attack-pattern`, con
     `confidence`.
   - Se carga con el cargador de F4.1, y en OpenCTI si sigue en el despliegue.
+  - **Otros 9 informes (08-11-2026), para el DoD 5** (`cti/extract/perfiles_informes.py`, el mismo sistema
+    adoptado):
+    - el actor de cada informe se resuelve por **alias exacto** en ATT&CK v19.2: Volt Typhoon G1017,
+      Peach Sandstorm → APT33 G0064, Forest Blizzard → APT28 G0007, Storm-0501 G1053, Octo Tempest → Scattered
+      Spider G1015, Storm-1811 G1046 y Mint Sandstorm → Magic Hound G0059;
+    - Storm-0558 (sin grupo en ATT&CK) y MS-2020-03-05 (varios actores) entran solo como `report`;
+    - cargados en Neo4j (fuente `ml2-informes`): 9 `report`, 51 `USES` y 84 `REFERS_TO`, 0 relaciones sin
+      extremo. **En el grafo: 15 informes y perfiles de 8 actores.**
+  - **Generalización a actores que no se usaron para diseñar nada** (un informe por actor, frente a su ficha de
+    ATT&CK con campañas y dentro del espacio de 62 etiquetas):
+
+    | Grupo | Técnicas | Ref. | Aciertos | P | R | F1 |
+    |---|---:|---:|---:|---:|---:|---:|
+    | G0007 APT28 | 8 | 33 | 5 | 0,63 | 0,15 | 0,24 |
+    | G0059 Magic Hound | 8 | 35 | 6 | 0,75 | 0,17 | 0,28 |
+    | G0064 APT33 | 4 | 18 | 2 | 0,50 | 0,11 | 0,18 |
+    | G1015 Scattered Spider | 5 | 26 | 4 | 0,80 | 0,15 | 0,26 |
+    | G1017 Volt Typhoon | 9 | 35 | 7 | 0,78 | 0,20 | 0,32 |
+    | G1046 Storm-1811 | 8 | 14 | 5 | 0,63 | 0,36 | 0,45 |
+    | G1053 Storm-0501 | 9 | 18 | 9 | 1,00 | 0,50 | 0,67 |
+
+    - **Precisión media de 0,73**: lo que extrae casi siempre está en la ficha.
+    - La exhaustividad es baja porque un informe cubre una parte de lo que la ficha acumula de muchas fuentes.
+      Con APT29, que tiene 6 informes, llega a 0,54. Cuanto menos documentado el actor, mejor la cobertura
+      (Storm-0501, Storm-1811).
+    - Misma circularidad que en 6a: las fichas se construyen en parte con estos informes.
 - [ ] **6. Evaluación extrínseca sobre el corpus del proyecto** (no requiere anotar nada):
   - **6a. Perfil de APT29 frente a ATT&CK.** Qué parte de la lista revisada de técnicas de G0016
     recupera el perfil extraído de los informes de APT29, comparando las líneas base con el afinado.
@@ -1036,8 +1103,35 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
     - **6b:** en day1, el espacio cubre ya 8 técnicas de campaña (antes 5) y el perfil acierta entre 4 y 6;
       en day2 cubre 4 y acierta entre 3 y 4.
     - Hay bastante variación entre semillas.
-  - Pendiente: decidir si el sistema adoptado pasa a ser el aumentado (repitiendo la validación cruzada) y
-    regenerar el perfil STIX.
+  - ~~Pendiente: decidir si el sistema adoptado pasa a ser el aumentado (repitiendo la validación cruzada) y
+    regenerar el perfil STIX.~~ Hecho el 08-11-2026 (abajo).
+  - **Regla fijada antes de ver resultados (08-11-2026)**, en `cti/extract/validacion_cruzada_aug.py`:
+    - mismos 5 bloques, semillas, época 7 y umbral 0,20 que la validación adoptada;
+    - el brazo B añade las 343 frases de ATT&CK solo al entrenamiento de cada vuelta;
+    - los dos brazos usan el mismo diccionario podado, así que solo cambia el modelo;
+    - se mide en los 86 informes y solo en las 59 etiquetas originales, porque AnnoCTR no mide las 3 nuevas
+      (2, 2 y 0 frases);
+    - **no inferioridad**: se adopta el aumentado si el límite inferior del IC 95 % de la diferencia en F1 por
+      frase (B − A, remuestreo por informe) es ≥ −0,02.
+  - **Resultado (08-11-2026): SE ADOPTA EL AUMENTADO.** Los 5 bloques tardan unos 20 min en la RTX 5070. El
+    brazo A reproduce exactamente la validación adoptada (0,481 y 0,520).
+
+    | Sistema (86 informes, 59 etiquetas) | F1 frase | P | R | F1 macro | F1 informe |
+    |---|---:|---:|---:|---:|---:|
+    | modelo A (sin aumento) | 0,481 | 0,585 | 0,408 | 0,206 | 0,620 |
+    | **unión A** (adoptado hasta hoy) | 0,520 | 0,569 | 0,480 | 0,382 | 0,695 |
+    | modelo B (aumentado) | 0,470 | 0,615 | 0,380 | 0,199 | 0,607 |
+    | **unión B** (aumentado ∪ diccionario) | 0,518 | 0,593 | 0,460 | 0,382 | 0,700 |
+
+    - Unión B − unión A: −0,002 por frase, IC 95 % [−0,018, +0,013], dentro del margen. Por informe, +0,005
+      [−0,012, +0,022].
+    - El modelo solo pierde algo de exhaustividad (−0,011, sin significación) a cambio de precisión, y el
+      diccionario lo compensa.
+    - **Lo que se gana**, que AnnoCTR no mide: T1003, T1548 y T1569 entran en el espacio.
+  - **Perfil STIX regenerado** (`cti/extract/perfil_stix.py`, ahora con `SecureBERT2.0-base-aug`; umbral
+    mediano 0,25). Salen 22 técnicas: entra T1548 y sale T1055. Frente a G0016+campañas, F1 0,667 (antes 0,655) y
+    precisión 0,864. **Cargado en Neo4j** sustituyendo al anterior: 6 informes, 22 `USES` y 42 `REFERS_TO`, 0
+    relaciones sin extremo. El perfil anterior queda en `data/ml2/stix/apt29-perfil-v1.json`.
 - [ ] **10.** 🟢 **Aumento de datos con LLM** para las técnicas con pocos ejemplos (enfoque tipo
   SynthCTI), midiendo si mejora el desbalanceo.
 
@@ -1050,15 +1144,18 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 - Perfiles STIX cargados en el grafo.
 - Experimentos en MLflow.
 
-### ✅ DoD
-1. ATT&CK completo, versionado y consultable en Neo4j. Técnicas obsoletas resueltas a su sustituto.
-2. ≥1 feed de IOCs sincronizado.
-3. **Comparativa entre OpenCTI y el plan B** medida con los criterios fijados y decisión documentada.
-4. **Modelo afinado, evaluado y comparado con las dos líneas base**, con métricas por técnica.
-5. ≥10 informes procesados y sus perfiles cargados en el grafo.
-6. **Evaluación sobre el corpus:** cobertura del perfil de APT29 frente a ATT&CK y frente a lo detectado
-   (6a y 6b).
-7. Análisis de errores documentado.
+### ✅ DoD — cumplido en el código (08-11-2026); falta pasarlo a la memoria
+1. ✅ ATT&CK completo, versionado y consultable en Neo4j. Técnicas obsoletas resueltas a su sustituto.
+2. ✅ ≥1 feed de IOCs sincronizado (ThreatFox).
+3. ✅ **Comparativa entre OpenCTI y el plan B** medida con los criterios fijados y decisión documentada
+   (F4.2: el plan B es la capa CTI; OpenCTI, perfil opcional).
+4. ✅ **Modelo afinado, evaluado y comparado con las dos líneas base**, con métricas por técnica. Sistema
+   adoptado: SecureBERT 2.0 aumentado ∪ diccionario podado (validaciones cruzadas del 07 y del 08-11).
+5. ✅ ≥10 informes procesados y sus perfiles cargados en el grafo (15 informes, 8 actores).
+6. ✅ **Evaluación sobre el corpus:** cobertura del perfil de APT29 frente a ATT&CK y frente a lo detectado
+   (6a y 6b), más 6c y la generalización a 7 actores más.
+7. ✅ Análisis de errores documentado. Pendiente de Javier: validar los 10 casos «dudosos» de
+   `cti/extract/revision_fp.md`.
 
 ### ⚠️ Riesgos
 | Riesgo | Mitigación |

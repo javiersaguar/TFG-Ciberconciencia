@@ -7,7 +7,7 @@ atrás: el 2 y el 3 miraban un único día de 2020 y la cobertura estaba escrita
 
 Reglas comunes:
   - todas las consultas usan FINAL (las tablas son ReplacingMergeTree y deduplican al fusionar);
-  - los filtros `origen` (corpus, atomico, fa, fa_red, fa_benigno; tabla tfg.verdad_datasets) y
+  - los filtros `origen` (corpus, atomico, fa, fa_red, fa_benigno, fa_art, fa_lab, fa_vm; tabla tfg.verdad_datasets) y
     `dataset` se aplican en todos los paneles de ClickHouse;
   - el rango de tiempo solo afecta a las series temporales; las cifras son del dataset entero.
 
@@ -258,7 +258,10 @@ def validacion():
                "antes y sin puertos en común), así que sirven para topología, no para confirmar aristas de P2. "
                "**COMISET v2**: actividad normal de una red universitaria (106 horas de 15 equipos, elegidas con el censo "
                "de los 202 M de registros) para medir falsas alarmas. Un equipo (`desktop-mh88805`) tenía **Atomic Red Team** "
-               "ejecutando pruebas: se separa como `fa_art` y no cuenta como actividad normal.", 0, 0, 24, 3)]
+               "ejecutando pruebas: se separa como `fa_art` y no cuenta como actividad normal. "
+               "**08-11-2026: COMISET LAB** (`fa_lab`, un equipo de laboratorio: 85 alertas y 0 campañas) y el "
+               "**laboratorio propio** de F2.3 (`fa_vm`: P1 en el ataque y nada en la línea base) validan el ajuste v2 "
+               "sobre datos no vistos.", 0, 0, 24, 3)]
     p.append(fila("Resumen por origen", 4))
     p += [tabla("Volumen y resultados por origen del dataset",
                 "SELECT v.origen, count() AS datasets, sum(e.eventos) AS eventos, sum(a.alertas) AS alertas, sum(c.campanas) AS campanas "
@@ -309,6 +312,22 @@ def validacion():
                 "SELECT pattern_id AS patron, first_seen AS inicio, arrayStringConcat(devices, ', ') AS hosts, "
                 "arrayStringConcat(stages, ' → ') AS etapas, confidence_score AS confianza, arrayStringConcat(technique_ids, ', ') AS tecnicas "
                 "FROM tfg.campaigns FINAL WHERE dataset_id = 'SDWIN-200502035409' ORDER BY inicio", 0, 32, 24, 7)]
+    p.append(fila("Ajuste v2 frente a v1, COMISET LAB y laboratorio propio", 39))
+    p += [tabla("Campañas v1 (tfg.campaigns) frente a v2 (tfg.campaigns_v2) por origen",
+                "SELECT v.origen, countIf(c.version = 'v1') AS campanas_v1, countIf(c.version = 'v2') AS campanas_v2 "
+                "FROM (SELECT dataset_id, 'v1' AS version FROM tfg.campaigns FINAL "
+                "UNION ALL SELECT dataset_id, 'v2' AS version FROM tfg.campaigns_v2 FINAL) AS c "
+                "INNER JOIN (SELECT dataset_id, origen FROM tfg.verdad_datasets FINAL) AS v ON v.dataset_id = c.dataset_id "
+                "GROUP BY v.origen ORDER BY v.origen", 0, 40, 8, 8,
+                desc="v1 son las cifras oficiales de F3; v2 es la versión actual desde el 08-11-2026 (validada en LAB y fa_vm)."),
+          tabla("Laboratorio propio y COMISET LAB: alertas y campañas por dataset",
+                "SELECT v.dataset_id AS dataset, v.origen, v.verdad, a.alertas, a.altas, c.campanas, c.patrones "
+                "FROM (SELECT * FROM tfg.verdad_datasets FINAL WHERE origen IN ('fa_vm', 'fa_lab')) AS v "
+                "LEFT JOIN (SELECT dataset_id, count() AS alertas, countIf(rule_level IN ('high', 'critical')) AS altas "
+                "FROM tfg.alerts FINAL GROUP BY dataset_id) AS a ON a.dataset_id = v.dataset_id "
+                "LEFT JOIN (SELECT dataset_id, count() AS campanas, arrayStringConcat(groupUniqArray(pattern_id), ', ') AS patrones "
+                "FROM tfg.campaigns FINAL GROUP BY dataset_id) AS c ON c.dataset_id = v.dataset_id "
+                "ORDER BY v.origen DESC, dataset SETTINGS join_use_nulls = 1", 8, 40, 16, 8)]
     return cuadro("tfg-external-validation", "6 · Corpus ampliado y validación externa", ["fa", "validacion"], p)
 
 

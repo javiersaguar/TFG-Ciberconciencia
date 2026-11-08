@@ -1,8 +1,11 @@
 """Paso 5 de ML-2: perfil de APT29 extraido de los informes, en STIX 2.1, para el grafo (F4.3).
 
-Sistema: el decidido por validacion cruzada, SecureBERT 2.0 UNION diccionario podado.
+Sistema: el decidido por validacion cruzada, SecureBERT 2.0 UNION diccionario podado. Desde el 08-11-2026,
+con el modelo AUMENTADO con procedimientos de ATT&CK (paso 10a; espacio de 62 tecnicas), adoptado por no
+inferioridad en cti.extract.validacion_cruzada_aug. La version anterior (59 tecnicas, sin aumento) queda en
+data/ml2/stix/apt29-perfil-v1.json.
   - Modelo: media de las probabilidades de las 3 semillas de la particion publicada, con el
-    umbral mediano de las tres (0,20).
+    umbral mediano de las tres.
   - Diccionario: el de la LB-a (poda decidida en desarrollo).
 Solo se usan las frases de ANALISIS (cti.extract.informes): ni las secciones de defensa ni
 las tablas ATT&CK del propio editor.
@@ -36,10 +39,12 @@ from cti.extract import diccionario as dic
 from cti.extract.informes import APT29, CARPETA, frases
 from cti.extract.perfil_apt29 import probabilidades
 
-DATOS = Path("data/ml2/annoctr")
+DATOS = Path("data/ml2/annoctr_aug")
+MODELO = "SecureBERT2.0-base-aug"
 SALIDA = Path("data/ml2/stix/apt29-perfil.json")
 NS = uuid.UUID("6f1c2a5e-6d1b-4e0c-9f2a-7c3d5b1e8a40")   # espacio de nombres propio de ML-2
 CREADO = "2026-11-07T00:00:00.000Z"
+MODIFICADO = "2026-11-08T00:00:00.000Z"   # perfil regenerado con el modelo aumentado
 CONFIANZA_DICCIONARIO = 61
 GRUPO = "G0016"
 
@@ -80,7 +85,7 @@ def main():
     podado = {t: v for t, v in terminos.items() if t not in quitados}
     patron = dic.compilar(podado)
 
-    semillas = probabilidades([f["texto"] for f in usadas])
+    semillas = probabilidades([f["texto"] for f in usadas], MODELO)
     umbral = statistics.median(d["umbral"] for d in semillas.values())
     media = [[statistics.mean(d["probs"][i][j] for d in semillas.values()) for j in range(len(espacio))]
              for i in range(len(usadas))]
@@ -105,14 +110,14 @@ def main():
     tecnicas, grupo = indice_attack()
     meta = metadatos_informes()
     autor = sid("identity", "tfg-ml2")
-    objs = [{"type": "identity", "spec_version": "2.1", "id": autor, "created": CREADO, "modified": CREADO,
-             "name": "TFG ML-2: SecureBERT 2.0 + diccionario ATT&CK", "identity_class": "system"}]
+    objs = [{"type": "identity", "spec_version": "2.1", "id": autor, "created": CREADO, "modified": MODIFICADO,
+             "name": "TFG ML-2: SecureBERT 2.0 (aumentado) + diccionario ATT&CK", "identity_class": "system"}]
     sin_id = []
     for d in APT29:
         refs = sorted(tecnicas[t] for t in por_informe[d] if t in tecnicas)
         m = meta.get(d, {})
         objs.append({"type": "report", "spec_version": "2.1", "id": sid("report", f"ml2|{d}"),
-                     "created": CREADO, "modified": CREADO, "created_by_ref": autor,
+                     "created": CREADO, "modified": MODIFICADO, "created_by_ref": autor,
                      "name": m.get("titulo", d), "published": f"{d[3:]}T00:00:00.000Z",
                      "report_types": ["threat-actor", "attack-pattern"],
                      "object_refs": [grupo] + refs,
@@ -124,7 +129,7 @@ def main():
             continue
         metodo = "ambos" if len(e["metodo"]) == 2 else next(iter(e["metodo"]))
         objs.append({"type": "relationship", "spec_version": "2.1", "id": sid("relationship", f"ml2|{GRUPO}|{t}"),
-                     "created": CREADO, "modified": CREADO, "created_by_ref": autor,
+                     "created": CREADO, "modified": MODIFICADO, "created_by_ref": autor,
                      "relationship_type": "uses", "source_ref": grupo, "target_ref": tecnicas[t],
                      "confidence": e["conf"], "x_tfg_tecnica": t, "x_tfg_metodo": metodo,
                      "x_tfg_frases": e["frases"], "x_tfg_informes": len(e["informes"]),
