@@ -422,6 +422,22 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
 
+  # Razonador Datalog del Pilar B (F5.3). No es un servicio: se lanza con
+  #   docker compose --profile reason run --rm souffle -F /work/facts -D /work/out /rules/attack.dl
+  # Sin red: solo lee reglas y hechos, y escribe las relaciones derivadas.
+  souffle:
+    build:
+      context: ./souffle
+    image: tfg/souffle:2.5
+    profiles: ["reason"]
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ../graph/datalog:/rules:ro
+      - ../data/graph/datalog:/work
+
 volumes:
   redpanda_data:
   flink_data:

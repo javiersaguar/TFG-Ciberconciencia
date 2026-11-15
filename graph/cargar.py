@@ -1,15 +1,20 @@
-"""Carga en Neo4j el inventario observado de un escenario (F5.1), de forma idempotente.
+"""Carga en Neo4j una capa del grafo de un escenario (F5.1), de forma idempotente.
 
-Lee el JSON de graph.inventory.extraer. Fusiona por `id` (los identificadores son deterministas) y
-despues borra lo obsoleto: lo que quedaba de una carga anterior de ESE escenario con `origen`
-observado o inferido y que ya no sale. No toca los nodos :StixObject ni nada con origen sintetico.
+Sirve para las dos capas propias (graph/model.md), segun el campo `capa` del JSON:
+  inventario  el de graph.inventory.extraer; regenera lo que tiene `origen` observado o inferido;
+  sintetica   el de graph.seed.construir; regenera lo que tiene `origen` sintetico.
+
+Fusiona por `id` (los identificadores son deterministas) y despues borra lo obsoleto: lo que quedaba
+de una carga anterior de ESE escenario y de ESA capa y que ya no sale. No toca los nodos :StixObject
+ni la otra capa.
 
 Las relaciones EVIDENCES van de una campana a la tecnica vigente de ATT&CK con ese `external_id`
 (cargada por cti.stix_loader). Si una tecnica no esta en el grafo, se informa y no se inventa.
 
 Uso (desde la raiz del repo, con Neo4j levantado):
-  .venv/bin/python -m graph.inventory.cargar data/graph/inventario-apt29-day1.json
-  .venv/bin/python -m graph.inventory.cargar data/graph/inventario-apt29-day1.json --dry-run
+  .venv/bin/python -m graph.cargar data/graph/inventario-apt29-day1.json
+  .venv/bin/python -m graph.cargar data/graph/sintetica-apt29-day1.json
+  .venv/bin/python -m graph.cargar data/graph/inventario-apt29-day1.json --dry-run
 """
 import argparse
 import collections
@@ -17,30 +22,33 @@ import json
 import time
 from pathlib import Path
 
-ETIQUETAS = {"TfgObject", "Host", "Zone", "Service", "User", "Campaign"}
-TIPOS = {"IN_ZONE", "RUNS", "CONNECTS_TO", "LOGGED_ON", "ADMIN_OF", "OBSERVED_ON", "EVIDENCES"}
+ETIQUETAS = {"TfgObject", "Host", "Zone", "Service", "User", "Campaign", "Vulnerability", "Asset", "Adversary"}
+TIPOS = {"IN_ZONE", "RUNS", "CONNECTS_TO", "LOGGED_ON", "ADMIN_OF", "OBSERVED_ON", "EVIDENCES",
+         "HAS_VULN", "HOSTS", "LOCATED_AT"}
+CAPAS = {"inventario": ["observado", "inferido"], "sintetica": ["sintetico"]}
 ESQUEMA = [
     "CREATE CONSTRAINT tfg_id IF NOT EXISTS FOR (n:TfgObject) REQUIRE n.id IS UNIQUE",
     "CREATE INDEX tfg_escenario IF NOT EXISTS FOR (n:TfgObject) ON (n.escenario)",
     "CREATE INDEX host_name IF NOT EXISTS FOR (n:Host) ON (n.name)",
 ]
-REGENERABLE = ["observado", "inferido"]
 
 
 def validar(doc):
+    regenerable = CAPAS[doc["capa"]]
     for n in doc["nodos"]:
         if not set(n["labels"]) <= ETIQUETAS or "TfgObject" not in n["labels"]:
             raise ValueError(f"Etiquetas no previstas: {n['labels']}")
-        if n["props"].get("escenario") != doc["escenario"] or n["props"].get("origen") not in REGENERABLE:
+        if n["props"].get("escenario") != doc["escenario"] or n["props"].get("origen") not in regenerable:
             raise ValueError(f"Nodo sin escenario u origen válidos: {n['id']}")
     for r in doc["relaciones"]:
         if r["tipo"] not in TIPOS:
             raise ValueError(f"Tipo de relación no previsto: {r['tipo']}")
-        if r["props"].get("escenario") != doc["escenario"] or r["props"].get("origen") not in REGENERABLE:
+        if r["props"].get("escenario") != doc["escenario"] or r["props"].get("origen") not in regenerable:
             raise ValueError(f"Relación sin escenario u origen válidos: {r['id']}")
 
 
 def cargar(tx, doc):
+    regenerable = CAPAS[doc["capa"]]
     por_etiquetas = collections.defaultdict(list)
     for n in doc["nodos"]:
         por_etiquetas[tuple(n["labels"])].append({"id": n["id"], "props": n["props"]})
@@ -61,18 +69,18 @@ def cargar(tx, doc):
                         filas=filas).single()["ids"]
         sin_extremo += sorted({f["id"] for f in filas} - set(hechas))
 
-    # lo obsoleto de este escenario (solo las capas que regenera este cargador)
+    # lo obsoleto de este escenario, solo de la capa que se esta cargando
     esc = doc["escenario"]
     rels = tx.run("MATCH (:TfgObject)-[r]->() WHERE r.escenario = $e AND r.origen IN $o AND NOT r.id IN $ids "
-                  "DELETE r RETURN count(r) AS n", e=esc, o=REGENERABLE, ids=[r["id"] for r in doc["relaciones"]]).single()["n"]
+                  "DELETE r RETURN count(r) AS n", e=esc, o=regenerable, ids=[r["id"] for r in doc["relaciones"]]).single()["n"]
     nodos = tx.run("MATCH (n:TfgObject) WHERE n.escenario = $e AND n.origen IN $o AND NOT n.id IN $ids "
-                   "DETACH DELETE n RETURN count(n) AS n", e=esc, o=REGENERABLE, ids=[n["id"] for n in doc["nodos"]]).single()["n"]
+                   "DETACH DELETE n RETURN count(n) AS n", e=esc, o=regenerable, ids=[n["id"] for n in doc["nodos"]]).single()["n"]
     return sin_extremo, rels, nodos
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("inventario", type=Path, help="JSON de graph.inventory.extraer")
+    ap.add_argument("inventario", type=Path, help="JSON de graph.inventory.extraer o de graph.seed.construir")
     ap.add_argument("--uri", default="bolt://localhost:7687")
     ap.add_argument("--user", default="neo4j")
     ap.add_argument("--password", default="tfg-neo4j")
@@ -81,7 +89,7 @@ def main():
 
     doc = json.loads(args.inventario.read_text(encoding="utf-8"))
     validar(doc)
-    print(f"{args.inventario.name} ({doc['escenario']}): {len(doc['nodos'])} nodos y {len(doc['relaciones'])} relaciones")
+    print(f"{args.inventario.name} ({doc['escenario']}, capa {doc['capa']}): {len(doc['nodos'])} nodos y {len(doc['relaciones'])} relaciones")
     if args.dry_run:
         return
 

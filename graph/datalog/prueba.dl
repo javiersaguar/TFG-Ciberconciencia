@@ -1,0 +1,7 @@
+// Comprobacion de la instalacion: alcanzabilidad transitiva
+.decl arista(a: symbol, b: symbol)
+.decl alcanza(a: symbol, b: symbol)
+arista("a", "b"). arista("b", "c"). arista("c", "d").
+alcanza(X, Y) :- arista(X, Y).
+alcanza(X, Z) :- alcanza(X, Y), arista(Y, Z).
+.output alcanza

@@ -1,0 +1,112 @@
+{
+ "descripcion": "Capa sintética de los escenarios de APT29: lo que los eventos no traen. Todo lo de este fichero se carga con origen 'sintetico'.",
+ "referencias": {
+  "cvss": "NVD (evaluación de nvd@nist.gov), consultado el 2026-11-15",
+  "epss": "FIRST EPSS, puntuación del 2026-11-14",
+  "kev": "CISA Known Exploited Vulnerabilities, catálogo 2026.11.13"
+ },
+ "efectos": {
+  "ejecucion_system": "ejecución de código como SYSTEM en el equipo vulnerable",
+  "admin_dominio": "control del dominio (cuenta del controlador de dominio)",
+  "elevacion_system": "de usuario local a SYSTEM"
+ },
+ "vulnerabilidades": [
+  {
+   "cve": "CVE-2020-0796",
+   "alias": "SMBGhost",
+   "cvss": 10.0,
+   "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+   "acceso": "remoto",
+   "epss": 0.9981,
+   "epss_percentil": 0.99959,
+   "kev": true,
+   "kev_ransomware": true,
+   "publicada": "2020-03-12",
+   "efecto": "ejecucion_system"
+  },
+  {
+   "cve": "CVE-2020-1472",
+   "alias": "Zerologon",
+   "cvss": 10.0,
+   "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+   "acceso": "remoto",
+   "epss": 0.99389,
+   "epss_percentil": 0.9994,
+   "kev": true,
+   "kev_ransomware": true,
+   "publicada": "2020-08-17",
+   "efecto": "admin_dominio"
+  },
+  {
+   "cve": "CVE-2020-0787",
+   "alias": "Elevación local por BITS",
+   "cvss": 7.8,
+   "vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+   "acceso": "local",
+   "epss": 0.42524,
+   "epss_percentil": 0.98728,
+   "kev": true,
+   "kev_ransomware": true,
+   "publicada": "2020-03-12",
+   "efecto": "elevacion_system"
+  }
+ ],
+ "asignaciones": [
+  {
+   "cve": "CVE-2020-1472",
+   "equipo": "NEWYORK",
+   "servicio": "tcp/135",
+   "motivo": "Netlogon va sobre RPC y el controlador de dominio lo atiende; la vulnerabilidad se publicó tres meses después de la captura, así que no podía estar parcheada."
+  },
+  {
+   "cve": "CVE-2020-0796",
+   "equipo": "NASHUA",
+   "servicio": "tcp/445",
+   "motivo": "SMBv3 en un puesto con Windows 10 de la época; versión no verificable en los eventos."
+  },
+  {
+   "cve": "CVE-2020-0787",
+   "equipo": "UTICA",
+   "servicio": null,
+   "motivo": "Elevación local en un puesto con Windows 10 de la época; no necesita servicio de red."
+  }
+ ],
+ "activos": [
+  {
+   "clave": "dominio",
+   "nombre": "Directorio activo del dominio",
+   "criticidad": 10,
+   "equipo": "NEWYORK",
+   "motivo": "Quien controla el controlador de dominio controla todas las cuentas."
+  },
+  {
+   "clave": "documentos-scranton",
+   "nombre": "Documentos de usuario en SCRANTON",
+   "criticidad": 5,
+   "equipo": "SCRANTON",
+   "motivo": "Puesto de usuario; el plan de emulación recoge y exfiltra ficheros de los puestos."
+  },
+  {
+   "clave": "documentos-nashua",
+   "nombre": "Documentos de usuario en NASHUA",
+   "criticidad": 5,
+   "equipo": "NASHUA",
+   "motivo": "Puesto de usuario."
+  },
+  {
+   "clave": "documentos-utica",
+   "nombre": "Documentos de usuario en UTICA",
+   "criticidad": 5,
+   "equipo": "UTICA",
+   "motivo": "Puesto de usuario."
+  }
+ ],
+ "adversario": {
+  "nombre": "Atacante externo",
+  "equipos": [
+   "192.168.0.4",
+   "192.168.0.5"
+  ],
+  "motivo": "Infraestructura del atacante según el plan de emulación (servidores de mando y control)."
+ }
+}

@@ -96,7 +96,7 @@ def main():
     nodos, relaciones = construir(args.escenario, cfg["red_interna"], filas)
     SALIDA.mkdir(parents=True, exist_ok=True)
     destino = SALIDA / f"inventario-{args.escenario}.json"
-    destino.write_text(json.dumps({"escenario": args.escenario, "dataset_id": cfg["dataset_id"],
+    destino.write_text(json.dumps({"escenario": args.escenario, "capa": "inventario", "dataset_id": cfg["dataset_id"],
                                    "campanas": args.campanas, "nodos": nodos, "relaciones": relaciones},
                                   indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"{destino}: {len(nodos)} nodos y {len(relaciones)} relaciones "

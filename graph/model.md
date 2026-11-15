@@ -49,8 +49,42 @@ Todos llevan la etiqueta común `:TfgObject` (restricción de unicidad sobre `id
 | `:User` | `<esc>/user/<sid>` | `name`, `domain`, `sid`, `rid`, `builtin_admin` | observado; `builtin_admin` inferido (RID 500) |
 | `:Campaign` | `campaign_id` del Pilar A | `pattern_id`, `title`, `first_seen`, `last_seen`, `confidence`, `severity`, `stages[]`, `techniques[]`, `evidence_count`, `version` | observado |
 
-Para la capa sintética y el razonamiento (pasos siguientes de F5): `:Vulnerability` (ya existe como
-tipo STIX) y `:AttackPath`.
+Para el razonamiento (pasos siguientes de F5): `:AttackPath`.
+
+## Capa sintética
+
+La declara `graph/seed/apt29.json` y la construye `graph/seed/construir.py`. Todo lleva
+`origen: sintetico`.
+
+| Etiqueta | `id` | Propiedades |
+|---|---|---|
+| `:Vulnerability` | `<esc>/vuln/<CVE>` | `cve`, `name`, `cvss`, `vector`, `access` (`remoto`, `local`), `effect`, `epss`, `epss_percentile`, `kev`, `kev_ransomware`, `published`, `sources[]` |
+| `:Asset` | `<esc>/asset/<clave>` | `name`, `criticality` (1–10), `reason` |
+| `:Adversary` | `<esc>/adversary/externo` | `name`, `reason` |
+
+| Relación | Entre | Propiedades |
+|---|---|---|
+| `HAS_VULN` | `Host → Vulnerability` | `proto`, `port` (solo las remotas), `reason` |
+| `HOSTS` | `Host → Asset` | — |
+| `LOCATED_AT` | `Adversary → Host` | — |
+
+**Lo que es real dentro de lo sintético:** las cifras de cada vulnerabilidad. El CVSS es el de NVD,
+el EPSS el de FIRST y la marca de explotada la del catálogo de CISA, consultados el 15-11-2026. Lo
+sintético es decir que ese equipo la tiene.
+
+**Regla de asignación:** una vulnerabilidad de acceso remoto solo se asigna si su servicio se
+observó en ese escenario. No se inventa un servicio para colgarle una vulnerabilidad. Por eso
+SMBGhost está en NASHUA el día 1 (alguien usó su SMB) y se omite el día 2.
+
+| Vulnerabilidad | Equipo | CVSS | EPSS | Efecto | Escenarios |
+|---|---|---|---|---|---|
+| CVE-2020-1472 (Zerologon) | NEWYORK, `tcp/135` | 10,0 | 0,994 | control del dominio | los dos |
+| CVE-2020-0796 (SMBGhost) | NASHUA, `tcp/445` | 10,0 | 0,998 | ejecución como SYSTEM | día 1 |
+| CVE-2020-0787 (BITS) | UTICA, local | 7,8 | 0,425 | de usuario a SYSTEM | los dos |
+
+Activos: el directorio activo del dominio en NEWYORK (criticidad 10) y los documentos de usuario de
+cada puesto (5). Adversario: en 192.168.0.4 y 192.168.0.5, la infraestructura de mando y control
+según el plan de emulación.
 
 ## Relaciones del inventario
 
@@ -89,10 +123,9 @@ a los grupos que la usan y a los perfiles de ML-2.
 
 ## Idempotencia
 
-`graph/inventory` fusiona por identificador (`MERGE`), y los identificadores son deterministas:
+`graph/cargar.py` carga las dos capas propias y fusiona por identificador (`MERGE`), y los identificadores son deterministas:
 recargar no duplica. Después borra lo que quedó obsoleto, es decir, los nodos y relaciones de ese
-escenario con `origen` `observado` o `inferido` que la carga actual ya no produce. No toca
-`:StixObject` ni nada con `origen` `sintetico`.
+escenario y de esa capa que la carga actual ya no produce. No toca `:StixObject` ni la otra capa.
 
 ## Lo que el inventario no puede dar
 

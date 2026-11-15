@@ -1214,12 +1214,21 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 - [x] **Inventario observado** *(15-11-2026)*, de los eventos de APT29 (day1 y day2): equipos e IP
   (Sysmon 3), usuarios, sesiones (4624), privilegios (4672) y conexiones entre equipos.
   - `graph/inventory/`: `construir.py` (reglas de inferencia, 12 tests sin bases de datos),
-    `extraer.py` (ClickHouse → JSON) y `cargar.py` (JSON → Neo4j, idempotente y con borrado de obsoletos).
+    `extraer.py` (ClickHouse → JSON) y `graph/cargar.py` (JSON → Neo4j, idempotente y con borrado de
+    obsoletos; sirve a las dos capas).
   - Las direcciones públicas (79 y 145) se agrupan en un nodo `internet`; las privadas se mantienen.
   - En el grafo: `apt29-day1` con 40 nodos y 101 relaciones; `apt29-day2` con 39 y 106. Ninguna
     relación sin extremo, y los 141.084 nodos de ATT&CK y CTI no cambian.
-- [ ] **Capa sintética documentada** (`graph/seed/`): zonas, activo crítico y unas pocas
-  vulnerabilidades (CVE con CVSS y EPSS reales) plausibles para los servicios observados.
+- [x] **Capa sintética documentada** *(15-11-2026)*: `graph/seed/apt29.json` (declaración) y
+  `graph/seed/construir.py` (6 tests). Todo entra con `origen: sintetico`.
+  - **3 vulnerabilidades con cifras reales** (CVSS de NVD, EPSS de FIRST y catálogo de explotadas de
+    CISA, consultados el 15-11-2026): Zerologon en el controlador de dominio (10,0; EPSS 0,994),
+    SMBGhost en NASHUA (10,0; 0,998) y la elevación local de BITS en UTICA (7,8; 0,425).
+  - **Regla:** una vulnerabilidad remota solo se asigna si su servicio se observó en ese escenario.
+    SMBGhost entra el día 1 y se omite el día 2.
+  - 4 activos (el dominio, criticidad 10; los documentos de cada puesto, 5) y la posición del
+    adversario (192.168.0.4 y .5, según el plan de emulación).
+  - Las zonas no son sintéticas: salen de las IP observadas (inferidas).
 - [x] **Campañas del Pilar A en el grafo** *(15-11-2026)*: `(:Campaign)` desde `tfg.campaigns_v2`,
   enlazadas a sus equipos (`OBSERVED_ON`, con el papel de origen o destino) y a sus técnicas vigentes
   de ATT&CK (`EVIDENCES`). 4 campañas el día 1 y 6 el día 2. Las alertas quedan como evidencia de la
@@ -1231,13 +1240,33 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 
 ### F5.3 — Razonamiento Datalog (lo simbólico) *(antes que F5.2)*
 
-- [ ] Instalar **Soufflé** (versión fijada).
+- [x] Instalar **Soufflé** *(15-11-2026)*: **2.5**, como imagen Docker `tfg/souffle:2.5`
+  (`infra/souffle/Dockerfile`, con el SHA-512 de la release comprobado). Perfil `reason` del compose,
+  sin red y sin privilegios. No hay `sudo` en WSL y así queda reproducible. Ocupa 583 MB porque
+  incluye el compilador de C++.
 - [ ] Estudiar el modelo MulVAL: hechos + reglas de interacción → estados alcanzables.
-- [ ] **Reimplementar el subconjunto de reglas en Soufflé**, adaptado al modelo propio:
-  `graph/datalog/{facts,rules}.dl`, con ejecución remota, escalada local, movimiento lateral por
-  credenciales y **refuerzo por evidencia observada** (campañas del Pilar A).
-- [ ] Exportador Neo4j → `.facts` e importador de rutas derivadas → `(:AttackPath)`.
-- [ ] **Trazabilidad de la derivación**: qué regla y qué hechos justifican cada paso.
+- [~] **Reimplementar el subconjunto de reglas en Soufflé**, adaptado al modelo propio
+  *(15-11-2026: primera versión, sobre el día 1)*: `graph/datalog/attack.dl`, con 12 reglas.
+  - Reglas: acceso inicial por ejecución del usuario, escalada local (por vulnerabilidad o porque la
+    sesión es de un administrador), robo de credenciales, movimiento lateral con credenciales y por
+    RDP, explotación remota, control del dominio (tres vías) y su propagación.
+  - Alcanzabilidad: conexión observada o misma subred interna (inferida y marcada).
+  - **Refuerzo por evidencia:** `confirmed` enlaza cada aplicación de regla con la campaña que la
+    confirma (P3 con T1548 → escalada; P1 → robo de credenciales; P2 → movimiento lateral).
+  - **Primer resultado (día 1):** el razonador deriva la cadena real y **las campañas confirman
+    todos sus pasos**: SCRANTON → escalada (P3) → credenciales de pbeesly (P1) → NASHUA por 5985, 445 y
+    135 (P2) → credenciales (P1). Además deriva lo que no ocurrió: el dominio por Zerologon desde
+    cualquier equipo comprometido, y NASHUA por SMBGhost.
+  - **Pendiente:**
+    - la regla de acceso inicial también se cumple en NASHUA, que alcanza al C2 *porque* ya estaba
+      comprometido: hay que usar el orden temporal;
+    - validar con el día 2 sin tocar las reglas;
+    - tests de las reglas con hechos mínimos.
+- [~] Exportador Neo4j → `.facts` *(15-11-2026: `graph/datalog/exportar.py`, 12 relaciones, con
+  la capa de procedencia de cada una)* e importador de rutas derivadas → `(:AttackPath)` *(pendiente)*.
+- [~] **Trazabilidad de la derivación** *(15-11-2026)*: las relaciones `app` (aplicación de regla,
+  conclusión y detalle) y `pre` (sus precondiciones) son el grafo de ataque Y/O. Falta extraer de ahí
+  las rutas.
 - [ ] Contraste con el plan de emulación: ¿la ruta derivada coincide con la de APT29?
 
 ### F5.2 — Analítica de grafos (GDS)
