@@ -1,0 +1,32 @@
+// Version 2 de las reglas del razonador (15-11-2026). Incluye la v1 SIN TOCARLA y solo anade clausulas.
+//
+// Por que existe: la v1 se diseno con el dia 1 de APT29 y, congelada, explico 3 de las 6 campanas del
+// dia 2. La causa no estaba en las reglas sino en los hechos: el adversario usa una cuenta que ya tenia
+// una sesion abierta ANTES de que empezara la captura, y el inventario solo contaba los inicios de
+// sesion de la captura. La v2 anade:
+//   - las sesiones previas (regla 8 del inventario, hecho `session_prior`) cuentan como sesion
+//     interactiva en R1, R3 y R4;
+//   - R12, el volcado del directorio desde el controlador de dominio (DCSync, T1003.006).
+// Se ajusto despues de ver el dia 2, y no hay un tercer escenario donde validarla: sus cifras se
+// informan aparte de las de la v1, que son las de referencia.
+#include "attack.dl"
+
+.decl session_prior(u: symbol, h: symbol)
+.input session_prior
+.decl user(u: symbol)
+.input user
+
+// R1, R3 y R4 con una sesion abierta antes de la captura.
+r_initial(H, U) :- host(H, _, "interna", _), session_prior(U, H), reaches_outside(H).
+r_admin_session(H, U) :- exec(H, "user"), session_prior(U, H), admin_of(U, H).
+r_cred_dump(H, U) :- exec(H, "admin"), session_prior(U, H).
+
+// R12. Credenciales de todo el dominio: quien administra el controlador puede replicar el directorio.
+.decl r_dcsync(d: symbol, u: symbol)
+r_dcsync(D, U) :- exec(D, "admin"), host(D, "domain_controller", _, _), user(U).
+creds(U) :- r_dcsync(_, U).
+
+app(cat("R12|", D, "|", U), "credenciales_del_dominio", cat("creds:", U),
+    cat("replicacion del directorio desde ", D), "observado") :- r_dcsync(D, U).
+pre(cat("R12|", D, "|", U), cat("exec:", D, ":admin")) :- r_dcsync(D, U).
+confirmed(cat("R12|", D, "|", U), "campana", C) :- r_dcsync(D, U), campaign(C, "P1", D, _), campaign_tech(C, "T1003.006").

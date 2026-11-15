@@ -18,6 +18,8 @@ SERVICIOS = {53: "dns", 80: "http", 88: "kerberos", 123: "ntp", 135: "rpc", 137:
              636: "ldaps", 3268: "global-catalog", 3389: "rdp", 5985: "winrm", 5986: "winrm-https",
              8080: "http-alt", 8443: "https-alt"}
 PRIVILEGIO_ADMIN = "SeDebugPrivilege"
+# Tolerancia entre el reloj de Sysmon y el del registro de seguridad (se han visto hasta 30 s).
+MARGEN_SESION_PREVIA_MS = 120_000
 
 
 def corto(fqdn):
@@ -169,6 +171,23 @@ def construir(escenario, red_interna, filas):
     for (u, h), a in sorted(adm.items()):
         rel("ADMIN_OF", u, h, "inferido", events=a["events"], privileges=sorted(a["privs"]),
             first_seen=a["first"], last_seen=a["last"])
+
+    # --- sesiones abiertas antes de la captura (regla 8)
+    por_nombre = collections.defaultdict(set)
+    for n in nodos.values():
+        if "User" in n["labels"]:
+            por_nombre[n["props"]["name"]].add(n["id"])
+    primer_inicio = {k: s["first"] for k, s in ses.items()}
+    for f in filas.get("actividad", []):
+        ids = por_nombre.get(f["user"], set())
+        if len(ids) != 1:            # cuenta desconocida o nombre ambiguo: no se infiere nada
+            continue
+        u, h = next(iter(ids)), f"{escenario}/host/{corto(f['host'])}"
+        inicio = primer_inicio.get((u, h))
+        if inicio is None or f["first"] < inicio - MARGEN_SESION_PREVIA_MS:
+            rel("HAS_SESSION", u, h, "inferido", process_events=f["n"], first_activity=f["first"],
+                last_activity=f["last"], first_logon=inicio if inicio is not None else -1,
+                reason="procesos de la cuenta anteriores a cualquier inicio de sesión de la captura")
 
     # --- campanas del Pilar A
     for c in filas["campanas"]:

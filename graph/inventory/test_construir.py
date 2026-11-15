@@ -32,6 +32,11 @@ def filas():
              "privileges": ["SeDebugPrivilege", "SeBackupPrivilege"], "n": 2, "first": 10, "last": 20},
             {"host": "DC.lab.local", "user": "alice", "domain": "LAB", "sid": f"{SID}1107",
              "privileges": ["SeChangeNotifyPrivilege"], "n": 1, "first": 10, "last": 20}],
+        "actividad": [
+            {"host": "DC.lab.local", "user": "alice", "n": 9, "first": 5, "last": 50},        # sin 4624 de alice en DC
+            {"host": "WS1.lab.local", "user": "alice", "n": 9, "first": 9, "last": 50},       # a la vez que su 4624
+            {"host": "DC.lab.local", "user": "admin", "n": 3, "first": 10 - 120_001, "last": 50},  # mucho antes
+            {"host": "WS1.lab.local", "user": "desconocido", "n": 9, "first": 1, "last": 50}],
         "campanas": [{
             "campaign_id": "c1", "pattern_id": "P2", "dataset_id": "ds", "title": "Movimiento lateral", "first_seen": 1,
             "last_seen": 2, "severity_id": 4, "confidence_score": 90, "technique_ids": ["T1021.006", "T1003.001"],
@@ -93,6 +98,11 @@ class Construir(unittest.TestCase):
     def test_admin_solo_con_sedebug(self):
         admins = [(x["origen"], x["destino"]) for x in self.tipos("ADMIN_OF")]
         self.assertEqual(admins, [(f"{ESC}/user/{SID}1107", f"{ESC}/host/WS1")])
+
+    def test_sesion_previa_a_la_captura(self):
+        previas = sorted((x["origen"].rsplit("-", 1)[1], x["destino"].rsplit("/", 1)[1]) for x in self.tipos("HAS_SESSION"))
+        self.assertEqual(previas, [("1107", "DC"), ("500", "DC")])
+        self.assertTrue(all(x["props"]["origen"] == "inferido" for x in self.tipos("HAS_SESSION")))
 
     def test_campana(self):
         c = self.n["c1"]["props"]

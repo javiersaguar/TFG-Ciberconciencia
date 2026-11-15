@@ -24,6 +24,9 @@ CONSULTAS = {
     "logon": ("inventario", f"MATCH (u:User)-[l:LOGGED_ON]->{H} UNWIND l.logon_types AS t RETURN u.name, h.name, t"),
     "admin_of": ("inventario", f"MATCH (u:User)-[:ADMIN_OF]->{H} RETURN u.name, h.name"),
     "builtin_admin": ("inventario", "MATCH (u:User {escenario: $e}) WHERE u.builtin_admin RETURN u.name"),
+    # solo las lee la v2 de las reglas
+    "session_prior": ("inventario", f"MATCH (u:User)-[:HAS_SESSION]->{H} RETURN u.name, h.name"),
+    "user": ("inventario", "MATCH (u:User {escenario: $e}) RETURN u.name"),
     "campaign": ("inventario", f"MATCH (c:Campaign)-[o:OBSERVED_ON]->{H} RETURN c.id, c.pattern_id, h.name, o.role"),
     "campaign_tech": ("inventario", "MATCH (c:Campaign {escenario: $e}) UNWIND c.techniques AS t RETURN c.id, t"),
     "vuln_remote": ("sintetica", f"MATCH {H}-[r:HAS_VULN]->(v:Vulnerability) WHERE v.access = 'remoto' "

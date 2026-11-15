@@ -26,7 +26,7 @@ from pathlib import Path
 ETIQUETAS = {"TfgObject", "Host", "Zone", "Service", "User", "Campaign", "Vulnerability", "Asset", "Adversary",
              "AttackPath"}
 TIPOS = {"IN_ZONE", "RUNS", "CONNECTS_TO", "LOGGED_ON", "ADMIN_OF", "OBSERVED_ON", "EVIDENCES",
-         "HAS_VULN", "HOSTS", "LOCATED_AT", "REACHES", "TRAVERSES", "CONFIRMED_BY"}
+         "HAS_VULN", "HOSTS", "LOCATED_AT", "REACHES", "TRAVERSES", "CONFIRMED_BY", "HAS_SESSION"}
 CAPAS = {"inventario": ["observado", "inferido"], "sintetica": ["sintetico"], "derivada": ["derivado"]}
 ESQUEMA = [
     "CREATE CONSTRAINT tfg_id IF NOT EXISTS FOR (n:TfgObject) REQUIRE n.id IS UNIQUE",

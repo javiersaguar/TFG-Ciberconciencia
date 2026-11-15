@@ -74,6 +74,8 @@ BASE = {
 
 @unittest.skipUnless(hay_souffle(), "falta la imagen tfg/souffle")
 class Reglas(unittest.TestCase):
+    version = "v1"
+
     def razonar(self, **cambios):
         hechos = {r: list(BASE.get(r, [])) for r in CONSULTAS}
         for r, filas in cambios.items():
@@ -86,7 +88,7 @@ class Reglas(unittest.TestCase):
             (d / "out").chmod(0o777)
             for r, filas in hechos.items():
                 (d / "facts" / f"{r}.facts").write_text("".join("\t".join(map(str, f)) + "\n" for f in filas))
-            razonar.ejecutar(d / "facts", d / "out")
+            razonar.ejecutar(d / "facts", d / "out", Path(razonar.__file__).parent / razonar.VERSIONES[self.version][0])
             rel = razonar.leer(d / "out")
         self.rel = rel
         self.exec = set(rel["exec"])
@@ -183,6 +185,36 @@ class Reglas(unittest.TestCase):
         # una escalada sin la tecnica de elusion de UAC no confirma R3
         self.razonar(**hechos | {"campaign_tech": [("c3", "T1055")]})
         self.assertFalse(self.apps["R3|WS1|alice"]["confirmed"])
+
+
+@unittest.skipUnless(hay_souffle(), "falta la imagen tfg/souffle")
+class ReglasV2(Reglas):
+    """La v2 incluye la v1 (hereda todos sus tests) y anade las sesiones previas y el volcado del directorio."""
+    version = "v2"
+
+    def test_v1_no_usa_las_sesiones_previas(self):
+        hechos = dict(logon=[], session_prior=[("alice", "WS1")])
+        self.razonar(**hechos)
+        self.assertEqual(self.exec, {("WS1", "user")})
+        self.version = "v1"
+        self.razonar(**hechos)
+        self.assertEqual(self.exec, set())
+
+    def test_una_sesion_previa_deja_credenciales(self):
+        # bob no inicia sesion en la captura, pero ya estaba trabajando en WS1
+        self.razonar(admin_of=[("alice", "WS1")], session_prior=[("bob", "WS1")])
+        self.assertEqual(self.creds, {"alice", "bob"})
+
+    def test_volcado_del_directorio_desde_el_controlador(self):
+        hechos = dict(admin_of=[("alice", "WS1"), ("alice", "DC")], conn=BASE["conn"] + [("WS1", "DC", "tcp", 5985)],
+                      user=[("alice",), ("carol",)], campaign=[("c1", "P1", "DC", "host")])
+        self.razonar(**hechos, campaign_tech=[("c1", "T1003.006")])
+        self.assertIn("carol", self.creds)
+        self.assertEqual([c["ref"] for c in self.apps["R12|DC|carol"]["confirmed"]], ["c1"])
+        self.razonar(**hechos, campaign_tech=[("c1", "T1003.001")])     # otra tecnica no lo confirma
+        self.assertFalse(self.apps["R12|DC|carol"]["confirmed"])
+        self.razonar(admin_of=[("alice", "WS1")], user=[("alice",), ("carol",)])   # sin el controlador, no
+        self.assertNotIn("carol", self.creds)
 
 
 if __name__ == "__main__":

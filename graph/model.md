@@ -56,7 +56,7 @@ Las escribe `graph/datalog/razonar.py` con la salida de Soufflé. Todo lleva `or
 
 | Etiqueta | `id` | Propiedades |
 |---|---|---|
-| `:AttackPath` | `<esc>/path/<activo>/<criterio>` | `asset`, `goal`, `criticality`, `criteria[]`, `steps`, `confirmed_steps`, `hypothetical_steps`, `uses_synthetic`, `uses_inferred`, `rules[]`, `hosts[]`, `narrative`, `steps_json`, `rules_sha256` |
+| `:AttackPath` | `<esc>/path/<activo>/<criterio>` | `asset`, `goal`, `criticality`, `criteria[]`, `steps`, `confirmed_steps`, `hypothetical_steps`, `uses_synthetic`, `uses_inferred`, `rules[]`, `hosts[]`, `narrative`, `steps_json`, `rules_sha256`, `rules_version` |
 
 | Relación | Entre | Propiedades |
 |---|---|---|
@@ -114,6 +114,7 @@ según el plan de emulación.
 | `CONNECTS_TO` | `Host → Host` | `port`, `proto`, `service`, `events`, `peers`, `recorders[]`, `first_seen`, `last_seen`, `processes[]` | Sysmon 3 |
 | `LOGGED_ON` | `User → Host` | `logon_types[]`, `events`, `from_ips[]`, `first_seen`, `last_seen` | Security 4624 |
 | `ADMIN_OF` | `User → Host` | `events`, `privileges[]`, `first_seen`, `last_seen` | Security 4672 con `SeDebugPrivilege` |
+| `HAS_SESSION` | `User → Host` | `process_events`, `first_activity`, `last_activity`, `first_logon`, `reason` | Sysmon 1, inferido (regla 8) |
 | `OBSERVED_ON` | `Campaign → Host` | `role` (`host`, `origen`, `destino`) | campaña del Pilar A |
 | `EVIDENCES` | `Campaign → Technique` | — | técnicas de la evidencia, enlazadas con ATT&CK por `external_id` |
 
@@ -139,6 +140,13 @@ a los grupos que la usan y a los perfiles de ML-2.
    administrador local o de dominio en ese equipo, en ese inicio de sesión.
 7. **Usuarios:** solo cuentas de dominio o locales con SID `S-1-5-21-…`, sin las cuentas de equipo
    (`NOMBRE$`) ni las de servicio integradas.
+8. **Sesión abierta antes de la captura** *(añadida el 15-11-2026, tras validar con el día 2)*: una
+   cuenta conocida que crea procesos en un equipo (Sysmon 1) sin ningún inicio de sesión suyo en la
+   captura, o más de 2 minutos antes del primero. La captura empieza con usuarios ya trabajando, y su
+   4624 quedó fuera. Los 2 minutos cubren la diferencia entre el reloj de Sysmon y el del registro de
+   seguridad (hasta 30 s observados). Cuando los procesos empiezan a la vez que un inicio de sesión
+   de red, es una sesión remota y no se infiere nada. El tipo de sesión no se conoce: se supone que
+   deja credenciales reutilizables, y por eso va marcada como `inferido`.
 
 ## Idempotencia
 

@@ -14,8 +14,8 @@ Cada ruta conserva la traza completa: por paso, la regla, el detalle, las precon
 apoya (observado, inferido o sintetico) y que evidencia lo confirma.
 
 Uso (desde la raiz del repo, con Neo4j levantado y despues de graph.datalog.exportar):
-  .venv/bin/python -m graph.datalog.razonar apt29-day1
-  .venv/bin/python -m graph.cargar data/graph/derivada-apt29-day1.json
+  .venv/bin/python -m graph.datalog.razonar apt29-day1 --reglas v2
+  .venv/bin/python -m graph.cargar data/graph/derivada-apt29-day1-v2.json
 """
 import argparse
 import collections
@@ -27,6 +27,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 REGLAS = Path(__file__).parent / "attack.dl"
+# Version de las reglas -> fichero principal y todos los que la componen (para su huella).
+VERSIONES = {"v1": ("attack.dl", ["attack.dl"]), "v2": ("attack_v2.dl", ["attack.dl", "attack_v2.dl"])}
 TRABAJO = Path("data/graph/datalog")
 DATOS = Path("data/graph")
 IMAGEN = "tfg/souffle:2.5"
@@ -138,7 +140,14 @@ def texto(n, paso, campanas):
     return f"{n}. {paso['rule']} → {paso['conclusion']}{detalle} [{estado}]"
 
 
-def construir(escenario, rel, mapa, hash_reglas):
+def huella(version):
+    h = hashlib.sha256()
+    for f in VERSIONES[version][1]:
+        h.update((Path(__file__).parent / f).read_bytes())
+    return h.hexdigest()
+
+
+def construir(escenario, rel, mapa, hash_reglas, version="v1"):
     """Nodos :AttackPath y sus relaciones a partir de la salida del razonador."""
     apps = aplicaciones(rel)
     mejor = {c: mejores(apps, c) for c in CRITERIOS}
@@ -179,7 +188,7 @@ def construir(escenario, rel, mapa, hash_reglas):
                 "rules": [p["rule"] for p in reales], "hosts": equipos,
                 "narrative": "\n".join(texto(i, p, campanas) for i, p in enumerate(reales, 1)),
                 "steps_json": json.dumps(pr["pasos"], ensure_ascii=False, sort_keys=True),
-                "rules_sha256": hash_reglas}}
+                "rules_sha256": hash_reglas, "rules_version": version}}
             rel_("REACHES", pid, mapa["activos"][activo])
             for i, e in enumerate(equipos, 1):
                 rel_("TRAVERSES", pid, mapa["equipos"][e], clave=str(i), order=i)
@@ -212,23 +221,24 @@ def entrada(hechos):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("escenario")
+    ap.add_argument("--reglas", choices=sorted(VERSIONES), default="v1")
     args = ap.parse_args()
-    hechos, salida = TRABAJO / args.escenario / "facts", TRABAJO / args.escenario / "out"
-    ejecutar(hechos, salida)
+    hechos, salida = TRABAJO / args.escenario / "facts", TRABAJO / args.escenario / f"out-{args.reglas}"
+    ejecutar(hechos, salida, Path(__file__).parent / VERSIONES[args.reglas][0])
     rel = leer(salida) | entrada(hechos)
     mapa = json.loads((hechos / "PROCEDENCIA.json").read_text(encoding="utf-8"))
-    hash_reglas = hashlib.sha256(REGLAS.read_bytes()).hexdigest()
-    nodos, relaciones, resumen = construir(args.escenario, rel, mapa, hash_reglas)
-    destino = DATOS / f"derivada-{args.escenario}.json"
+    hash_reglas = huella(args.reglas)
+    nodos, relaciones, resumen = construir(args.escenario, rel, mapa, hash_reglas, args.reglas)
+    destino = DATOS / f"derivada-{args.escenario}-{args.reglas}.json"
     camp = explicadas(rel)
-    destino.write_text(json.dumps({"escenario": args.escenario, "capa": "derivada", "reglas_sha256": hash_reglas,
+    destino.write_text(json.dumps({"escenario": args.escenario, "capa": "derivada", "reglas": args.reglas, "reglas_sha256": hash_reglas,
                                    "campanas": camp, "nodos": nodos, "relaciones": relaciones}, indent=1, ensure_ascii=False),
                        encoding="utf-8")
     apps = aplicaciones(rel)
     reales = [a for a in apps.values() if a["basis"] != "trivial"]
     print(f"{args.escenario}: {len(reales)} aplicaciones de regla, {sum(bool(a['confirmed']) for a in reales)} confirmadas; "
           f"estados: {dict(collections.Counter(a['conclusion'].split(':')[0] for a in reales))}")
-    print(f"reglas {hash_reglas[:12]} · {destino}: {len(nodos)} rutas")
+    print(f"reglas {args.reglas} ({hash_reglas[:12]}) · {destino}: {len(nodos)} rutas")
     print(f"campañas del Pilar A explicadas por alguna regla: {sum(c['explicada'] for c in camp)} de {len(camp)}")
     for c in camp:
         if not c["explicada"]:

@@ -1284,15 +1284,44 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
   - **Causa:** en el día 2 el adversario usa las cuentas de mscott y kmalone, y en los eventos esas
     cuentas solo tienen sesiones de red, que son el efecto del salto y no su causa. La regla de robo
     de credenciales exige una sesión interactiva en un equipo ya comprometido, y no la hay.
-  - **Mejoras candidatas (v2 de las reglas, a medir aparte como con los patrones):**
-    - inicio de sesión de red como U **desde un equipo comprometido** ⇒ el adversario tiene las
-      credenciales de U (kmalone entra en NEWYORK desde UTICA);
-    - administrador en el controlador de dominio ⇒ credenciales de todo el dominio (DCSync,
-      `T1003.006`, que está entre las técnicas de la campaña de NEWYORK).
-    Solo hay dos escenarios, así que una v2 no tendría un tercero donde validarse: se informaría con
-    esa cautela.
-- [~] Contraste con el plan de emulación: ¿la ruta derivada coincide con la de APT29? *(15-11-2026: el día 1 coincide
-  con las campañas; falta contrastar paso a paso con el plan, y el día 2 tras la v2.)*
+- [x] **v2 de las reglas, medida aparte** *(15-11-2026; `graph/datalog/attack_v2.dl`, huella
+  `76c174ce27f9`)*. Incluye la v1 sin tocarla y solo añade cláusulas.
+  - **La causa real del día 2 estaba en los hechos, no en las reglas.** mscott crea procesos en UTICA y
+    SCRANTON desde el primer minuto de la captura y no tiene ningún inicio de sesión registrado: ya
+    tenía la sesión abierta. El inventario solo contaba los 4624 de la captura.
+  - **Regla 8 del inventario (sesión previa a la captura):** una cuenta conocida que crea procesos en un
+    equipo sin inicio de sesión suyo, o más de 2 min antes del primero. Da 5 sesiones (`HAS_SESSION`,
+    inferidas): pbeesly en SCRANTON y NASHUA; dschrute y mscott en UTICA; mscott en SCRANTON. No se
+    infiere donde los procesos empiezan a la vez que un inicio de sesión de red (kmalone en SCRANTON,
+    mscott en NEWYORK): eso es el salto lateral.
+  - **Reglas nuevas:** las sesiones previas cuentan como sesión en R1, R3 y R4; y **R12**, el volcado del
+    directorio desde el controlador de dominio (DCSync), que se confirma con una campaña P1 con
+    `T1003.006`.
+  - **Descartada:** «inicio de sesión de red desde un equipo comprometido ⇒ credenciales». Habría
+    explicado el salto a NEWYORK con kmalone, que entra 15 min después; el salto se hizo como mscott.
+
+  | Escenario | Reglas | Aplicaciones | Confirmadas | Campañas explicadas |
+  |---|---|---:|---:|---:|
+  | Día 1 | v1 | 32 | 7 | 4 de 4 |
+  | Día 1 | v2 | 33 | 7 | 4 de 4 |
+  | Día 2 | v1 | 16 | 3 | **3 de 6** |
+  | Día 2 | v2 | 43 | 15 | **6 de 6** |
+
+  - **Día 2 con v2:** la ruta más respaldada hacia SCRANTON es la cadena real, **6 pasos y los 6
+    confirmados**: acceso a UTICA → escalada (P3) → credenciales de mscott (P1) → NEWYORK como mscott
+    (P2) → credenciales de kmalone por el volcado del directorio (P1) → SCRANTON como kmalone (P2).
+    El orden de equipos coincide con las campañas y con los pasos del plan ya anotados (16.C y 20.B).
+    Las cuentas están comprobadas contra los eventos (mscott entra en NEWYORK en el momento del primer
+    salto; kmalone, en SCRANTON en el del segundo), no contra el documento del plan.
+  - **Cautela:** la v2 se ajustó después de ver el día 2 y no hay un tercer escenario donde validarla.
+    La cifra de referencia de la generalización es el 3 de 6 de la v1. **La v2 es la versión actual del
+    grafo** (las rutas de Neo4j llevan `rules_version: v2`), porque es la que consumen F6 y el portal.
+  - Tests: 51 en `graph/` (la clase de la v2 hereda y vuelve a pasar todos los de la v1).
+- [x] Contraste con el plan de emulación: ¿la ruta derivada coincide con la de APT29? *(15-11-2026: el orden de equipos
+  coincide en los dos días con la v2. Día 1: SCRANTON → NASHUA con pbeesly, como en `docs/scenarios/apt29-day1.md`.
+  Día 2: UTICA → NEWYORK → SCRANTON, como los pasos 16.C y 20.B; **pendiente de Javier: contrastar las cuentas
+  (mscott, kmalone) con el plan del día 2**, que aquí solo se han comprobado contra los eventos. Las rutas no
+  recogen los pasos sin campaña, como la exfiltración.)*
 
 ### F5.2 — Analítica de grafos (GDS)
 

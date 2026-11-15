@@ -55,6 +55,12 @@ CONSULTAS = {
                        FROM tfg.events WHERE dataset_id = {{ds:String}} AND source_event_id = 4672
                          AND source_channel = 'security'
                        GROUP BY host, user, domain, sid""",
+    # Procesos creados (Sysmon 1) por cada cuenta en cada equipo: la huella de una sesion abierta.
+    "actividad": """SELECT device_hostname AS host, lower(splitByChar('\\\\', actor_user_name)[-1]) AS user, count() AS n,
+                      toUnixTimestamp64Milli(min(time)) AS first, toUnixTimestamp64Milli(max(time)) AS last
+                    FROM tfg.events WHERE dataset_id = {ds:String} AND source_event_id = 1
+                      AND source_channel = 'microsoft-windows-sysmon/operational' AND actor_user_name != ''
+                    GROUP BY host, user""",
 }
 CAMPANAS = """SELECT campaign_id, pattern_id, dataset_id, title, toUnixTimestamp64Milli(first_seen) AS first_seen,
                 toUnixTimestamp64Milli(last_seen) AS last_seen, toInt32(severity_id) AS severity_id,

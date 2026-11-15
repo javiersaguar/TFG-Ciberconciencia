@@ -423,7 +423,7 @@ services:
     restart: unless-stopped
 
   # Razonador Datalog del Pilar B (F5.3). No es un servicio: se lanza con
-  #   docker compose --profile reason run --rm souffle -F /work/facts -D /work/out /rules/attack.dl
+  #   docker compose --profile reason run --rm souffle -F /work/facts -D /work/out /rules/attack_v2.dl
   # Sin red: solo lee reglas y hechos, y escribe las relaciones derivadas.
   souffle:
     build:
