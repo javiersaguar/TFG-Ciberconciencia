@@ -1,0 +1,18 @@
+{
+ "descripcion": "Técnica de ATT&CK (padre) que corresponde a cada regla del razonador. Lo usa el bucle neurosimbólico (ml/graph/bucle.py) para cruzar las técnicas que propone el modelo con los pasos que el razonador considera factibles. Una regla sin técnica es una consecuencia, no una acción del adversario.",
+ "reglas": {
+  "acceso_inicial_usuario": ["T1204"],
+  "escalada_vulnerabilidad": ["T1068"],
+  "escalada_sesion_admin": ["T1548"],
+  "robo_credenciales": ["T1003"],
+  "credenciales_del_dominio": ["T1003"],
+  "movimiento_lateral_credenciales": ["T1021"],
+  "movimiento_lateral_rdp": ["T1021"],
+  "explotacion_remota": ["T1210"],
+  "dominio_por_vulnerabilidad": ["T1210"],
+  "dominio_por_credenciales": ["T1078"],
+  "dominio_administra_equipos": ["T1021"],
+  "dominio_por_controlador": [],
+  "admin_implica_usuario": []
+ }
+}

@@ -3,7 +3,7 @@
 **Proyecto:** Plataforma de conciencia cibersituacional — detección de ataques multi-etapa, grafo de ataque razonado y priorización explicable
 **Autor:** Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos, ETSIT-UPM
 **Horizonte:** agosto 2026 → defensa junio 2027
-**Última actualización:** 2026-11-15 · *(rev. 8 — F5: parte simbólica cumplida (grafo, Datalog con rutas explicables, GDS y Dagster); falta ML-3. rev. 7 — F5 replanificada; rev. 6 — ajuste v2 adoptado tras COMISET LAB y el laboratorio propio; OpenCTI decidido (plan B como capa CTI); ML-2 aumentado adoptado; DoD de F4 cumplido en el código)*
+**Última actualización:** 2026-11-15 · *(rev. 9 — DoD de F5 cumplido: ML-3 evaluado (resultado negativo para los modelos aprendidos) y bucle neurosimbólico funcionando. rev. 8 — F5: parte simbólica cumplida (grafo, Datalog con rutas explicables, GDS y Dagster). rev. 7 — F5 replanificada; rev. 6 — ajuste v2 adoptado tras COMISET LAB y el laboratorio propio; OpenCTI decidido (plan B como capa CTI); ML-2 aumentado adoptado; DoD de F4 cumplido en el código)*
 
 ---
 
@@ -1372,36 +1372,83 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 
 **Este es el componente de mayor valor diferencial del trabajo.**
 
-- [ ] **1. Datos y protocolo, fijados antes de entrenar:** aristas `uses` de grupos, campañas y
-  software a técnicas en ATT&CK v19.2; partición con **ocultación de aristas**; APT29 y sus campañas
-  fuera del entrenamiento cuando se evalúe sobre el corpus.
-- [ ] **2. Líneas base:** popularidad de la técnica, vecinos comunes / Jaccard y coocurrencia.
-- [ ] **3. Modelo:** embeddings estructurales (FastRP o Node2Vec en GDS) con un clasificador de
-  enlaces; una GNN (GraphSAGE con PyTorch Geometric) solo si las líneas base dejan margen.
-- [ ] **4. Evaluación:** AUC y precision@K frente a las líneas base, con intervalo por remuestreo.
-- [ ] **5. 🔑 El bucle neurosimbólico:**
+- [x] **1. Datos y protocolo, fijados antes de entrenar** *(15-11-2026; `ml/graph/datos.py` y la cabecera
+  de `ml/graph/evaluar.py`)*:
+  - **Datos:** 227 entidades de ATT&CK v19.2 (172 grupos y 55 campañas) con sus técnicas padre: 4.704
+    relaciones y 222 técnicas. Se evalúa con las 202 que tienen 5 técnicas o más.
+  - **Tarea:** dada una parte de las técnicas de un actor (la consulta), ordenar las demás.
+  - **Reparto por familia:** un grupo y las campañas que ATT&CK le atribuye van al mismo bloque (204
+    familias), porque comparten técnicas. 5 bloques; la entidad evaluada nunca está en el entrenamiento.
+  - **Ocultación:** por entidad, 5 repeticiones ocultando el 30 % de sus técnicas.
+  - **Métricas:** exhaustividad a 5 y a 10, MRR, MAP y AUC, por entidad.
+  - Sin búsqueda de hiperparámetros.
+  - **Regla de decisión:** el bucle usa el sistema de mejor MRR; uno aprendido solo se adopta si supera a
+    la mejor línea base con una fracción de diferencias ≤ 0 menor que 0,05 (remuestreo emparejado por
+    entidad, 10.000 muestras).
+- [x] **2. Líneas base y 3. modelo** *(15-11-2026; `ml/graph/evaluar.py`, 9 tests)*: popularidad,
+  coocurrencia entre técnicas (`knn_tecnicas`) y voto de las 20 entidades más parecidas
+  (`knn_entidades`); embeddings **FastRP de GDS** sobre el grafo de entrenamiento, y un sistema
+  **combinado** (regresión logística sobre las cuatro puntuaciones y el solape de tácticas, ajustado
+  dentro de los bloques de entrenamiento).
+- [x] **4. Evaluación** *(15-11-2026)*, 202 entidades y 222 técnicas candidatas:
+
+  | Sistema | R@5 | R@10 | MRR | MAP | AUC |
+  |---|---:|---:|---:|---:|---:|
+  | popularidad | 0,251 | 0,382 | 0,610 | 0,319 | 0,863 |
+  | knn_tecnicas | 0,279 | 0,412 | 0,670 | 0,358 | 0,872 |
+  | **knn_entidades** | 0,283 | 0,415 | **0,691** | 0,372 | 0,864 |
+  | fastrp | 0,221 | 0,336 | 0,598 | 0,287 | 0,830 |
+  | combinado | 0,278 | 0,424 | 0,679 | 0,372 | 0,878 |
+
+  - **Resultado negativo para los modelos aprendidos, y se informa como tal.** FastRP queda por debajo de
+    la mejor línea base (−0,093 de MRR, IC 95 % [−0,126, −0,060]) e incluso de la popularidad. El
+    combinado no la supera (−0,012 [−0,024, +0,001]).
+  - **Mirar la consulta sí aporta:** `knn_entidades` supera a la popularidad en +0,081 de MRR
+    [+0,048, +0,113]. Aun así, la popularidad sola ya da un AUC de 0,86: las técnicas genéricas
+    dominan, como avisó 6c en F4.
+  - **Decisión (regla fijada antes): el bucle usa `knn_entidades`.** No se ajusta nada tras ver las
+    cifras, y no se entrena una GNN: con 227 entidades, los modelos con más parámetros no han dado
+    margen sobre los vecinos más próximos. Queda como trabajo futuro con más datos.
+- [x] **5. 🔑 El bucle neurosimbólico** *(15-11-2026; `ml/graph/bucle.py`, 4 tests;
+  `graph/datalog/tecnicas.json` enlaza cada regla con su técnica)*:
   ```
-  el modelo propone la SIGUIENTE técnica probable  ──►  Datalog comprueba si es FACTIBLE aquí
+  el modelo propone técnicas probables  ──►  el razonador comprueba cuáles son FACTIBLES ahora
         ▲                                                        │
-        └──── solo se presenta lo que la lógica deriva ◄─────────┘
+        └──── solo se presenta lo que la lógica deriva, y dónde ◄─┘
   ```
-  **Toda sugerencia se verifica simbólicamente antes de presentarse**: el modelo propone, la lógica
-  dispone y justifica.
-- [ ] **6. Evaluación del bucle** sobre APT29: ¿la técnica que vino después estaba entre las K
-  propuestas y verificadas? ¿cuántas sugerencias descarta el razonador?
+  Tras cada campaña detectada: el modelo (entrenado sin la familia de APT29) ordena las técnicas aún no
+  vistas, y el razonador da la **frontera**, las reglas aún no confirmadas cuyas precondiciones ya se
+  cumplen. Se presenta solo la técnica que alguna regla factible realiza, con el equipo o la cuenta. El
+  resto se descarta, distinguiendo «no factible ahora» de «sin regla que la modele».
+- [x] **6. Evaluación del bucle** sobre APT29 *(15-11-2026; caso de estudio: 2 escenarios, 8 transiciones)*:
+  - **El paso siguiente real estaba en la frontera del razonador en 6 de 8 transiciones.** Las dos que
+    faltan son repeticiones: robar las credenciales de una cuenta que el adversario ya tenía, que no
+    cambia su estado.
+  - **El modelo solo predice mal el paso siguiente:** en las 3 transiciones con técnica nueva la tenía en
+    los puestos 43, 18 y 151 de 222. **Tras verificar** queda en los puestos 2, 2 y 4, pero entre 3 o 4
+    opciones factibles: quien acota es el razonador, y el modelo ordena poco y no muy bien.
+  - **De las 10 primeras propuestas del modelo, 8,8 de media no tienen regla** (descubrimiento,
+    recolección, mando y control). El razonador modela acceso, escalada, credenciales y movimiento
+    lateral, y esa cobertura es el límite del bucle.
+  - Frente al plan de emulación, 5,2 de las 10 propuestas son técnicas del plan aún no observadas; con
+    la popularidad, 6,0. **En nuestro corpus el modelo adoptado no mejora a la popularidad.**
+  - **Lectura:** el bucle funciona y cumple su garantía (nada se presenta sin derivación), pero su valor
+    en este corpus lo pone la parte simbólica. La parte aprendida aporta poco con estos datos.
 - [ ] **7.** 🟢 **Clasificación de nodos**: criticidad de un activo por su posición en el grafo.
 
 ### 📦 Entregables F5
 `graph/model.md` · `graph/seed/` · `graph/inventory/` · `graph/datalog/*.dl` ·
 `ml/graph/` (líneas base, predicción de enlaces, bucle neurosimbólico) · definiciones de Dagster
 
-### ✅ DoD — parte simbólica cumplida (15-11-2026); falta ML-3
+### ✅ DoD — cumplido (15-11-2026); falta pasarlo a la memoria
 1. ✅ Grafo poblado con topología, vulnerabilidades, ATT&CK, CTI y campañas, con la procedencia de cada
    dato (observado, inferido, sintético o derivado).
 2. ✅ Métricas GDS calculadas (centralidad, cuellos de botella y caminos ponderados).
 3. ✅ Reglas Datalog derivando rutas no triviales (hasta 6 pasos), explicables paso a paso.
-4. ⬜ **Modelo de grafo entrenado y evaluado** con ocultación de aristas y frente a líneas base.
-5. ⬜ **Bucle neurosimbólico funcionando**: sugerencias del modelo verificadas por el razonador.
+4. ✅ **Modelo de grafo entrenado y evaluado** con ocultación de aristas y frente a líneas base. Resultado
+   negativo: los modelos aprendidos no superan a los vecinos más próximos.
+5. ✅ **Bucle neurosimbólico funcionando**: sugerencias del modelo verificadas por el razonador. En el
+   corpus, el valor lo pone la parte simbólica.
 6. ✅ El ciclo del grafo se reconstruye con un lanzamiento de Dagster.
 
 ### ⚠️ Riesgos
