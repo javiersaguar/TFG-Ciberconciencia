@@ -3,7 +3,7 @@
 **Proyecto:** Plataforma de conciencia cibersituacional — detección de ataques multi-etapa, grafo de ataque razonado y priorización explicable
 **Autor:** Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos, ETSIT-UPM
 **Horizonte:** agosto 2026 → defensa junio 2027
-**Última actualización:** 2026-11-08 · *(rev. 6 — ajuste v2 adoptado tras COMISET LAB y el laboratorio propio; OpenCTI decidido (plan B como capa CTI); ML-2 aumentado adoptado; DoD de F4 cumplido en el código)*
+**Última actualización:** 2026-11-15 · *(rev. 7 — F5 replanificada y F5.1 en marcha: inventario observado y campañas en el grafo; rev. 6 — ajuste v2 adoptado tras COMISET LAB y el laboratorio propio; OpenCTI decidido (plan B como capa CTI); ML-2 aumentado adoptado; DoD de F4 cumplido en el código)*
 
 ---
 
@@ -1169,92 +1169,136 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 
 ## F5 — Pilar B: grafo razonado + aprendizaje 🔴
 
-**Estimación:** 4–5 semanas · **Prerrequisitos:** F2, F4 (o su plan B)
+**Estimación:** 4–5 semanas · **Prerrequisitos:** F2, F4 · **Plan revisado el 15-11-2026**
 
-### F5.1 — Neo4j y modelo de datos
+> **Qué cambió el 15-11-2026 y por qué** (propuesto por Claude Code y aprobado por Javier).
+> 1. **ML-3 aprende sobre el grafo de ATT&CK, no sobre el de equipos.** La red del corpus tiene 4–7
+>    equipos: ahí no se puede entrenar ni evaluar una predicción de enlaces. En Neo4j ya hay 173 grupos,
+>    858 técnicas y miles de relaciones `uses`. La tarea es **predecir la siguiente técnica probable**
+>    dado lo observado en una campaña y el perfil del actor, con ocultación de aristas y líneas base
+>    simples (popularidad, vecinos comunes). F4 (6c) ya avisó de que las técnicas genéricas dominan.
+> 2. **El bucle neurosimbólico:** el modelo propone la técnica; Datalog comprueba si es factible en
+>    esta red (conectividad, credenciales expuestas) y deriva la ruta, justificada paso a paso.
+> 3. **Inventario real + capa sintética declarada.** Equipos, usuarios, sesiones y conexiones salen de
+>    los eventos de APT29. Zonas, activo crítico y vulnerabilidades son un escenario sintético
+>    documentado como tal. La aportación frente a MulVAL son las **reglas con evidencia observada**.
+> 4. **Dagster orquesta el ciclo del grafo**, no la ingesta de alertas en micro-lotes: refresco del
+>    feed de IOCs, campañas → grafo, exportación de hechos → Soufflé → importación de rutas, y métricas.
+>    Es la automatización que pidió Javier, y va después de que el ciclo funcione a mano.
+> 5. **Orden:** primero lo simbólico (F5.1 y F5.3), que es el núcleo defendible del 28-02-2027;
+>    después la analítica (F5.2), la orquestación (F5.5) y ML-3 (F5.4).
 
-- [ ] Neo4j en el compose (perfil `graph`) con GDS. Heap 2 GB + pagecache 1–2 GB. *(Adelantado a F4.1 el 06-11-2026.)*
-- [ ] **Modelo de grafo** en `graph/model.md`:
+### F5.1 — Modelo de datos e inventario
+
+- [x] Neo4j en el compose (perfil `graph`) con GDS. *(Hecho en F4.1 el 06-11-2026.)*
+- [x] **0. Inventario de la materia prima antes de diseñar** *(15-11-2026)*: qué equipos, usuarios,
+  sesiones y conexiones hay de verdad en `tfg.events`, y qué etiquetas y relaciones hay ya en Neo4j.
+  - 4 equipos monitorizados en dos subredes (NEWYORK es el controlador de dominio), más un quinto
+    equipo interno, la infraestructura del atacante (192.168.0.4 y .5) y el origen del RDP (172.18.39.2).
+  - Sesiones (4624), privilegios (4672 con `SeDebugPrivilege`) y conexiones (Sysmon 3) dan usuarios,
+    administradores y servicios reales.
+  - **Hallazgo: los dos días de APT29 son dos montajes distintos del laboratorio.** Mismos nombres e
+    IP, pero cambia el SID del dominio y los usuarios activos (pbeesly el día 1; dschrute, kmalone y
+    mscott el día 2). **Cada día es un escenario propio:** las reglas se diseñan con el día 1 y se
+    validan con el día 2.
+- [x] **Modelo de grafo** en `graph/model.md` *(15-11-2026)*, sobre lo que ya carga F4 (`:Technique`, `:Tactic`,
+  `:Actor`, `:Software`, `:Indicator`, `:Report`…):
   ```
-  NODOS: Host, User, Service, Vulnerability, Asset, Technique, Actor,
-         Campaign, Indicator, Alert, AttackPath
-  RELACIONES: RUNS, HAS_VULN, CONNECTS_TO, CAN_ACCESS, HOSTS, ENABLES,
-              PRECEDES, USES, OBSERVED_ON, EVIDENCES, TRAVERSES, REACHES
+  NODOS NUEVOS: Host, User, Zone, Service, Vulnerability, Campaign, AttackPath
+  RELACIONES:   IN_ZONE, CONNECTS_TO, LOGGED_ON, ADMIN_OF, RUNS, HAS_VULN,
+                OBSERVED_ON, EVIDENCES, INVOLVES, TRAVERSES, REACHES
   ```
-- [ ] Índices y restricciones de unicidad.
-- [ ] **Poblar el inventario del laboratorio** desde los propios datasets (hosts de apt29)
-  + escenario sintético documentado (DMZ / interna / activo crítico).
-- [ ] Cargar vulnerabilidades (CVE + CVSS + EPSS) plausibles para los servicios.
-- [ ] Cargar el subgrafo de ATT&CK y CTI (salida de F4), con los **perfiles de actor de ML-2** (F4.3 paso 5),
-  que son la base de la predicción de la siguiente etapa probable.
-- [ ] Ingerir `det.alerts` como nodos `(:Alert)` en micro-batch vía Dagster.
+  Cada nodo y relación lleva su procedencia: `observado` (de los eventos), `inferido` (por una regla
+  escrita en el modelo) o `sintetico`.
+- [x] Índices y restricciones de unicidad (etiqueta común `:TfgObject`, `id` único).
+- [x] **Inventario observado** *(15-11-2026)*, de los eventos de APT29 (day1 y day2): equipos e IP
+  (Sysmon 3), usuarios, sesiones (4624), privilegios (4672) y conexiones entre equipos.
+  - `graph/inventory/`: `construir.py` (reglas de inferencia, 12 tests sin bases de datos),
+    `extraer.py` (ClickHouse → JSON) y `cargar.py` (JSON → Neo4j, idempotente y con borrado de obsoletos).
+  - Las direcciones públicas (79 y 145) se agrupan en un nodo `internet`; las privadas se mantienen.
+  - En el grafo: `apt29-day1` con 40 nodos y 101 relaciones; `apt29-day2` con 39 y 106. Ninguna
+    relación sin extremo, y los 141.084 nodos de ATT&CK y CTI no cambian.
+- [ ] **Capa sintética documentada** (`graph/seed/`): zonas, activo crítico y unas pocas
+  vulnerabilidades (CVE con CVSS y EPSS reales) plausibles para los servicios observados.
+- [x] **Campañas del Pilar A en el grafo** *(15-11-2026)*: `(:Campaign)` desde `tfg.campaigns_v2`,
+  enlazadas a sus equipos (`OBSERVED_ON`, con el papel de origen o destino) y a sus técnicas vigentes
+  de ATT&CK (`EVIDENCES`). 4 campañas el día 1 y 6 el día 2. Las alertas quedan como evidencia de la
+  campaña, no una a una.
+  - Comprobación cruzando capas: el día 1 sale la cadena RDP → SCRANTON (P3, P1) → NASHUA (P2, P1) con
+    sus tácticas, el salto por WinRM, SMB y PsExec, y las conexiones al C2.
+  - Por técnicas de las campañas, los grupos más parecidos son Wizard Spider, APT41 y Threat
+    Group-3390, no APT29: lo mismo que midió 6c.
+
+### F5.3 — Razonamiento Datalog (lo simbólico) *(antes que F5.2)*
+
+- [ ] Instalar **Soufflé** (versión fijada).
+- [ ] Estudiar el modelo MulVAL: hechos + reglas de interacción → estados alcanzables.
+- [ ] **Reimplementar el subconjunto de reglas en Soufflé**, adaptado al modelo propio:
+  `graph/datalog/{facts,rules}.dl`, con ejecución remota, escalada local, movimiento lateral por
+  credenciales y **refuerzo por evidencia observada** (campañas del Pilar A).
+- [ ] Exportador Neo4j → `.facts` e importador de rutas derivadas → `(:AttackPath)`.
+- [ ] **Trazabilidad de la derivación**: qué regla y qué hechos justifican cada paso.
+- [ ] Contraste con el plan de emulación: ¿la ruta derivada coincide con la de APT29?
 
 ### F5.2 — Analítica de grafos (GDS)
 
-- [ ] **Centralidad** (Betweenness / PageRank) → identifica puntos de paso críticos.
-- [ ] **Comunidades** (Louvain) → segmentación efectiva de la red.
+- [ ] **Centralidad** (Betweenness / PageRank) → puntos de paso críticos.
 - [ ] **Caminos mínimos ponderados** (Dijkstra) con pesos derivados de CVSS/EPSS.
+- [ ] **Comunidades** (Louvain) → 🟢 opcional: con pocos equipos aporta poco.
 
-### F5.3 — Razonamiento Datalog (lo simbólico)
+### F5.5 — Orquestación con Dagster
 
-- [ ] Instalar **Soufflé**.
-- [ ] Estudiar el modelo MulVAL: facts + reglas de interacción → estados alcanzables.
-- [ ] **Reimplementar el subconjunto de reglas en Soufflé** (opción B), adaptado al modelo
-  propio. Permite añadir reglas basadas en **evidencia observada**, que es la aportación
-  frente a MulVAL clásico (que razona solo sobre configuración estática).
-- [ ] `graph/datalog/{facts,rules}.dl` con reglas de ejecución remota, escalada local,
-  movimiento lateral por credenciales y refuerzo por evidencia observada.
-- [ ] Exportador Neo4j → `.facts` e importador de rutas derivadas → `(:AttackPath)`.
-- [ ] **Trazabilidad de la derivación**: conservar qué regla y qué hechos justifican cada paso.
-- [ ] Orquestar el ciclo con Dagster.
+- [ ] Dagster en el compose (perfil `orchestration`), con versión fijada.
+- [ ] **Activos:** ATT&CK y perfiles (carga), feed de IOCs (refresco programado, con caducidad por
+  tipo), inventario, campañas → grafo, hechos → Soufflé → rutas, y métricas de GDS.
+- [ ] Un solo lanzamiento reconstruye el grafo razonado de extremo a extremo; cada activo es
+  idempotente, como el cargador STIX.
 
 ### F5.4 🧠 — ML-3: aprendizaje sobre el grafo (lo neurosimbólico)
 
 **Este es el componente de mayor valor diferencial del trabajo.**
 
-- [ ] **1. Proyección y embeddings.** Generar representaciones vectoriales de los nodos con
-  **FastRP** o **Node2Vec** (disponibles en GDS), o una **GNN** (GraphSAGE / GAT con PyTorch
-  Geometric) si se quiere control total.
-- [ ] **2. Predicción de enlaces.** Entrenar un modelo que prediga aristas ausentes:
-  - Relaciones de acceso no declaradas en el inventario pero plausibles por la estructura.
-  - Técnicas que un actor podría usar aunque no se le hayan observado.
-  - Rutas de progresión que las reglas de interacción no contemplan.
-- [ ] **3. Protocolo de evaluación correcto:** ocultar un porcentaje de aristas conocidas,
-  entrenar sin ellas y medir si el modelo las recupera (AUC, precision@K). Es el estándar
-  en predicción de enlaces.
-- [ ] **4. 🔑 El bucle neurosimbólico.** Esta es la pieza clave:
+- [ ] **1. Datos y protocolo, fijados antes de entrenar:** aristas `uses` de grupos, campañas y
+  software a técnicas en ATT&CK v19.2; partición con **ocultación de aristas**; APT29 y sus campañas
+  fuera del entrenamiento cuando se evalúe sobre el corpus.
+- [ ] **2. Líneas base:** popularidad de la técnica, vecinos comunes / Jaccard y coocurrencia.
+- [ ] **3. Modelo:** embeddings estructurales (FastRP o Node2Vec en GDS) con un clasificador de
+  enlaces; una GNN (GraphSAGE con PyTorch Geometric) solo si las líneas base dejan margen.
+- [ ] **4. Evaluación:** AUC y precision@K frente a las líneas base, con intervalo por remuestreo.
+- [ ] **5. 🔑 El bucle neurosimbólico:**
   ```
-  Datalog deriva rutas POSIBLES  ──►  el modelo puntúa cuáles son PLAUSIBLES
-        ▲                                          │
-        └──── verifica las sugerencias del modelo ◄─┘
+  el modelo propone la SIGUIENTE técnica probable  ──►  Datalog comprueba si es FACTIBLE aquí
+        ▲                                                        │
+        └──── solo se presenta lo que la lógica deriva ◄─────────┘
   ```
-  Las aristas sugeridas por el modelo se **reinyectan como hechos candidatos** al razonador,
-  que deriva las rutas resultantes. **Toda ruta sugerida se verifica simbólicamente antes
-  de presentarse**: el modelo propone, la lógica dispone y justifica. Así se gana
-  generalización sin perder explicabilidad.
-- [ ] **5. Evaluación del bucle:** ¿descubre rutas que solo con reglas no aparecían?
-  ¿son plausibles al inspeccionarlas? ¿cuántas son espurias?
-- [ ] **6.** 🟢 **Clasificación de nodos**: predecir la criticidad de un activo a partir de su
-  posición en el grafo, y comparar con la criticidad declarada.
+  **Toda sugerencia se verifica simbólicamente antes de presentarse**: el modelo propone, la lógica
+  dispone y justifica.
+- [ ] **6. Evaluación del bucle** sobre APT29: ¿la técnica que vino después estaba entre las K
+  propuestas y verificadas? ¿cuántas sugerencias descarta el razonador?
+- [ ] **7.** 🟢 **Clasificación de nodos**: criticidad de un activo por su posición en el grafo.
 
 ### 📦 Entregables F5
-Perfil `graph` · `graph/model.md` · `graph/seed/*.cypher` · `graph/datalog/*.dl` ·
-`ml/graph/` (embeddings, link prediction, bucle neurosimbólico) · pipeline Dagster
+`graph/model.md` · `graph/seed/` · `graph/inventory/` · `graph/datalog/*.dl` ·
+`ml/graph/` (líneas base, predicción de enlaces, bucle neurosimbólico) · definiciones de Dagster
 
 ### ✅ DoD
-1. Grafo poblado con topología, vulnerabilidades, ATT&CK, CTI y alertas.
+1. Grafo poblado con topología, vulnerabilidades, ATT&CK, CTI y campañas, con la procedencia de cada
+   dato (observado o sintético).
 2. Métricas GDS calculadas.
 3. Reglas Datalog derivando rutas no triviales (≥3 saltos), explicables paso a paso.
-4. **Modelo de grafo entrenado y evaluado** con protocolo de ocultación de aristas.
+4. **Modelo de grafo entrenado y evaluado** con ocultación de aristas y frente a líneas base.
 5. **Bucle neurosimbólico funcionando**: sugerencias del modelo verificadas por el razonador.
+6. El ciclo del grafo se reconstruye con un lanzamiento de Dagster.
 
 ### ⚠️ Riesgos
 | Riesgo | Mitigación |
 |---|---|
-| Grafo demasiado pequeño para entrenar | Ampliar el escenario sintético; usar embeddings estructurales (FastRP), que necesitan menos datos |
-| El modelo sugiere aristas absurdas | Por eso se **verifican** con el razonador antes de presentarse |
+| El modelo no supera a la popularidad | Se informa como resultado; las líneas base son parte del entregable y el bucle funciona con cualquiera de ellas |
+| El escenario sintético parece un decorado | Mínimo y declarado; lo observado y lo sintético se distinguen en cada nodo, y las reglas clave usan evidencia observada |
+| El modelo sugiere técnicas absurdas | Por eso se **verifican** con el razonador antes de presentarse |
 | Curva de Datalog | Empezar con 5 reglas y crecer |
 | Explosión combinatoria de rutas | Acotar profundidad, podar por umbral, quedarse con el top-K |
+| Dagster se come el tiempo | Va después de que el ciclo funcione a mano; solo envuelve funciones ya probadas |
 
 ---
 
