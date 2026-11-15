@@ -3,7 +3,7 @@
 **Proyecto:** Plataforma de conciencia cibersituacional — detección de ataques multi-etapa, grafo de ataque razonado y priorización explicable
 **Autor:** Javier Saguar Antona · Grado en Ingeniería y Sistemas de Datos, ETSIT-UPM
 **Horizonte:** agosto 2026 → defensa junio 2027
-**Última actualización:** 2026-11-15 · *(rev. 7 — F5 replanificada y F5.1 en marcha: inventario observado y campañas en el grafo; rev. 6 — ajuste v2 adoptado tras COMISET LAB y el laboratorio propio; OpenCTI decidido (plan B como capa CTI); ML-2 aumentado adoptado; DoD de F4 cumplido en el código)*
+**Última actualización:** 2026-11-15 · *(rev. 8 — F5: parte simbólica cumplida (grafo, Datalog con rutas explicables, GDS y Dagster); falta ML-3. rev. 7 — F5 replanificada; rev. 6 — ajuste v2 adoptado tras COMISET LAB y el laboratorio propio; OpenCTI decidido (plan B como capa CTI); ML-2 aumentado adoptado; DoD de F4 cumplido en el código)*
 
 ---
 
@@ -1325,17 +1325,48 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 
 ### F5.2 — Analítica de grafos (GDS)
 
-- [ ] **Centralidad** (Betweenness / PageRank) → puntos de paso críticos.
-- [ ] **Caminos mínimos ponderados** (Dijkstra) con pesos derivados de CVSS/EPSS.
-- [ ] **Comunidades** (Louvain) → 🟢 opcional: con pocos equipos aporta poco.
+- [x] **Centralidad** (PageRank e intermediación) *(15-11-2026; `graph/analytics/gds.py`, GDS 2.13.13)*,
+  sobre dos grafos:
+  - **la red** (equipos y conexiones observadas): el controlador de dominio es el más central los dos
+    días, y el equipo de entrada (SCRANTON el día 1, UTICA el día 2) el segundo punto de paso;
+  - **el grafo de derivación** del razonador, que ahora también se carga en Neo4j (`:AttackState` y
+    `:RuleApp`, con `ENABLES` y `CONCLUDES`): 13 estados y 38 aplicaciones el día 1; 15 y 48 el día 2.
+- [x] **Cuellos de botella, exactos y aproximados** *(15-11-2026)*. Cada estado lleva `cuts_assets`: los
+  activos que dejan de ser alcanzables si el adversario no puede lograrlo, calculado quitando el estado
+  y volviendo a buscar pruebas. Se compara con la intermediación de GDS:
+  - el estado `dominio` es el cuello de botella los dos días por las dos medidas;
+  - la intermediación **sobrevalora** estados con muchas alternativas (`exec:NASHUA:admin` el día 1 es
+    el segundo por intermediación y no corta ningún activo).
+- [x] **Caminos mínimos ponderados** (Dijkstra) *(15-11-2026)*, con el coste de cada paso: 0 si está
+  confirmado, −ln(EPSS) si explota una vulnerabilidad y 1 para el resto (heurística declarada).
+  - **Límite medido:** GDS trata el grafo de derivación como un grafo normal, y una regla con dos
+    precondiciones le parece alcanzable con una. De los 4 caminos por escenario, **3 son pruebas válidas
+    el día 1 y 2 el día 2**; a los demás les falta la precondición de las credenciales. Por eso las
+    rutas se extraen con la búsqueda de pruebas propia (F5.3) y Dijkstra queda como contraste.
+- [ ] **Comunidades** (Louvain) → 🟢 no se calculan: con 4 equipos monitorizados no aportan nada.
 
 ### F5.5 — Orquestación con Dagster
 
-- [ ] Dagster en el compose (perfil `orchestration`), con versión fijada.
-- [ ] **Activos:** ATT&CK y perfiles (carga), feed de IOCs (refresco programado, con caducidad por
-  tipo), inventario, campañas → grafo, hechos → Soufflé → rutas, y métricas de GDS.
-- [ ] Un solo lanzamiento reconstruye el grafo razonado de extremo a extremo; cada activo es
-  idempotente, como el cargador STIX.
+- [x] **El ciclo a mano, con un comando** *(15-11-2026)*: `graph/pipeline.py` encadena inventario → capa
+  sintética → hechos → rutas → analítica para un escenario. Cada paso es idempotente y devuelve su
+  resumen. Las conexiones salen del entorno (`NEO4J_URI`, `CH_HOST`…).
+- [x] Dagster en el compose (perfil `orchestration`), con versión fijada *(15-11-2026)*: **1.13.30**,
+  imagen `tfg/dagster` construida sobre la de Soufflé, para que el razonador corra dentro del mismo
+  contenedor sin acceso al socket de Docker. Solo ve `graph/`, `cti/` y `orchestration/` en solo lectura
+  y `data/graph`; no se le montan los `.env`. `./scripts/up.sh orchestration`, en `localhost:3000`.
+- [x] **Activos** *(15-11-2026; `orchestration/definitions.py`)*: `inventario`, `capa_sintetica`, `hechos`,
+  `rutas` y `analitica`, con una **partición por escenario**, y `caducidad_indicadores`. Dagster no añade
+  lógica: cada activo llama a la misma función que se lanza a mano, y guarda sus cifras como metadatos.
+- [x] **Automatización** *(15-11-2026)*:
+  - sensor `campanas_nuevas`: cuando cambian las campañas del Pilar A de un escenario en ClickHouse,
+    lanza su ciclo;
+  - planificación `caducidad_diaria` (06:00): marca los indicadores caducados por tipo
+    (`cti/feeds/caducidad.py`: 47 días para IP y URL, 300 para dominios y 460 para ficheros, las vidas de
+    OpenCTI). A 15-11-2026, **29.810 de 135.737 caducados**.
+- [x] Un solo lanzamiento reconstruye el grafo razonado de extremo a extremo *(15-11-2026: el día 2
+  completo, dentro del contenedor, en unos 8 s; campañas explicadas 6 de 6)*.
+- [ ] **Pendiente:** el refresco del feed de ThreatFox como activo (necesita la clave de abuse.ch dentro
+  del contenedor, como secreto) y las cargas de ATT&CK y de los perfiles de ML-2.
 
 ### F5.4 🧠 — ML-3: aprendizaje sobre el grafo (lo neurosimbólico)
 
@@ -1364,14 +1395,14 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
 `graph/model.md` · `graph/seed/` · `graph/inventory/` · `graph/datalog/*.dl` ·
 `ml/graph/` (líneas base, predicción de enlaces, bucle neurosimbólico) · definiciones de Dagster
 
-### ✅ DoD
-1. Grafo poblado con topología, vulnerabilidades, ATT&CK, CTI y campañas, con la procedencia de cada
-   dato (observado o sintético).
-2. Métricas GDS calculadas.
-3. Reglas Datalog derivando rutas no triviales (≥3 saltos), explicables paso a paso.
-4. **Modelo de grafo entrenado y evaluado** con ocultación de aristas y frente a líneas base.
-5. **Bucle neurosimbólico funcionando**: sugerencias del modelo verificadas por el razonador.
-6. El ciclo del grafo se reconstruye con un lanzamiento de Dagster.
+### ✅ DoD — parte simbólica cumplida (15-11-2026); falta ML-3
+1. ✅ Grafo poblado con topología, vulnerabilidades, ATT&CK, CTI y campañas, con la procedencia de cada
+   dato (observado, inferido, sintético o derivado).
+2. ✅ Métricas GDS calculadas (centralidad, cuellos de botella y caminos ponderados).
+3. ✅ Reglas Datalog derivando rutas no triviales (hasta 6 pasos), explicables paso a paso.
+4. ⬜ **Modelo de grafo entrenado y evaluado** con ocultación de aristas y frente a líneas base.
+5. ⬜ **Bucle neurosimbólico funcionando**: sugerencias del modelo verificadas por el razonador.
+6. ✅ El ciclo del grafo se reconstruye con un lanzamiento de Dagster.
 
 ### ⚠️ Riesgos
 | Riesgo | Mitigación |

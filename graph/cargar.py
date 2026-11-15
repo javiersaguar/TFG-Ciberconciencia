@@ -24,9 +24,10 @@ import time
 from pathlib import Path
 
 ETIQUETAS = {"TfgObject", "Host", "Zone", "Service", "User", "Campaign", "Vulnerability", "Asset", "Adversary",
-             "AttackPath"}
+             "AttackPath", "AttackState", "RuleApp"}
 TIPOS = {"IN_ZONE", "RUNS", "CONNECTS_TO", "LOGGED_ON", "ADMIN_OF", "OBSERVED_ON", "EVIDENCES",
-         "HAS_VULN", "HOSTS", "LOCATED_AT", "REACHES", "TRAVERSES", "CONFIRMED_BY", "HAS_SESSION"}
+         "HAS_VULN", "HOSTS", "LOCATED_AT", "REACHES", "TRAVERSES", "CONFIRMED_BY", "HAS_SESSION",
+         "ENABLES", "CONCLUDES", "ON_HOST"}
 CAPAS = {"inventario": ["observado", "inferido"], "sintetica": ["sintetico"], "derivada": ["derivado"]}
 ESQUEMA = [
     "CREATE CONSTRAINT tfg_id IF NOT EXISTS FOR (n:TfgObject) REQUIRE n.id IS UNIQUE",
@@ -80,6 +81,26 @@ def cargar(tx, doc):
     return sin_extremo, rels, nodos
 
 
+def cargar_documento(doc, uri="bolt://localhost:7687", user="neo4j", password="tfg-neo4j"):
+    """Valida y carga un documento de capa. Devuelve un resumen con lo cargado y lo borrado por obsoleto."""
+    from neo4j import GraphDatabase  # solo hace falta para cargar de verdad
+    validar(doc)
+    t0 = time.time()
+    with GraphDatabase.driver(uri, auth=(user, password)) as driver:
+        with driver.session() as s:
+            for q in ESQUEMA:
+                s.run(q).consume()
+            sin_extremo, rels, nodos = s.execute_write(cargar, doc)
+            total = s.run("MATCH (n:TfgObject {escenario: $e}) UNWIND labels(n) AS l WITH l, count(*) AS c "
+                          "WHERE l <> 'TfgObject' RETURN l, c ORDER BY l", e=doc["escenario"]).values()
+            tr = s.run("MATCH (:TfgObject)-[r]->() WHERE r.escenario = $e RETURN type(r) AS t, count(*) AS c ORDER BY t",
+                       e=doc["escenario"]).values()
+    return {"escenario": doc["escenario"], "capa": doc["capa"], "nodos": len(doc["nodos"]),
+            "relaciones": len(doc["relaciones"]), "sin_extremo": sin_extremo, "obsoletos_nodos": nodos,
+            "obsoletos_relaciones": rels, "segundos": round(time.time() - t0, 1),
+            "grafo_nodos": dict(map(tuple, total)), "grafo_relaciones": dict(map(tuple, tr))}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("inventario", type=Path, help="JSON de graph.inventory.extraer o de graph.seed.construir")
@@ -91,24 +112,15 @@ def main():
 
     doc = json.loads(args.inventario.read_text(encoding="utf-8"))
     validar(doc)
-    print(f"{args.inventario.name} ({doc['escenario']}, capa {doc['capa']}): {len(doc['nodos'])} nodos y {len(doc['relaciones'])} relaciones")
+    print(f"{args.inventario.name} ({doc['escenario']}, capa {doc['capa']}): {len(doc['nodos'])} nodos "
+          f"y {len(doc['relaciones'])} relaciones")
     if args.dry_run:
         return
-
-    from neo4j import GraphDatabase  # solo hace falta para cargar de verdad
-    t0 = time.time()
-    with GraphDatabase.driver(args.uri, auth=(args.user, args.password)) as driver:
-        with driver.session() as s:
-            for q in ESQUEMA:
-                s.run(q).consume()
-            sin_extremo, rels, nodos = s.execute_write(cargar, doc)
-            total = s.run("MATCH (n:TfgObject {escenario: $e}) UNWIND labels(n) AS l WITH l, count(*) AS c "
-                          "WHERE l <> 'TfgObject' RETURN l, c ORDER BY l", e=doc["escenario"]).values()
-            tr = s.run("MATCH (:TfgObject)-[r]->() WHERE r.escenario = $e RETURN type(r) AS t, count(*) AS c ORDER BY t",
-                       e=doc["escenario"]).values()
-    print(f"Cargado en {time.time() - t0:.1f} s. Obsoletos borrados: {nodos} nodos y {rels} relaciones.")
-    print(f"  relaciones sin alguno de sus extremos: {len(sin_extremo)} {sin_extremo[:5]}")
-    print("  en el grafo:", dict(map(tuple, total)), dict(map(tuple, tr)))
+    r = cargar_documento(doc, args.uri, args.user, args.password)
+    print(f"Cargado en {r['segundos']} s. Obsoletos borrados: {r['obsoletos_nodos']} nodos y "
+          f"{r['obsoletos_relaciones']} relaciones.")
+    print(f"  relaciones sin alguno de sus extremos: {len(r['sin_extremo'])} {r['sin_extremo'][:5]}")
+    print("  en el grafo:", r["grafo_nodos"], r["grafo_relaciones"])
 
 
 if __name__ == "__main__":

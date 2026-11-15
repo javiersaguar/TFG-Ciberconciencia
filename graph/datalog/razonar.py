@@ -22,6 +22,8 @@ import collections
 import csv
 import hashlib
 import json
+import math
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -38,9 +40,15 @@ CRITERIOS = ("evidencia", "corta")
 
 # ------------------------------------------------------------------ Soufflé
 def ejecutar(hechos, salida, reglas=REGLAS, tope_s=300):
-    """Lanza Soufflé en su contenedor. `hechos` y `salida` son carpetas del anfitrion."""
+    """Lanza Soufflé: el binario local si existe (contenedor de orquestacion) o, si no, su contenedor."""
     hechos, salida, reglas = Path(hechos).resolve(), Path(salida).resolve(), Path(reglas).resolve()
     salida.mkdir(parents=True, exist_ok=True)
+    if shutil.which("souffle"):
+        r = subprocess.run(["souffle", "-F", str(hechos), "-D", str(salida), str(reglas)],
+                           capture_output=True, text=True, timeout=tope_s)
+        if r.returncode != 0 or "Error" in r.stderr:
+            raise RuntimeError(f"Soufflé falló ({r.returncode}): {r.stderr.strip()[:2000]}")
+        return r.stderr.strip()
     cmd = ["docker", "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
            "-v", f"{reglas.parent}:/rules:ro", "-v", f"{hechos}:/facts:ro", "-v", f"{salida}:/out",
            IMAGEN, "-F", "/facts", "-D", "/out", f"/rules/{reglas.name}"]
@@ -125,6 +133,34 @@ def prueba(estado, mejor, apps):
     return orden
 
 
+def coste_gds(app, epss):
+    """Peso de un paso para los caminos ponderados de GDS (F5.2). Es una heuristica declarada:
+    0 si esta confirmado o es trivial (ya ocurrio o no es un paso); -ln(EPSS) si explota una vulnerabilidad
+    (EPSS es la probabilidad publicada de explotacion); 1 para el resto de pasos posibles."""
+    if app["basis"] == "trivial" or app["confirmed"]:
+        return 0.0
+    if app["basis"] == "sintetico":
+        p = epss.get(app["id"].rsplit("|", 1)[1])
+        if p:
+            return round(-math.log(p), 4)
+    return 1.0
+
+
+def cortes(apps, objetivos):
+    """Para cada estado, los activos que dejan de ser alcanzables si el adversario no puede lograrlo.
+
+    Es el analisis exacto de cuellos de botella en un grafo Y/O: se quitan las reglas que concluyen el
+    estado y se vuelve a comprobar que objetivos siguen teniendo prueba.
+    """
+    demostrables = set(mejores(apps, "corta"))
+    vivos = {a: e for a, e in objetivos.items() if e in demostrables}
+    out = {}
+    for estado in sorted(demostrables - {INICIO}):
+        resto = set(mejores({i: a for i, a in apps.items() if a["conclusion"] != estado}, "corta"))
+        out[estado] = sorted(a for a, e in vivos.items() if e not in resto)
+    return out
+
+
 # ------------------------------------------------------------------ capa derivada
 def _equipo(estado):
     return estado.split(":")[1] if estado.startswith("exec:") else None
@@ -159,6 +195,32 @@ def construir(escenario, rel, mapa, hash_reglas, version="v1"):
     def rel_(tipo, a, b, clave="", **props):
         id_ = f"{a}|{tipo}|{b}" + (f"|{clave}" if clave else "")
         rels[id_] = {"id": id_, "tipo": tipo, "origen": a, "destino": b, "props": {"id": id_, **base, **props}}
+
+    # --- el grafo de derivacion: estados y aplicaciones de regla (lo analiza GDS en F5.2)
+    objetivos = {a: f"exec:{h}:{p}" for a, (h, _, p) in activos.items()}
+    corte = cortes(apps, objetivos)
+    epss = mapa.get("vulnerabilidades", {})
+    eid = lambda e: f"{escenario}/state/{e}"
+    for e in sorted({INICIO} | set(corte)):
+        partes = e.split(":")
+        nodos[eid(e)] = {"id": eid(e), "labels": ["TfgObject", "AttackState"], "props": {
+            "id": eid(e), **base, "state": e, "kind": partes[0],
+            "host": partes[1] if partes[0] == "exec" else "", "privilege": partes[2] if partes[0] == "exec" else "",
+            "user": partes[1] if partes[0] == "creds" else "",
+            "goal_of": sorted(a for a, o in objetivos.items() if o == e),
+            "cuts": corte.get(e, []), "cuts_assets": len(corte.get(e, [])), "rules_version": version}}
+        if partes[0] == "exec" and partes[1] in mapa["equipos"]:
+            rel_("ON_HOST", eid(e), mapa["equipos"][partes[1]])
+    for a in apps.values():
+        aid = f"{escenario}/app/{a['id']}"
+        c = coste_gds(a, epss)
+        nodos[aid] = {"id": aid, "labels": ["TfgObject", "RuleApp"], "props": {
+            "id": aid, **base, "app": a["id"], "rule": a["rule"], "detail": a["detail"], "basis": a["basis"],
+            "confirmed": bool(a["confirmed"]), "confirmed_by": [f"{x['kind']}:{x['ref']}" for x in a["confirmed"]],
+            "cost": c, "rules_version": version}}
+        for p in a["pre"]:
+            rel_("ENABLES", eid(p), aid, cost=0.0)
+        rel_("CONCLUDES", aid, eid(a["conclusion"]), cost=c)
 
     for activo in sorted(activos):
         equipo, criticidad, priv = activos[activo]
@@ -238,7 +300,7 @@ def main():
     reales = [a for a in apps.values() if a["basis"] != "trivial"]
     print(f"{args.escenario}: {len(reales)} aplicaciones de regla, {sum(bool(a['confirmed']) for a in reales)} confirmadas; "
           f"estados: {dict(collections.Counter(a['conclusion'].split(':')[0] for a in reales))}")
-    print(f"reglas {args.reglas} ({hash_reglas[:12]}) · {destino}: {len(nodos)} rutas")
+    print(f"reglas {args.reglas} ({hash_reglas[:12]}) · {destino}: {sum('AttackPath' in n['labels'] for n in nodos)} rutas")
     print(f"campañas del Pilar A explicadas por alguna regla: {sum(c['explicada'] for c in camp)} de {len(camp)}")
     for c in camp:
         if not c["explicada"]:

@@ -64,6 +64,21 @@ Las escribe `graph/datalog/razonar.py` con la salida de Soufflé. Todo lleva `or
 | `TRAVERSES` | `AttackPath → Host` | `order` |
 | `CONFIRMED_BY` | `AttackPath → Campaign` | — |
 
+| `:AttackState` | `<esc>/state/<estado>` | `state`, `kind` (`adversario`, `exec`, `creds`, `dominio`), `host`, `privilege`, `user`, `goal_of[]`, `cuts[]`, `cuts_assets`, `gds_betweenness` |
+| `:RuleApp` | `<esc>/app/<id>` | `app`, `rule`, `detail`, `basis`, `confirmed`, `confirmed_by[]`, `cost` |
+
+| Relación | Entre | Propiedades |
+|---|---|---|
+| `ENABLES` | `AttackState → RuleApp` | `cost` (0) |
+| `CONCLUDES` | `RuleApp → AttackState` | `cost` (el del paso) |
+| `ON_HOST` | `AttackState → Host` | — |
+
+`:AttackState` y `:RuleApp` son el **grafo de derivación** completo (todas las formas de llegar a cada
+estado, no solo la ruta elegida). Una regla necesita **todas** sus precondiciones (`ENABLES`), y un
+estado se logra con **cualquiera** de las reglas que lo concluyen (`CONCLUDES`). `cuts_assets` es el
+análisis exacto de cuellos de botella; `gds_betweenness` y los `gds_pagerank` y `gds_betweenness` de
+los `:Host` los escribe `graph/analytics/gds.py` (F5.2).
+
 Una ruta es una **prueba**: el conjunto de aplicaciones de regla que lleva del estado `adversario` al
 objetivo, con todas las precondiciones demostradas. `steps_json` guarda la traza completa (regla,
 detalle, precondiciones, en qué se apoya y qué evidencia lo confirma), y `rules_sha256` la versión

@@ -58,6 +58,18 @@ class Pruebas(unittest.TestCase):
         self.assertNotIn("z", mejor)
         self.assertEqual(mejor["a"][1], "p1")
 
+    def test_cortes_un_estado_es_cuello_de_botella_solo_si_no_hay_otra_prueba(self):
+        corte = razonar.cortes(self.apps, {"activo": "g", "otro": "b"})
+        self.assertEqual(corte["a"], ["otro"])      # g tiene la via directa; b solo se alcanza por a
+        self.assertEqual(corte["g"], ["activo"])
+        self.assertEqual(corte["b"], ["otro"])
+
+    def test_coste_gds(self):
+        epss = {"CVE-1": 0.5}
+        self.assertEqual(razonar.coste_gds(app("R7|a|b|CVE-1", "s", [], base="sintetico"), epss), round(-__import__("math").log(0.5), 4))
+        self.assertEqual(razonar.coste_gds(app("R5|x", "s", [], confirmado=True), epss), 0.0)
+        self.assertEqual(razonar.coste_gds(app("R5|x", "s", []), epss), 1.0)
+
     def test_el_paso_trivial_no_cuenta(self):
         self.assertEqual(razonar.coste(app("R0|x", "s", [], base="trivial"), "corta"), (0, 0))
 

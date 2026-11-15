@@ -438,6 +438,31 @@ services:
       - ../graph/datalog:/rules:ro
       - ../data/graph/datalog:/work
 
+  # Orquestador del ciclo del grafo razonado (F5.5): http://localhost:3000
+  # Solo ve el código que necesita (graph, cti, orchestration), en solo lectura, y la carpeta de datos
+  # del grafo. No se le montan los .env ni el socket de Docker: Soufflé va dentro de la imagen.
+  dagster:
+    build:
+      context: ./dagster
+    image: tfg/dagster:1.13.30
+    container_name: dagster
+    profiles: ["orchestration"]
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - CH_HOST=clickhouse
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ../graph:/app/graph:ro
+      - ../cti:/app/cti:ro
+      - ../orchestration:/app/orchestration:ro
+      - ../data/graph:/app/data/graph
+      - dagster_home:/dagster_home
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
 volumes:
   redpanda_data:
   flink_data:
@@ -447,6 +472,7 @@ volumes:
   mlflow_data:
   neo4j_data:
   neo4j_logs:
+  dagster_home:
   neo4j_plugins:
   opencti_redis:
   opencti_es:

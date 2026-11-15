@@ -45,6 +45,7 @@ CONSULTAS = {
 MAPA = {
     "equipos": f"MATCH {H} RETURN h.name, h.id",
     "activos": f"MATCH {H}-[:HOSTS]->(a:Asset) RETURN a.name, a.id",
+    "vulnerabilidades": f"MATCH {H}-[:HAS_VULN]->(v:Vulnerability) RETURN DISTINCT v.cve, v.epss",
 }
 
 
