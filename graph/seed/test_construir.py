@@ -18,7 +18,7 @@ DECL = {
     "asignaciones": [{"cve": "CVE-1", "equipo": "WS1", "servicio": "tcp/445", "motivo": "m"},
                      {"cve": "CVE-1", "equipo": "WS2", "servicio": "tcp/445", "motivo": "m"},
                      {"cve": "CVE-2", "equipo": "WS2", "servicio": None, "motivo": "m"}],
-    "activos": [{"clave": "dominio", "nombre": "Dominio", "criticidad": 10, "equipo": "DC", "motivo": "m"}],
+    "activos": [{"clave": "dominio", "nombre": "Dominio", "criticidad": 10, "privilegio": "admin", "equipo": "DC", "motivo": "m"}],
     "adversario": {"nombre": "Atacante", "equipos": ["192.168.0.4", "192.168.0.5"], "motivo": "m"},
 }
 

@@ -1245,29 +1245,54 @@ informes de amenazas, mapeo a ATT&CK). Merece tratamiento de primera.**
   sin red y sin privilegios. No hay `sudo` en WSL y así queda reproducible. Ocupa 583 MB porque
   incluye el compilador de C++.
 - [ ] Estudiar el modelo MulVAL: hechos + reglas de interacción → estados alcanzables.
-- [~] **Reimplementar el subconjunto de reglas en Soufflé**, adaptado al modelo propio
-  *(15-11-2026: primera versión, sobre el día 1)*: `graph/datalog/attack.dl`, con 12 reglas.
+- [x] **Reimplementar el subconjunto de reglas en Soufflé**, adaptado al modelo propio
+  *(15-11-2026)*: `graph/datalog/attack.dl`, con 12 reglas.
   - Reglas: acceso inicial por ejecución del usuario, escalada local (por vulnerabilidad o porque la
     sesión es de un administrador), robo de credenciales, movimiento lateral con credenciales y por
     RDP, explotación remota, control del dominio (tres vías) y su propagación.
   - Alcanzabilidad: conexión observada o misma subred interna (inferida y marcada).
-  - **Refuerzo por evidencia:** `confirmed` enlaza cada aplicación de regla con la campaña que la
-    confirma (P3 con T1548 → escalada; P1 → robo de credenciales; P2 → movimiento lateral).
-  - **Primer resultado (día 1):** el razonador deriva la cadena real y **las campañas confirman
-    todos sus pasos**: SCRANTON → escalada (P3) → credenciales de pbeesly (P1) → NASHUA por 5985, 445 y
-    135 (P2) → credenciales (P1). Además deriva lo que no ocurrió: el dominio por Zerologon desde
-    cualquier equipo comprometido, y NASHUA por SMBGhost.
-  - **Pendiente:**
-    - la regla de acceso inicial también se cumple en NASHUA, que alcanza al C2 *porque* ya estaba
-      comprometido: hay que usar el orden temporal;
-    - validar con el día 2 sin tocar las reglas;
-    - tests de las reglas con hechos mínimos.
-- [~] Exportador Neo4j → `.facts` *(15-11-2026: `graph/datalog/exportar.py`, 12 relaciones, con
-  la capa de procedencia de cada una)* e importador de rutas derivadas → `(:AttackPath)` *(pendiente)*.
-- [~] **Trazabilidad de la derivación** *(15-11-2026)*: las relaciones `app` (aplicación de regla,
-  conclusión y detalle) y `pre` (sus precondiciones) son el grafo de ataque Y/O. Falta extraer de ahí
-  las rutas.
-- [ ] Contraste con el plan de emulación: ¿la ruta derivada coincide con la de APT29?
+  - **Refuerzo por evidencia:** `confirmed` enlaza cada aplicación de regla con lo que la confirma:
+    una campaña del Pilar A (P3 con T1548 → escalada; P1 → robo de credenciales; P2 → movimiento
+    lateral) o el primer contacto con el adversario.
+  - **Acceso inicial, corregido con el orden temporal:** la conexión con el servidor del adversario es
+    la consecuencia del compromiso, no su condición. La regla queda como hipótesis (puesto con sesión
+    interactiva y salida al exterior) y se confirma solo en el equipo que contacta primero (SCRANTON
+    el día 1, 19 min antes que NASHUA).
+  - **Tests** (`graph/datalog/test_reglas.py`, 17): 12 ejecutan las reglas con Soufflé sobre hechos
+    mínimos y 5 comprueban la búsqueda de pruebas. Se saltan si falta la imagen.
+- [x] Exportador Neo4j → `.facts` (`graph/datalog/exportar.py`, 13 relaciones, con la capa de
+  procedencia de cada una) e importador de rutas → `(:AttackPath)` (`graph/datalog/razonar.py` y la
+  capa `derivada` de `graph/cargar.py`) *(15-11-2026)*.
+- [x] **Trazabilidad de la derivación** *(15-11-2026)*: las relaciones `app` y `pre` son el grafo de
+  ataque Y/O. Una ruta es una **prueba** (todas las precondiciones demostradas), elegida con la
+  generalización de Dijkstra a grafos Y/O. Por activo se guardan la más respaldada por evidencia y la
+  más corta. Cada ruta conserva la traza completa y el SHA-256 de las reglas que la derivaron.
+- [x] **Diseño con el día 1, validación con el día 2** *(15-11-2026; reglas congeladas,
+  `979d765d21a0`)*:
+
+  | Escenario | Aplicaciones de regla | Confirmadas | Campañas explicadas | Rutas |
+  |---|---:|---:|---:|---:|
+  | Día 1 (diseño) | 32 | 7 | **4 de 4** | 5 |
+  | Día 2 (validación) | 16 | 3 | **3 de 6** | 4 |
+
+  - **Día 1:** la ruta más respaldada hacia NASHUA es la cadena real, 4 pasos y los 4 confirmados
+    (acceso a SCRANTON → escalada → credenciales de pbeesly → NASHUA). La ruta al dominio tiene 3 pasos
+    y usa Zerologon: posible, no observada, apoyada en un dato sintético.
+  - **Día 2:** las reglas explican el acceso a UTICA, la escalada (P3) y los dos robos de credenciales
+    (P1). **No explican los dos movimientos laterales (UTICA → NEWYORK y UTICA → SCRANTON) ni el robo
+    de credenciales en NEWYORK.** A esos equipos solo llegan por Zerologon.
+  - **Causa:** en el día 2 el adversario usa las cuentas de mscott y kmalone, y en los eventos esas
+    cuentas solo tienen sesiones de red, que son el efecto del salto y no su causa. La regla de robo
+    de credenciales exige una sesión interactiva en un equipo ya comprometido, y no la hay.
+  - **Mejoras candidatas (v2 de las reglas, a medir aparte como con los patrones):**
+    - inicio de sesión de red como U **desde un equipo comprometido** ⇒ el adversario tiene las
+      credenciales de U (kmalone entra en NEWYORK desde UTICA);
+    - administrador en el controlador de dominio ⇒ credenciales de todo el dominio (DCSync,
+      `T1003.006`, que está entre las técnicas de la campaña de NEWYORK).
+    Solo hay dos escenarios, así que una v2 no tendría un tercero donde validarse: se informaría con
+    esa cautela.
+- [~] Contraste con el plan de emulación: ¿la ruta derivada coincide con la de APT29? *(15-11-2026: el día 1 coincide
+  con las campañas; falta contrastar paso a paso con el plan, y el día 2 tras la v2.)*
 
 ### F5.2 — Analítica de grafos (GDS)
 

@@ -30,8 +30,18 @@ CONSULTAS = {
                                  "RETURN h.name, v.cve, r.proto, r.port, v.effect"),
     "vuln_local": ("sintetica", f"MATCH {H}-[:HAS_VULN]->(v:Vulnerability) WHERE v.access = 'local' "
                                 "RETURN h.name, v.cve, v.effect"),
-    "asset": ("sintetica", f"MATCH {H}-[:HOSTS]->(a:Asset) RETURN a.name, h.name, a.criticality"),
+    "asset": ("sintetica", f"MATCH {H}-[:HOSTS]->(a:Asset) RETURN a.name, h.name, a.criticality, a.required_privilege"),
     "attacker_at": ("sintetica", f"MATCH (:Adversary)-[:LOCATED_AT]->{H} RETURN h.name"),
+    # Los numeros de Soufflé son de 32 bits: el tiempo va en segundos desde el primer evento del escenario.
+    "contact": ("inventario+sintetica",
+                f"MATCH {H}-[c:CONNECTS_TO]->(x:Host)<-[:LOCATED_AT]-(:Adversary) "
+                "WITH h, x, min(c.first_seen) AS t CALL () { MATCH (n:TfgObject {escenario: $e})-[r:CONNECTS_TO]->() "
+                "RETURN min(r.first_seen) AS t0 } RETURN h.name, x.name, toInteger((t - t0) / 1000)"),
+}
+# Identificadores del grafo que necesita quien lea la salida del razonador.
+MAPA = {
+    "equipos": f"MATCH {H} RETURN h.name, h.id",
+    "activos": f"MATCH {H}-[:HOSTS]->(a:Asset) RETURN a.name, a.id",
 }
 
 
@@ -49,8 +59,9 @@ def exportar(session, escenario, destino):
         filas = sorted({tuple(celda(v) for v in fila) for fila in session.run(q, e=escenario).values()})
         (destino / f"{rel}.facts").write_text("".join("\t".join(f) + "\n" for f in filas), encoding="utf-8")
         resumen[rel] = {"capa": capa, "hechos": len(filas)}
-    (destino / "PROCEDENCIA.json").write_text(json.dumps({"escenario": escenario, "relaciones": resumen}, indent=1),
-                                              encoding="utf-8")
+    mapa = {k: dict(map(tuple, session.run(q, e=escenario).values())) for k, q in MAPA.items()}
+    (destino / "PROCEDENCIA.json").write_text(json.dumps({"escenario": escenario, "relaciones": resumen, **mapa},
+                                                         indent=1, ensure_ascii=False), encoding="utf-8")
     return resumen
 
 

@@ -5,8 +5,9 @@
 //   1. Los hechos salen de lo OBSERVADO en la telemetria (conexiones, sesiones, privilegios), no de
 //      un escaner ni de la configuracion de los cortafuegos. Lo sintetico (vulnerabilidades, activos,
 //      posicion del adversario) viene marcado en PROCEDENCIA.json.
-//   2. Cada aplicacion de una regla se puede CONFIRMAR con una campana del Pilar A: `confirmed` dice
-//      que pasos de la ruta se han visto de verdad y cuales son solo posibles.
+//   2. Cada aplicacion de una regla se puede CONFIRMAR con evidencia observada (una campana del
+//      Pilar A o el primer contacto con el adversario): `confirmed` dice que pasos de la ruta se han
+//      visto de verdad y cuales son solo posibles.
 //
 // Salida: el grafo de ataque como aplicaciones de regla (`app`) con sus precondiciones (`pre`), que
 // es la traza de la derivacion: que regla y que hechos justifican cada paso.
@@ -34,10 +35,13 @@
 .input vuln_remote
 .decl vuln_local(h: symbol, cve: symbol, effect: symbol)
 .input vuln_local
-.decl asset(a: symbol, h: symbol, crit: number)
+.decl asset(a: symbol, h: symbol, crit: number, priv: symbol)   // priv: privilegio que hace falta para alcanzarlo
 .input asset
 .decl attacker_at(h: symbol)
 .input attacker_at
+// Primer contacto de un equipo con uno del adversario, en segundos desde el inicio del escenario.
+.decl contact(h: symbol, x: symbol, first_s: number)
+.input contact
 
 // ---------------------------------------------------------------- conocimiento fijo
 // Inicios de sesion que dejan credenciales reutilizables en el equipo: interactivo, RDP y en cache.
@@ -65,10 +69,14 @@ hacl(A, B, Pr, Po, "misma_subred") :- service(B, Pr, Po), host(A, _, "interna", 
 exec(H, "user") :- exec(H, "admin").
 
 // R1. Acceso inicial por ejecucion del usuario (T1204): un equipo interno con una sesion interactiva
-//     que alcanza la infraestructura del adversario.
-.decl r_initial(h: symbol, x: symbol, u: symbol)
-r_initial(H, X, U) :- attacker_at(X), hacl(H, X, _, _, _), host(H, _, "interna", _), logon(U, H, T), interactive(T).
-exec(H, "user") :- r_initial(H, _, _).
+//     y salida al exterior. Es una HIPOTESIS: cualquier puesto asi puede recibir un senuelo. Que haya
+//     ocurrido se confirma aparte (ver `confirmed`), porque la conexion con el adversario es la
+//     consecuencia del compromiso y no su condicion.
+.decl reaches_outside(h: symbol)
+reaches_outside(H) :- conn(H, X, _, _), host(X, _, K, _), K != "interna".
+.decl r_initial(h: symbol, u: symbol)
+r_initial(H, U) :- host(H, _, "interna", _), logon(U, H, T), interactive(T), reaches_outside(H).
+exec(H, "user") :- r_initial(H, _).
 
 // R2. Escalada local por una vulnerabilidad.
 .decl r_local_vuln(h: symbol, cve: symbol)
@@ -120,64 +128,73 @@ r_domain_spread(H) :- domain_admin(), host(H, R, "interna", _), (R = "workstatio
 exec(H, "admin") :- r_domain_spread(H).
 
 // ---------------------------------------------------------------- objetivos
-.decl asset_reached(a: symbol, h: symbol, crit: number, p: symbol)
-asset_reached(A, H, Cr, P) :- asset(A, H, Cr), exec(H, P).
+.decl asset_reached(a: symbol, h: symbol, crit: number)
+asset_reached(A, H, Cr) :- asset(A, H, Cr, P), exec(H, P).
 
 // ---------------------------------------------------------------- traza de la derivacion
 // app: una aplicacion de regla y el estado que concluye.  pre: sus precondiciones (todas necesarias).
-.decl app(id: symbol, rule: symbol, conclusion: symbol, detail: symbol)
+// basis: en que se apoya el paso. `observado` (solo hechos de la telemetria), `inferido` (supone que
+// dentro de una subred no hay filtrado) o `sintetico` (usa una vulnerabilidad declarada). `trivial`
+// para R0, que no es un paso del adversario.
+.decl app(id: symbol, rule: symbol, conclusion: symbol, detail: symbol, basis: symbol)
 .decl pre(id: symbol, state: symbol)
+.decl basis_of(hacl_basis: symbol, basis: symbol)
+basis_of("conexion_observada", "observado"). basis_of("misma_subred", "inferido").
 
-app(cat("R0|", H), "admin_implica_usuario", cat("exec:", H, ":user"), "") :- exec(H, "admin").
+app(cat("R0|", H), "admin_implica_usuario", cat("exec:", H, ":user"), "", "trivial") :- exec(H, "admin").
 pre(cat("R0|", H), cat("exec:", H, ":admin")) :- exec(H, "admin").
 
-app(cat("R1|", H, "|", X, "|", U), "acceso_inicial_usuario", cat("exec:", H, ":user"),
-    cat("sesion interactiva de ", U, "; el equipo alcanza ", X)) :- r_initial(H, X, U).
-pre(cat("R1|", H, "|", X, "|", U), "adversario") :- r_initial(H, X, U).
+app(cat("R1|", H, "|", U), "acceso_inicial_usuario", cat("exec:", H, ":user"),
+    cat("sesion interactiva de ", U, " y salida al exterior"), "observado") :- r_initial(H, U).
+pre(cat("R1|", H, "|", U), "adversario") :- r_initial(H, U).
 
-app(cat("R2|", H, "|", C), "escalada_vulnerabilidad", cat("exec:", H, ":admin"), C) :- r_local_vuln(H, C).
+app(cat("R2|", H, "|", C), "escalada_vulnerabilidad", cat("exec:", H, ":admin"), C, "sintetico") :- r_local_vuln(H, C).
 pre(cat("R2|", H, "|", C), cat("exec:", H, ":user")) :- r_local_vuln(H, C).
 
 app(cat("R3|", H, "|", U), "escalada_sesion_admin", cat("exec:", H, ":admin"),
-    cat(U, " es administrador del equipo")) :- r_admin_session(H, U).
+    cat(U, " es administrador del equipo"), "observado") :- r_admin_session(H, U).
 pre(cat("R3|", H, "|", U), cat("exec:", H, ":user")) :- r_admin_session(H, U).
 
-app(cat("R4|", H, "|", U), "robo_credenciales", cat("creds:", U), cat("sesion de ", U, " en ", H)) :- r_cred_dump(H, U).
+app(cat("R4|", H, "|", U), "robo_credenciales", cat("creds:", U), cat("sesion de ", U, " en ", H), "observado") :- r_cred_dump(H, U).
 pre(cat("R4|", H, "|", U), cat("exec:", H, ":admin")) :- r_cred_dump(H, U).
 
 app(cat("R5|", A, "|", U, "|", B, "|", to_string(Po)), "movimiento_lateral_credenciales", cat("exec:", B, ":admin"),
-    cat(U, " es administrador de ", B, "; puerto ", to_string(Po), " (", Ba, ")")) :- r_lateral(A, U, B, Po, Ba).
+    cat(U, " es administrador de ", B, "; puerto ", to_string(Po), " (", Ba, ")"), Bs) :- r_lateral(A, U, B, Po, Ba), basis_of(Ba, Bs).
 pre(cat("R5|", A, "|", U, "|", B, "|", to_string(Po)), cat("exec:", A, ":user")) :- r_lateral(A, U, B, Po, _).
 pre(cat("R5|", A, "|", U, "|", B, "|", to_string(Po)), cat("creds:", U)) :- r_lateral(A, U, B, Po, _).
 
 app(cat("R6|", A, "|", U, "|", B), "movimiento_lateral_rdp", cat("exec:", B, ":user"),
-    cat(U, " ya entro por RDP en ", B, " (", Ba, ")")) :- r_rdp(A, U, B, Ba).
+    cat(U, " ya entro por RDP en ", B, " (", Ba, ")"), Bs) :- r_rdp(A, U, B, Ba), basis_of(Ba, Bs).
 pre(cat("R6|", A, "|", U, "|", B), cat("exec:", A, ":user")) :- r_rdp(A, U, B, _).
 pre(cat("R6|", A, "|", U, "|", B), cat("creds:", U)) :- r_rdp(A, U, B, _).
 
 app(cat("R7|", A, "|", B, "|", C), "explotacion_remota", cat("exec:", B, ":admin"),
-    cat(C, " en el puerto ", to_string(Po), " (", Ba, ")")) :- r_exploit(A, B, C, Po, Ba).
+    cat(C, " en el puerto ", to_string(Po), " (", Ba, ")"), "sintetico") :- r_exploit(A, B, C, Po, Ba).
 pre(cat("R7|", A, "|", B, "|", C), cat("exec:", A, ":user")) :- r_exploit(A, B, C, _, _).
 
 app(cat("R8|", A, "|", D, "|", C), "dominio_por_vulnerabilidad", "dominio",
-    cat(C, " en ", D, ", puerto ", to_string(Po), " (", Ba, ")")) :- r_domain_vuln(A, D, C, Po, Ba).
+    cat(C, " en ", D, ", puerto ", to_string(Po), " (", Ba, ")"), "sintetico") :- r_domain_vuln(A, D, C, Po, Ba).
 pre(cat("R8|", A, "|", D, "|", C), cat("exec:", A, ":user")) :- r_domain_vuln(A, D, C, _, _).
 
-app(cat("R9|", U), "dominio_por_credenciales", "dominio", cat(U, " es la cuenta de administrador integrada")) :- r_domain_creds(U).
+app(cat("R9|", U), "dominio_por_credenciales", "dominio", cat(U, " es la cuenta de administrador integrada"), "observado") :- r_domain_creds(U).
 pre(cat("R9|", U), cat("creds:", U)) :- r_domain_creds(U).
 
-app(cat("R10|", D), "dominio_por_controlador", "dominio", cat("administrador en el controlador ", D)) :- r_domain_dc(D).
+app(cat("R10|", D), "dominio_por_controlador", "dominio", cat("administrador en el controlador ", D), "observado") :- r_domain_dc(D).
 pre(cat("R10|", D), cat("exec:", D, ":admin")) :- r_domain_dc(D).
 
-app(cat("R11|", H), "dominio_administra_equipos", cat("exec:", H, ":admin"), "") :- r_domain_spread(H).
+app(cat("R11|", H), "dominio_administra_equipos", cat("exec:", H, ":admin"), "", "observado") :- r_domain_spread(H).
 pre(cat("R11|", H), "dominio") :- r_domain_spread(H).
 
 // ---------------------------------------------------------------- refuerzo por evidencia observada
-// Una campana del Pilar A confirma la aplicacion de regla que describe.
-.decl confirmed(id: symbol, campaign: symbol)
-confirmed(cat("R3|", H, "|", U), C) :- r_admin_session(H, U), campaign(C, "P3", H, _), campaign_tech(C, T), match("T1548.*", T).
-confirmed(cat("R4|", H, "|", U), C) :- r_cred_dump(H, U), campaign(C, "P1", H, _).
-confirmed(cat("R5|", A, "|", U, "|", B, "|", to_string(Po)), C) :- r_lateral(A, U, B, Po, "conexion_observada"),
+// kind = "campana": una campana del Pilar A confirma la aplicacion de regla que describe (ref = su id).
+// kind = "primer_contacto": el acceso inicial se confirma en el equipo que contacta ANTES que ningun
+//        otro con la infraestructura del adversario (ref = el equipo del adversario).
+.decl confirmed(id: symbol, kind: symbol, ref: symbol)
+confirmed(cat("R1|", H, "|", U), "primer_contacto", X) :- r_initial(H, U), contact(H, X, T), attacker_at(X),
+    T = min T2 : { contact(_, _, T2) }.
+confirmed(cat("R3|", H, "|", U), "campana", C) :- r_admin_session(H, U), campaign(C, "P3", H, _), campaign_tech(C, T), match("T1548.*", T).
+confirmed(cat("R4|", H, "|", U), "campana", C) :- r_cred_dump(H, U), campaign(C, "P1", H, _).
+confirmed(cat("R5|", A, "|", U, "|", B, "|", to_string(Po)), "campana", C) :- r_lateral(A, U, B, Po, "conexion_observada"),
     campaign(C, "P2", A, "origen"), campaign(C, "P2", B, "destino").
 
 // Equipos donde el Pilar A ha visto actividad del adversario, sea cual sea la regla.

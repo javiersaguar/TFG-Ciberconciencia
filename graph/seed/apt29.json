@@ -77,28 +77,32 @@
    "nombre": "Directorio activo del dominio",
    "criticidad": 10,
    "equipo": "NEWYORK",
-   "motivo": "Quien controla el controlador de dominio controla todas las cuentas."
+   "motivo": "Quien controla el controlador de dominio controla todas las cuentas.",
+   "privilegio": "admin"
   },
   {
    "clave": "documentos-scranton",
    "nombre": "Documentos de usuario en SCRANTON",
    "criticidad": 5,
    "equipo": "SCRANTON",
-   "motivo": "Puesto de usuario; el plan de emulación recoge y exfiltra ficheros de los puestos."
+   "motivo": "Puesto de usuario; el plan de emulación recoge y exfiltra ficheros de los puestos.",
+   "privilegio": "user"
   },
   {
    "clave": "documentos-nashua",
    "nombre": "Documentos de usuario en NASHUA",
    "criticidad": 5,
    "equipo": "NASHUA",
-   "motivo": "Puesto de usuario."
+   "motivo": "Puesto de usuario.",
+   "privilegio": "user"
   },
   {
    "clave": "documentos-utica",
    "nombre": "Documentos de usuario en UTICA",
    "criticidad": 5,
    "equipo": "UTICA",
-   "motivo": "Puesto de usuario."
+   "motivo": "Puesto de usuario.",
+   "privilegio": "user"
   }
  ],
  "adversario": {

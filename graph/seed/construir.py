@@ -65,7 +65,8 @@ def construir(escenario, decl, inventario):
     for a in decl["activos"]:
         aid = f"{escenario}/asset/{a['clave']}"
         nodos[aid] = {"id": aid, "labels": ["TfgObject", "Asset"], "props": {
-            "id": aid, **base, "name": a["nombre"], "criticality": a["criticidad"], "reason": a["motivo"]}}
+            "id": aid, **base, "name": a["nombre"], "criticality": a["criticidad"], "required_privilege": a["privilegio"],
+            "reason": a["motivo"]}}
         rel("HOSTS", equipo(a["equipo"], a["clave"]), aid)
 
     adv = decl["adversario"]

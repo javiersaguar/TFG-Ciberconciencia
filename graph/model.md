@@ -2,7 +2,7 @@
 
 Fecha: 15-11-2026. Parte del plan revisado de F5 (ROADMAP).
 
-El grafo vive en Neo4j y tiene tres capas, que se distinguen por la propiedad `origen` de cada nodo
+El grafo vive en Neo4j y tiene cuatro capas, que se distinguen por la propiedad `origen` de cada nodo
 y de cada relación:
 
 | Capa | `origen` | De dónde sale | Quién la carga |
@@ -10,6 +10,7 @@ y de cada relación:
 | Conocimiento | — (nodos `:StixObject`) | ATT&CK v19.2, ThreatFox y perfiles de ML-2 | `cti/stix_loader` (F4) |
 | Inventario observado | `observado` o `inferido` | Los eventos normalizados (`tfg.events`) y las campañas del Pilar A | `graph/inventory` |
 | Escenario sintético | `sintetico` | Lo que los datos no traen: activo crítico y vulnerabilidades | `graph/seed` |
+| Rutas derivadas | `derivado` | Lo que concluye el razonador Datalog a partir de las otras capas | `graph/datalog` |
 
 - **`observado`**: está tal cual en un evento (una conexión, una sesión).
 - **`inferido`**: sale de lo observado con una regla escrita aquí (la IP de un equipo, su subred, su papel).
@@ -49,7 +50,25 @@ Todos llevan la etiqueta común `:TfgObject` (restricción de unicidad sobre `id
 | `:User` | `<esc>/user/<sid>` | `name`, `domain`, `sid`, `rid`, `builtin_admin` | observado; `builtin_admin` inferido (RID 500) |
 | `:Campaign` | `campaign_id` del Pilar A | `pattern_id`, `title`, `first_seen`, `last_seen`, `confidence`, `severity`, `stages[]`, `techniques[]`, `evidence_count`, `version` | observado |
 
-Para el razonamiento (pasos siguientes de F5): `:AttackPath`.
+## Rutas derivadas
+
+Las escribe `graph/datalog/razonar.py` con la salida de Soufflé. Todo lleva `origen: derivado`.
+
+| Etiqueta | `id` | Propiedades |
+|---|---|---|
+| `:AttackPath` | `<esc>/path/<activo>/<criterio>` | `asset`, `goal`, `criticality`, `criteria[]`, `steps`, `confirmed_steps`, `hypothetical_steps`, `uses_synthetic`, `uses_inferred`, `rules[]`, `hosts[]`, `narrative`, `steps_json`, `rules_sha256` |
+
+| Relación | Entre | Propiedades |
+|---|---|---|
+| `REACHES` | `AttackPath → Asset` | — |
+| `TRAVERSES` | `AttackPath → Host` | `order` |
+| `CONFIRMED_BY` | `AttackPath → Campaign` | — |
+
+Una ruta es una **prueba**: el conjunto de aplicaciones de regla que lleva del estado `adversario` al
+objetivo, con todas las precondiciones demostradas. `steps_json` guarda la traza completa (regla,
+detalle, precondiciones, en qué se apoya y qué evidencia lo confirma), y `rules_sha256` la versión
+exacta de las reglas que la derivó. Por activo se guardan hasta dos rutas: la más respaldada por
+evidencia y la más corta.
 
 ## Capa sintética
 

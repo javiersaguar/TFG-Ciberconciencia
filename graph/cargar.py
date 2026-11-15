@@ -1,8 +1,9 @@
 """Carga en Neo4j una capa del grafo de un escenario (F5.1), de forma idempotente.
 
-Sirve para las dos capas propias (graph/model.md), segun el campo `capa` del JSON:
+Sirve para las tres capas propias (graph/model.md), segun el campo `capa` del JSON:
   inventario  el de graph.inventory.extraer; regenera lo que tiene `origen` observado o inferido;
-  sintetica   el de graph.seed.construir; regenera lo que tiene `origen` sintetico.
+  sintetica   el de graph.seed.construir; regenera lo que tiene `origen` sintetico;
+  derivada    el de graph.datalog.razonar (rutas de ataque); regenera lo que tiene `origen` derivado.
 
 Fusiona por `id` (los identificadores son deterministas) y despues borra lo obsoleto: lo que quedaba
 de una carga anterior de ESE escenario y de ESA capa y que ya no sale. No toca los nodos :StixObject
@@ -22,10 +23,11 @@ import json
 import time
 from pathlib import Path
 
-ETIQUETAS = {"TfgObject", "Host", "Zone", "Service", "User", "Campaign", "Vulnerability", "Asset", "Adversary"}
+ETIQUETAS = {"TfgObject", "Host", "Zone", "Service", "User", "Campaign", "Vulnerability", "Asset", "Adversary",
+             "AttackPath"}
 TIPOS = {"IN_ZONE", "RUNS", "CONNECTS_TO", "LOGGED_ON", "ADMIN_OF", "OBSERVED_ON", "EVIDENCES",
-         "HAS_VULN", "HOSTS", "LOCATED_AT"}
-CAPAS = {"inventario": ["observado", "inferido"], "sintetica": ["sintetico"]}
+         "HAS_VULN", "HOSTS", "LOCATED_AT", "REACHES", "TRAVERSES", "CONFIRMED_BY"}
+CAPAS = {"inventario": ["observado", "inferido"], "sintetica": ["sintetico"], "derivada": ["derivado"]}
 ESQUEMA = [
     "CREATE CONSTRAINT tfg_id IF NOT EXISTS FOR (n:TfgObject) REQUIRE n.id IS UNIQUE",
     "CREATE INDEX tfg_escenario IF NOT EXISTS FOR (n:TfgObject) ON (n.escenario)",
